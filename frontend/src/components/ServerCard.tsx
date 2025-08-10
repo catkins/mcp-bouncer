@@ -1,4 +1,4 @@
-import { PencilIcon, TrashIcon, ArrowPathIcon, WrenchScrewdriverIcon, CheckCircleIcon, XCircleIcon, NoSymbolIcon } from '@heroicons/react/24/outline'
+import { PencilIcon, TrashIcon, WrenchScrewdriverIcon, CheckCircleIcon, XCircleIcon, NoSymbolIcon } from '@heroicons/react/24/outline'
 import { MCPServerConfig } from '../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/settings/models'
 import { ClientStatus } from '../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/mcp/models'
 import { LoadingButton } from './LoadingButton'
@@ -13,11 +13,6 @@ interface ServerCardProps {
 }
 
 export function ServerCard({ server, clientStatus, onEdit, onRemove, onRefreshStatus, loading = false }: ServerCardProps) {
-  const handleRefreshStatus = () => {
-    if (onRefreshStatus) {
-      onRefreshStatus(server.name)
-    }
-  }
 
   return (
     <div className="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-shadow">

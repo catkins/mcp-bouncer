@@ -20,8 +20,11 @@ export function useTheme() {
 
   useEffect(() => {
     const root = window.document.documentElement
+    // Remove both light and dark classes first
     root.classList.remove('light', 'dark')
+    // Add the current theme class
     root.classList.add(theme)
+    // Save to localStorage
     localStorage.setItem('theme', theme)
   }, [theme])
 

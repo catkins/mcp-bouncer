@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Custom dark mode variant for Tailwind CSS v4 */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Custom utilities for Tailwind CSS v4 */
 .line-clamp-2 {
   display: -webkit-box;

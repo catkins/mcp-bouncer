@@ -23,7 +23,7 @@ export function Header({ isActive, toggleTheme, theme }: HeaderProps) {
             className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
             aria-label="Toggle theme"
           >
-            {theme === 'dark' ? (
+            {theme === 'light' ? (
               <SunIcon className="h-4 w-4" />
             ) : (
               <MoonIcon className="h-4 w-4" />
