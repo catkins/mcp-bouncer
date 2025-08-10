@@ -47,7 +47,7 @@ function StatusIndicator({ isActive }: StatusIndicatorProps) {
 function App() {
   const [servers, setServers] = useState<MCPServerConfig[]>([])
   const [settings, setSettings] = useState<Settings | null>(null)
-  const [listenAddr, setListenAddr] = useState<string>('')
+  const [mcpUrl, setMcpUrl] = useState<string>('')
   const [isActive, setIsActive] = useState<boolean | null>(null)
   const [copySuccess, setCopySuccess] = useState<boolean>(false)
   const [showAddServer, setShowAddServer] = useState<boolean>(false)
@@ -67,11 +67,17 @@ function App() {
     try {
       const currentSettings = await SettingsService.GetSettings()
       setSettings(currentSettings)
-      if (currentSettings) {
-        setListenAddr(currentSettings.listen_addr)
-      }
     } catch (error) {
       console.error('Failed to load settings:', error)
+    }
+  }
+
+  const loadMcpUrl = async () => {
+    try {
+      const url = await MCPService.ListenAddr()
+      setMcpUrl(url)
+    } catch (error) {
+      console.error('Failed to load MCP URL:', error)
     }
   }
 
@@ -87,10 +93,10 @@ function App() {
   }
 
   const copyToClipboard = async () => {
-    if (!listenAddr) return
+    if (!mcpUrl) return
     
     try {
-      await navigator.clipboard.writeText(listenAddr)
+      await navigator.clipboard.writeText(mcpUrl)
       setCopySuccess(true)
       setTimeout(() => setCopySuccess(false), 2000)
     } catch (error) {
@@ -103,6 +109,7 @@ function App() {
   useEffect(() => {
     const init = async () => {
       await loadSettings()
+      await loadMcpUrl()
       await loadServers()
       await loadActive()
     }
@@ -120,6 +127,7 @@ function App() {
     const unsubscribeSettings = Events.On("settings:updated", async (event: WailsEvent) => {
       console.log('Received settings:updated event:', event)
       await loadSettings()
+      await loadMcpUrl()
       await loadServers()
     })
 
@@ -148,15 +156,15 @@ function App() {
             className="flex-1 bg-gray-100 px-3 py-2 rounded-md text-sm font-mono text-gray-800 cursor-pointer hover:bg-gray-200 transition-colors select-all"
             title="Click to select all"
           >
-            <code>{listenAddr || 'Not available'}</code>
+            <code>{mcpUrl || 'Not available'}</code>
           </div>
           <button
             onClick={copyToClipboard}
-            disabled={!listenAddr}
+            disabled={!mcpUrl}
             className={`p-2 rounded-md text-sm font-medium transition-colors ${
               copySuccess 
                 ? 'bg-green-500 text-white' 
-                : listenAddr 
+                : mcpUrl 
                   ? 'bg-blue-500 text-white hover:bg-blue-600' 
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
