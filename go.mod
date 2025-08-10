@@ -1,4 +1,4 @@
-module changeme
+module github.com/catkins/mcp-bouncer-poc
 
 go 1.24.0
 
