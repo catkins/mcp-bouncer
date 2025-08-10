@@ -1,5 +1,3 @@
-import { ReactNode } from 'react'
-
 interface ToggleSwitchProps {
   checked: boolean
   onChange: (checked: boolean) => void

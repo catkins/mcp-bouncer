@@ -90,7 +90,7 @@ export function ServerList({
 
   return (
     <div className="mb-4">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-2">
         <h2 className="text-base font-semibold text-gray-900 dark:text-white">
           Servers
         </h2>

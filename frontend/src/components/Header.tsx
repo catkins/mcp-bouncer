@@ -1,4 +1,3 @@
-import { StatusIndicator } from './StatusIndicator'
 import { SunIcon, MoonIcon, Cog6ToothIcon, GlobeAltIcon, ClipboardDocumentIcon } from '@heroicons/react/24/outline'
 
 interface HeaderProps {
@@ -20,7 +19,7 @@ export function Header({ isActive, toggleTheme, theme, onOpenConfig, mcpUrl }: H
   return (
     <header className="fixed top-0 left-0 right-0 z-40 bg-gray-50/90 dark:bg-gray-800/60 backdrop-blur-md border-b border-gray-200 dark:border-gray-700/50">
       <div className="flex items-center justify-between px-4 py-2">
-        <div className="flex items-center gap-3 ml-20">
+        <div className="flex items-center gap-1 ml-20">
           <img src="/appicon.png" alt="App Icon" className="h-10 w-10 drop-shadow-md" />
           <h1 className="text-lg font-semibold text-gray-900 dark:text-white">MCP Bouncer</h1>
         </div>

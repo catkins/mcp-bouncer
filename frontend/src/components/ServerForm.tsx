@@ -30,6 +30,20 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
     }
   }, [server])
 
+  // Handle escape key to dismiss modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onCancel()
+      }
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [onCancel])
+
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {}
 
