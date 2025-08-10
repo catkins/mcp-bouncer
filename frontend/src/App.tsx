@@ -1,4 +1,4 @@
-import { StatusIndicator, ListenAddress, ServerList, Header } from './components'
+import { ListenAddress, ServerList, Header } from './components'
 import { useMCPService } from './hooks/useMCPService'
 import { useTheme } from './hooks/useTheme'
 import { ToastProvider } from './contexts/ToastContext'

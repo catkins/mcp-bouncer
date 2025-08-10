@@ -12,9 +12,9 @@ export function StatusIndicator({ isActive }: StatusIndicatorProps) {
     )
   } else if (isActive) {
     return (
-      <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 dark:bg-green-900/30 rounded-full border border-green-200 dark:border-green-800">
-        <div className="h-1.5 w-1.5 bg-green-500 rounded-full animate-pulse"></div>
-        <span className="text-xs font-medium text-green-700 dark:text-green-400">Active</span>
+      <div className="flex items-center gap-1.5 px-2 py-1 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30 rounded-full border border-blue-200 dark:border-blue-800">
+        <div className="h-1.5 w-1.5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-pulse"></div>
+        <span className="text-xs font-medium text-blue-700 dark:text-blue-400">Active</span>
       </div>
     )
   } else {
