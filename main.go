@@ -51,11 +51,11 @@ func main() {
 	// 'BackgroundColour' is the background colour of the window.
 	// 'URL' is the URL that will be loaded into the webview.
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title: "Application",
+		Title: "MCP Bouncer",
 		Mac: application.MacWindow{
 			InvisibleTitleBarHeight: 50,
-			Backdrop:                application.MacBackdropTranslucent,
-			TitleBar:                application.MacTitleBarHiddenInset,
+			Backdrop:                application.MacBackdropNormal,
+			TitleBar:                application.MacTitleBarHidden,
 			WebviewPreferences:      application.MacWebviewPreferences{},
 		},
 		BackgroundColour: application.NewRGB(27, 38, 54),

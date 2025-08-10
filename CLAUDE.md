@@ -27,6 +27,8 @@ This is a **Wails 3 application** that creates a desktop app combining Go backen
 - `pkg/services/mcp/`: Go service layer containing MCP server functionality
 - `frontend/`: Web-based UI built with TypeScript and vanilla HTML/CSS
 
+After making changes in `pkg/services` regenerate bindings with `wails3 generate bindings`
+
 ### MCP Service Architecture
 The core functionality revolves around an **MCP (Model Context Protocol) service**:
 
