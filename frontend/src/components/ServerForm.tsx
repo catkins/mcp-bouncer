@@ -4,6 +4,47 @@ import { MCPServerConfig } from '../../bindings/github.com/catkins/mcp-bouncer-p
 import { LoadingButton } from './LoadingButton'
 import { ToggleSwitch } from './ToggleSwitch'
 
+interface FormInputProps {
+  id: string
+  label: string
+  value: string
+  onChange: (value: string) => void
+  error?: string
+  required?: boolean
+  placeholder?: string
+  type?: string
+}
+
+function FormInput({ id, label, value, onChange, error, required = false, placeholder, type = 'text' }: FormInputProps) {
+  const getInputClassName = () => {
+    const baseClasses = "w-full px-2 py-1.5 border rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:border-transparent text-sm"
+    const errorClasses = "border-red-500 focus:ring-red-500"
+    const normalClasses = "border-gray-300 dark:border-gray-700 focus:ring-purple-500 dark:focus:ring-purple-400"
+    
+    return `${baseClasses} ${error ? errorClasses : normalClasses}`
+  }
+
+  return (
+    <div>
+      <label htmlFor={id} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+        {label} {required && '*'}
+      </label>
+      <input
+        id={id}
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={getInputClassName()}
+        required={required}
+        placeholder={placeholder}
+      />
+      {error && (
+        <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>
+      )}
+    </div>
+  )
+}
+
 interface ServerFormProps {
   server?: MCPServerConfig | null
   onSave: (server: MCPServerConfig) => Promise<void>
@@ -29,6 +70,14 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
       setFormData(server)
     }
   }, [server])
+
+  // Auto-focus the name field when form opens
+  useEffect(() => {
+    const nameInput = document.getElementById('server-name') as HTMLInputElement
+    if (nameInput) {
+      nameInput.focus()
+    }
+  }, [])
 
   // Handle escape key to dismiss modal
   useEffect(() => {
@@ -140,13 +189,7 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
     })
   }
 
-  const getInputClassName = (fieldName: string) => {
-    const baseClasses = "w-full px-2 py-1.5 border rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:border-transparent text-sm"
-    const errorClasses = "border-red-500 focus:ring-red-500"
-    const normalClasses = "border-gray-300 dark:border-gray-700 focus:ring-blue-500"
-    
-    return `${baseClasses} ${errors[fieldName] ? errorClasses : normalClasses}`
-  }
+
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -174,62 +217,40 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
             </div>
           )}
 
-          <div>
-            <label htmlFor="server-name" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Name *
-            </label>
-            <input
-              id="server-name"
-              type="text"
-              value={formData.name}
-              onChange={(e) => {
-                setFormData(prev => ({ ...prev, name: e.target.value }))
-                if (errors.name) {
-                  setErrors(prev => ({ ...prev, name: '' }))
-                }
-              }}
-              className={getInputClassName('name')}
-              required
-            />
-            {errors.name && (
-              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.name}</p>
-            )}
-          </div>
+          <FormInput
+            id="server-name"
+            label="Name"
+            value={formData.name}
+            onChange={(value) => {
+              setFormData(prev => ({ ...prev, name: value }))
+              if (errors.name) {
+                setErrors(prev => ({ ...prev, name: '' }))
+              }
+            }}
+            error={errors.name}
+            required
+          />
 
-          <div>
-            <label htmlFor="server-description" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Description
-            </label>
-            <input
-              id="server-description"
-              type="text"
-              value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              className={getInputClassName('description')}
-            />
-          </div>
+          <FormInput
+            id="server-description"
+            label="Description"
+            value={formData.description}
+            onChange={(value) => setFormData(prev => ({ ...prev, description: value }))}
+          />
 
-          <div>
-            <label htmlFor="server-command" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Command *
-            </label>
-            <input
-              id="server-command"
-              type="text"
-              value={formData.command}
-              onChange={(e) => {
-                setFormData(prev => ({ ...prev, command: e.target.value }))
-                if (errors.command) {
-                  setErrors(prev => ({ ...prev, command: '' }))
-                }
-              }}
-              className={getInputClassName('command')}
-              required
-            />
-            {errors.command && (
-              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.command}</p>
-            )}
-          </div>
+          <FormInput
+            id="server-command"
+            label="Command"
+            value={formData.command}
+            onChange={(value) => {
+              setFormData(prev => ({ ...prev, command: value }))
+              if (errors.command) {
+                setErrors(prev => ({ ...prev, command: '' }))
+              }
+            }}
+            error={errors.command}
+            required
+          />
 
           <div>
             <div className="flex items-center justify-between mb-1">
@@ -254,7 +275,7 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
                     type="text"
                     value={arg}
                     onChange={(e) => updateArg(index, e.target.value)}
-                    className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
                     placeholder="Argument"
                     aria-label={`Argument ${index + 1}`}
                   />
@@ -296,7 +317,7 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
                     type="text"
                     value={key}
                     onChange={(e) => updateEnvVar(key, e.target.value, value)}
-                    className="w-1/3 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    className="w-1/3 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
                     placeholder="Variable name"
                     aria-label={`Environment variable name ${index + 1}`}
                   />
@@ -304,7 +325,7 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
                     type="text"
                     value={value}
                     onChange={(e) => updateEnvVar(key, key, e.target.value)}
-                    className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
                     placeholder="Value"
                     aria-label={`Environment variable value ${index + 1}`}
                   />
@@ -331,26 +352,25 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
               size="sm"
             />
           </div>
-        </form>
 
-        <div className="flex items-center justify-end gap-2 p-3 border-t border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-800">
-          <LoadingButton
-            type="button"
-            onClick={onCancel}
-            variant="secondary"
-            size="sm"
-          >
-            Cancel
-          </LoadingButton>
-          <LoadingButton
-            type="submit"
-            onClick={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
-            loading={loading}
-            size="sm"
-          >
-            {server ? 'Update Server' : 'Add Server'}
-          </LoadingButton>
-        </div>
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-200 dark:border-gray-800">
+            <LoadingButton
+              type="button"
+              onClick={onCancel}
+              variant="secondary"
+              size="sm"
+            >
+              Cancel
+            </LoadingButton>
+            <LoadingButton
+              type="submit"
+              loading={loading}
+              size="sm"
+            >
+              {server ? 'Update Server' : 'Add Server'}
+            </LoadingButton>
+          </div>
+        </form>
       </div>
     </div>
   )

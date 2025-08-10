@@ -88,6 +88,24 @@ export function ServerList({
     setShowAddServer(true)
   }
 
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check for Cmd+A (macOS) or Ctrl+A (other platforms)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
+        e.preventDefault() // Prevent default "select all" behavior
+        if (!showAddServer && !editingServer) {
+          handleAddServer()
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [showAddServer, editingServer])
+
   return (
     <div className="mb-4">
       <div className="flex items-center justify-between mb-2">
