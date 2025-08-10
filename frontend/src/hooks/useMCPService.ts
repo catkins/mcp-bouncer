@@ -17,25 +17,42 @@ export function useMCPService() {
     updateServer: boolean
     removeServer: boolean
     general: boolean
+    toggleServer: { [key: string]: boolean }
   }>({
     addServer: false,
     updateServer: false,
     removeServer: false,
-    general: false
+    general: false,
+    toggleServer: {}
   })
   const [errors, setErrors] = useState<{
     addServer?: string
     updateServer?: string
     removeServer?: string
     general?: string
+    toggleServer?: { [key: string]: string | undefined }
   }>({})
 
   const setLoading = (key: keyof typeof loadingStates, value: boolean) => {
     setLoadingStates(prev => ({ ...prev, [key]: value }))
   }
 
+  const setToggleLoading = (serverName: string, value: boolean) => {
+    setLoadingStates(prev => ({
+      ...prev,
+      toggleServer: { ...prev.toggleServer, [serverName]: value }
+    }))
+  }
+
   const setError = (key: keyof typeof errors, error?: string) => {
     setErrors(prev => ({ ...prev, [key]: error }))
+  }
+
+  const setToggleError = (serverName: string, error?: string) => {
+    setErrors(prev => ({
+      ...prev,
+      toggleServer: { ...prev.toggleServer, [serverName]: error }
+    }))
   }
 
   const loadServers = async () => {
@@ -138,22 +155,47 @@ export function useMCPService() {
   }
 
   const toggleServer = async (serverName: string, enabled: boolean) => {
+    // Clear any previous error for this server
+    setToggleError(serverName)
+    
+    // Set loading state for this specific server
+    setToggleLoading(serverName, true)
+    
+    // Optimistic update - immediately update the UI
+    setServers(prevServers => 
+      prevServers.map(server => 
+        server.name === serverName 
+          ? { ...server, enabled } 
+          : server
+      )
+    )
+
     try {
-      setLoading('updateServer', true)
-      setError('updateServer')
       const server = servers.find(s => s.name === serverName)
       if (server) {
         const updatedServer = { ...server, enabled }
         await MCPService.UpdateMCPServer(serverName, updatedServer)
-        await loadServers()
+        
+        // Reload client status to reflect the new state
         await loadClientStatus()
       }
     } catch (error) {
       console.error('Failed to toggle server:', error)
-      setError('updateServer', 'Failed to toggle server')
+      
+      // Revert optimistic update on error
+      setServers(prevServers => 
+        prevServers.map(server => 
+          server.name === serverName 
+            ? { ...server, enabled: !enabled } 
+            : server
+        )
+      )
+      
+      // Set error for this specific server
+      setToggleError(serverName, `Failed to ${enabled ? 'enable' : 'disable'} server`)
       throw error
     } finally {
-      setLoading('updateServer', false)
+      setToggleLoading(serverName, false)
     }
   }
 
@@ -194,9 +236,29 @@ export function useMCPService() {
       await loadClientStatus()
     })
 
+    // Listen for client status changes
+    const unsubscribeClientStatus = Events.On("mcp:client_status_changed", async (event: WailsEvent) => {
+      console.log('Received mcp:client_status_changed event:', event)
+      await loadClientStatus()
+    })
+
+    // Listen for client errors
+    const unsubscribeClientError = Events.On("mcp:client_error", async (event: WailsEvent) => {
+      console.log('Received mcp:client_error event:', event)
+      const data = event.data as any
+      if (data && data.server_name) {
+        // Set error for the specific server
+        setToggleError(data.server_name, `${data.action} failed: ${data.error}`)
+        // Reload client status to get updated state
+        await loadClientStatus()
+      }
+    })
+
     return () => {
       unsubscribe()
       unsubscribeSettings()
+      unsubscribeClientStatus()
+      unsubscribeClientError()
     }
   }, [])
 

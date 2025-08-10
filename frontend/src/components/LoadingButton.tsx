@@ -25,7 +25,7 @@ export function LoadingButton({
   
   const variantClasses = {
     primary: "bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 hover:from-blue-600 hover:via-purple-600 hover:to-pink-600 focus:ring-purple-500 text-white shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95 animate-gradient bg-[length:200%_200%]",
-    secondary: "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 focus:ring-gray-500",
+    secondary: "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 focus:ring-gray-500 hover:shadow-md transform hover:scale-105 active:scale-95",
     danger: "bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 focus:ring-red-500 text-white shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
   }
   
@@ -51,14 +51,22 @@ export function LoadingButton({
       type={type}
       onClick={handleClick}
       disabled={loading || disabled}
-      className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
+      className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className} ${
+        loading ? 'animate-pulse' : ''
+      }`}
     >
       {loading && (
-        <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+        <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
       )}
-      {children}
-      {variant === 'primary' && (
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-shimmer"></div>
+      <span className={`transition-all duration-200 ${loading ? 'opacity-75' : ''}`}>
+        {children}
+      </span>
+      {variant === 'primary' && !loading && (
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-shimmer" />
+      )}
+      {/* Loading overlay */}
+      {loading && (
+        <div className="absolute inset-0 bg-black/10 rounded-lg animate-pulse" />
       )}
     </button>
   )

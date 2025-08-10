@@ -130,8 +130,65 @@ func (s *MCPService) UpdateMCPServer(name string, config settings.MCPServerConfi
 		if err != nil {
 			return err
 		}
+		
 		// Emit event to notify frontend that servers have been updated
-		s.emitEvent("mcp:servers_updated", map[string]any{})
+		s.emitEvent("mcp:servers_updated", map[string]any{
+			"updated_server": name,
+			"action": "updated",
+		})
+		
+		// If this is a toggle operation, handle client start/stop immediately
+		if s.server != nil {
+			// Find the old configuration to check if this is a toggle
+			var oldConfig *settings.MCPServerConfig
+			for _, server := range s.settings.GetMCPServers() {
+				if server.Name == name {
+					oldConfig = &server
+					break
+				}
+			}
+			
+			if oldConfig != nil && oldConfig.Enabled != config.Enabled {
+				if config.Enabled {
+					// Start the client asynchronously
+					go func() {
+						if err := s.server.GetClientManager().StartClient(context.Background(), config); err != nil {
+							slog.Error("Failed to start client after toggle", "name", name, "error", err)
+							// Emit error event for the frontend
+							s.emitEvent("mcp:client_error", map[string]any{
+								"server_name": name,
+								"error": err.Error(),
+								"action": "start",
+							})
+						} else {
+							// Emit success event
+							s.emitEvent("mcp:client_status_changed", map[string]any{
+								"server_name": name,
+								"status": "started",
+							})
+						}
+					}()
+				} else {
+					// Stop the client
+					if err := s.server.GetClientManager().StopClient(name); err != nil {
+						slog.Error("Failed to stop client after toggle", "name", name, "error", err)
+						// Emit error event for the frontend
+						s.emitEvent("mcp:client_error", map[string]any{
+							"server_name": name,
+							"error": err.Error(),
+							"action": "stop",
+						})
+					} else {
+						// Emit success event
+						s.emitEvent("mcp:client_status_changed", map[string]any{
+							"server_name": name,
+							"status": "stopped",
+						})
+					}
+				}
+			}
+		}
+		
 		return nil
 	}
 	return fmt.Errorf("settings service not available")

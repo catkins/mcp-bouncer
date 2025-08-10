@@ -44,33 +44,48 @@ export function ToggleSwitch({
         onClick={handleToggle}
         disabled={disabled}
         className={`
-          relative inline-flex items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
+          relative inline-flex items-center rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
           ${sizeClasses[size]}
           ${checked 
-            ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500' 
+            ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 shadow-lg' 
             : 'bg-gray-300 dark:bg-gray-600'
           }
-          ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-md'}
+          ${disabled 
+            ? 'opacity-50 cursor-not-allowed' 
+            : 'cursor-pointer hover:shadow-md transform hover:scale-105 active:scale-95'
+          }
+          ${disabled && checked ? 'animate-pulse' : ''}
         `}
         aria-label={label || 'Toggle switch'}
       >
         <span
           className={`
-            inline-block rounded-full bg-white shadow transform transition-transform duration-200 ease-in-out
+            inline-block rounded-full bg-white shadow transform transition-all duration-300 ease-in-out
             ${thumbSizeClasses[size]}
             ${checked ? 'translate-x-5' : 'translate-x-0.5'}
+            ${disabled ? 'opacity-75' : ''}
           `}
         />
+        {/* Loading indicator when disabled */}
+        {disabled && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-2 h-2 bg-white/20 rounded-full animate-pulse" />
+          </div>
+        )}
       </button>
       {(label || description) && (
         <div className="flex flex-col">
           {label && (
-            <span className={`font-medium ${size === 'sm' ? 'text-xs' : size === 'md' ? 'text-sm' : 'text-base'} text-gray-900 dark:text-white`}>
+            <span className={`font-medium ${size === 'sm' ? 'text-xs' : size === 'md' ? 'text-sm' : 'text-base'} text-gray-900 dark:text-white transition-colors duration-200 ${
+              disabled ? 'text-gray-400 dark:text-gray-500' : ''
+            }`}>
               {label}
             </span>
           )}
           {description && (
-            <span className={`${size === 'sm' ? 'text-xs' : 'text-sm'} text-gray-500 dark:text-gray-400`}>
+            <span className={`${size === 'sm' ? 'text-xs' : 'text-sm'} text-gray-500 dark:text-gray-400 transition-colors duration-200 ${
+              disabled ? 'text-gray-300 dark:text-gray-600' : ''
+            }`}>
               {description}
             </span>
           )}

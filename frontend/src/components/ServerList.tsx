@@ -19,12 +19,14 @@ interface ServerListProps {
     updateServer: boolean
     removeServer: boolean
     general: boolean
+    toggleServer: { [key: string]: boolean }
   }
   errors: {
     addServer?: string
     updateServer?: string
     removeServer?: string
     general?: string
+    toggleServer?: { [key: string]: string | undefined }
   }
 }
 
@@ -125,17 +127,27 @@ export function ServerList({
         </div>
       ) : (
         <div className="space-y-3">
-          {servers.map((server) => (
-            <ServerCard
+          {servers.map((server, index) => (
+            <div
               key={server.name}
-              server={server}
-              clientStatus={clientStatus[server.name] || {}}
-              onEdit={handleEditServer}
-              onRemove={handleRemoveServer}
-              onToggle={onToggleServer}
-              loading={loadingStates.updateServer}
-              onRefreshStatus={onRefreshStatus}
-            />
+              className="animate-fadeIn"
+              style={{
+                animationDelay: `${index * 100}ms`,
+                animationFillMode: 'both'
+              }}
+            >
+              <ServerCard
+                server={server}
+                clientStatus={clientStatus[server.name] || {}}
+                onEdit={handleEditServer}
+                onRemove={handleRemoveServer}
+                onToggle={onToggleServer}
+                loading={loadingStates.updateServer || loadingStates.removeServer}
+                toggleLoading={loadingStates.toggleServer[server.name] || false}
+                toggleError={errors.toggleServer?.[server.name]}
+                onRefreshStatus={onRefreshStatus}
+              />
+            </div>
           ))}
         </div>
       )}
