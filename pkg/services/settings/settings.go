@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sync"
 
 	"github.com/adrg/xdg"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -33,9 +34,10 @@ type Settings struct {
 
 // SettingsService handles loading and saving application settings
 type SettingsService struct {
-	settings *Settings
-	filePath string
-	callback func(e *application.CustomEvent)
+	settings       *Settings
+	filePath       string
+	callbacks      []func(e *application.CustomEvent)
+	callbacksMutex sync.RWMutex
 }
 
 // NewSettingsService creates a new settings service
@@ -81,7 +83,39 @@ func (s *SettingsService) ServiceStartup(ctx context.Context, options applicatio
 
 // Subscribe sets the event callback
 func (s *SettingsService) Subscribe(callback func(e *application.CustomEvent)) {
-	s.callback = callback
+	s.callbacksMutex.Lock()
+	defer s.callbacksMutex.Unlock()
+	s.callbacks = append(s.callbacks, callback)
+}
+
+// Unsubscribe removes a callback from the list of callbacks
+// Note: This removes the first matching callback. If you have multiple identical callbacks,
+// you may need to call this multiple times.
+func (s *SettingsService) Unsubscribe(callback func(e *application.CustomEvent)) {
+	s.callbacksMutex.Lock()
+	defer s.callbacksMutex.Unlock()
+
+	for i, cb := range s.callbacks {
+		if fmt.Sprintf("%p", cb) == fmt.Sprintf("%p", callback) {
+			// Remove the callback by slicing
+			s.callbacks = append(s.callbacks[:i], s.callbacks[i+1:]...)
+			break
+		}
+	}
+}
+
+// ClearCallbacks removes all callbacks
+func (s *SettingsService) ClearCallbacks() {
+	s.callbacksMutex.Lock()
+	defer s.callbacksMutex.Unlock()
+	s.callbacks = nil
+}
+
+// GetCallbackCount returns the number of registered callbacks
+func (s *SettingsService) GetCallbackCount() int {
+	s.callbacksMutex.RLock()
+	defer s.callbacksMutex.RUnlock()
+	return len(s.callbacks)
 }
 
 // Load loads settings from file
@@ -130,6 +164,14 @@ func (s *SettingsService) UpdateSettings(settings *Settings) error {
 // AddMCPServer adds a new MCP server configuration
 func (s *SettingsService) AddMCPServer(config MCPServerConfig) error {
 	slog.Info("Adding MCP server", "name", config.Name, "command", config.Command)
+
+	// Check for duplicate names
+	for _, server := range s.settings.MCPServers {
+		if server.Name == config.Name {
+			return fmt.Errorf("server with name '%s' already exists", config.Name)
+		}
+	}
+
 	s.settings.MCPServers = append(s.settings.MCPServers, config)
 	if err := s.Save(); err != nil {
 		slog.Error("Failed to save settings after adding server", "error", err)
@@ -152,6 +194,13 @@ func (s *SettingsService) RemoveMCPServer(name string) error {
 
 // UpdateMCPServer updates an existing MCP server configuration
 func (s *SettingsService) UpdateMCPServer(name string, config MCPServerConfig) error {
+	// Check for duplicate names (excluding the current server being updated)
+	for _, server := range s.settings.MCPServers {
+		if server.Name == config.Name && server.Name != name {
+			return fmt.Errorf("server with name '%s' already exists", config.Name)
+		}
+	}
+
 	for i, server := range s.settings.MCPServers {
 		if server.Name == name {
 			s.settings.MCPServers[i] = config
@@ -201,19 +250,38 @@ func (s *SettingsService) GetAutoStart() bool {
 
 // emitEvent emits a custom event
 func (s *SettingsService) emitEvent(name string, data any) {
-	if s.callback != nil {
-		s.callback(&application.CustomEvent{
-			Name:   name,
-			Data:   data,
-			Sender: "settings_service",
-		})
+	slog.Info("Emitting settings event", "name", name, "callback_count", s.GetCallbackCount())
+
+	s.callbacksMutex.RLock()
+	defer s.callbacksMutex.RUnlock()
+
+	if len(s.callbacks) == 0 {
+		slog.Debug("No callbacks registered for settings service event", "name", name)
+		return
+	}
+
+	event := &application.CustomEvent{
+		Name:   name,
+		Data:   data,
+		Sender: "settings_service",
+	}
+
+	for i, callback := range s.callbacks {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					slog.Error("Panic in settings service callback", "callback_index", i, "event_name", name, "panic", r)
+				}
+			}()
+			callback(event)
+		}()
 	}
 }
 
 // OpenConfigDirectory opens the config directory in the platform's file manager
 func (s *SettingsService) OpenConfigDirectory() error {
 	configDir := filepath.Dir(s.filePath)
-	
+
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "darwin":
@@ -225,6 +293,6 @@ func (s *SettingsService) OpenConfigDirectory() error {
 	default:
 		return fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
 	}
-	
+
 	return cmd.Run()
 }

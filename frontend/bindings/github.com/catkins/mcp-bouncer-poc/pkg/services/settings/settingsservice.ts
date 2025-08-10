@@ -22,10 +22,24 @@ export function AddMCPServer(config: $models.MCPServerConfig): $CancellablePromi
 }
 
 /**
+ * ClearCallbacks removes all callbacks
+ */
+export function ClearCallbacks(): $CancellablePromise<void> {
+    return $Call.ByID(4017496835);
+}
+
+/**
  * GetAutoStart returns the current auto-start setting
  */
 export function GetAutoStart(): $CancellablePromise<boolean> {
     return $Call.ByID(2395191109);
+}
+
+/**
+ * GetCallbackCount returns the number of registered callbacks
+ */
+export function GetCallbackCount(): $CancellablePromise<number> {
+    return $Call.ByID(2416665922);
 }
 
 /**
@@ -109,6 +123,15 @@ export function SetListenAddr(addr: string): $CancellablePromise<void> {
  */
 export function Subscribe(callback: any): $CancellablePromise<void> {
     return $Call.ByID(739470316, callback);
+}
+
+/**
+ * Unsubscribe removes a callback from the list of callbacks
+ * Note: This removes the first matching callback. If you have multiple identical callbacks,
+ * you may need to call this multiple times.
+ */
+export function Unsubscribe(callback: any): $CancellablePromise<void> {
+    return $Call.ByID(323799697, callback);
 }
 
 /**

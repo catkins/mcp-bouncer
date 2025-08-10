@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { XMarkIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { XMarkIcon, PlusIcon, TrashIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import { MCPServerConfig } from '../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/settings/models'
 import { LoadingButton } from './LoadingButton'
 
@@ -8,9 +8,10 @@ interface ServerFormProps {
   onSave: (server: MCPServerConfig) => Promise<void>
   onCancel: () => void
   loading?: boolean
+  existingServers?: MCPServerConfig[]
 }
 
-export function ServerForm({ server, onSave, onCancel, loading = false }: ServerFormProps) {
+export function ServerForm({ server, onSave, onCancel, loading = false, existingServers = [] }: ServerFormProps) {
   const [formData, setFormData] = useState<MCPServerConfig>({
     name: '',
     description: '',
@@ -19,6 +20,8 @@ export function ServerForm({ server, onSave, onCancel, loading = false }: Server
     env: {},
     enabled: true
   })
+  const [errors, setErrors] = useState<{ [key: string]: string }>({})
+  const [submitError, setSubmitError] = useState<string>('')
 
   useEffect(() => {
     if (server) {
@@ -26,12 +29,52 @@ export function ServerForm({ server, onSave, onCancel, loading = false }: Server
     }
   }, [server])
 
+  const validateForm = (): boolean => {
+    const newErrors: { [key: string]: string } = {}
+
+    // Validate name
+    if (!formData.name.trim()) {
+      newErrors.name = 'Server name is required'
+    } else if (formData.name.trim().length < 2) {
+      newErrors.name = 'Server name must be at least 2 characters'
+    } else {
+      // Check for duplicate names (excluding the current server being edited)
+      const isDuplicate = existingServers.some(s => 
+        s.name === formData.name.trim() && s.name !== server?.name
+      )
+      if (isDuplicate) {
+        newErrors.name = 'A server with this name already exists'
+      }
+    }
+
+    // Validate command
+    if (!formData.command.trim()) {
+      newErrors.command = 'Command is required'
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setSubmitError('')
+    
+    if (!validateForm()) {
+      return
+    }
+
     try {
       await onSave(formData)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save server:', error)
+      
+      // Handle specific backend errors
+      if (error?.message?.includes('already exists')) {
+        setErrors({ name: 'A server with this name already exists' })
+      } else {
+        setSubmitError(error?.message || 'Failed to save server')
+      }
     }
   }
 
@@ -82,6 +125,14 @@ export function ServerForm({ server, onSave, onCancel, loading = false }: Server
     })
   }
 
+  const getInputClassName = (fieldName: string) => {
+    const baseClasses = "w-full px-3 py-2 border rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:border-transparent"
+    const errorClasses = "border-red-500 focus:ring-red-500"
+    const normalClasses = "border-gray-300 dark:border-gray-700 focus:ring-blue-500"
+    
+    return `${baseClasses} ${errors[fieldName] ? errorClasses : normalClasses}`
+  }
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-gray-50 dark:bg-gray-900 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -98,6 +149,16 @@ export function ServerForm({ server, onSave, onCancel, loading = false }: Server
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
+          {/* Submit error */}
+          {submitError && (
+            <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
+                <ExclamationTriangleIcon className="h-4 w-4 flex-shrink-0" />
+                <span>{submitError}</span>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
               Name *
@@ -105,10 +166,18 @@ export function ServerForm({ server, onSave, onCancel, loading = false }: Server
             <input
               type="text"
               value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onChange={(e) => {
+                setFormData(prev => ({ ...prev, name: e.target.value }))
+                if (errors.name) {
+                  setErrors(prev => ({ ...prev, name: '' }))
+                }
+              }}
+              className={getInputClassName('name')}
               required
             />
+            {errors.name && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
+            )}
           </div>
 
           <div>
@@ -119,7 +188,7 @@ export function ServerForm({ server, onSave, onCancel, loading = false }: Server
               type="text"
               value={formData.description}
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className={getInputClassName('description')}
             />
           </div>
 
@@ -130,10 +199,18 @@ export function ServerForm({ server, onSave, onCancel, loading = false }: Server
             <input
               type="text"
               value={formData.command}
-              onChange={(e) => setFormData(prev => ({ ...prev, command: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onChange={(e) => {
+                setFormData(prev => ({ ...prev, command: e.target.value }))
+                if (errors.command) {
+                  setErrors(prev => ({ ...prev, command: '' }))
+                }
+              }}
+              className={getInputClassName('command')}
               required
             />
+            {errors.command && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.command}</p>
+            )}
           </div>
 
           <div>

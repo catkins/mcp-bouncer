@@ -111,7 +111,9 @@ func (cm *ClientManager) StopClient(name string) error {
 func (cm *ClientManager) stopClientInternal(name string) error {
 	mc, exists := cm.clients[name]
 	if !exists {
-		return fmt.Errorf("client '%s' not found", name)
+		// Client doesn't exist, which is fine when disabling a server
+		slog.Debug("Client not found when stopping", "name", name)
+		return nil
 	}
 
 	// Signal stop
@@ -120,9 +122,21 @@ func (cm *ClientManager) stopClientInternal(name string) error {
 	// Remove tools from main server
 	cm.removeClientTools(mc)
 
-	// Close transport (this will also stop the process)
+	// Close transport with timeout to prevent hanging
 	if mc.Transport != nil {
-		mc.Transport.Close()
+		done := make(chan struct{})
+		go func() {
+			mc.Transport.Close()
+			close(done)
+		}()
+
+		// Wait for transport close with timeout
+		select {
+		case <-done:
+			slog.Debug("Transport closed successfully", "name", name)
+		case <-time.After(5 * time.Second):
+			slog.Warn("Transport close timed out", "name", name)
+		}
 	}
 
 	// Remove from clients map

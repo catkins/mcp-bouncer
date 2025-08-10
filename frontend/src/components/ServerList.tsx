@@ -97,10 +97,10 @@ export function ServerList({
         <LoadingButton
           onClick={handleAddServer}
           loading={loadingStates.addServer}
-          size="sm"
-          className="px-3 py-2"
+          size="md"
+          className="whitespace-nowrap flex-shrink-0"
         >
-          <PlusIcon className="h-3.5 w-3.5" />
+          <PlusIcon className="h-4 w-4" />
           Add Server
         </LoadingButton>
       </div>
@@ -119,9 +119,9 @@ export function ServerList({
           <LoadingButton
             onClick={handleAddServer}
             loading={loadingStates.addServer}
-            size="sm"
+            size="md"
           >
-            <PlusIcon className="h-3.5 w-3.5" />
+            <PlusIcon className="h-4 w-4" />
             Add Server
           </LoadingButton>
         </div>
@@ -158,6 +158,7 @@ export function ServerList({
           onSave={handleSaveServer}
           onCancel={handleCancelServer}
           loading={loadingStates.addServer || loadingStates.updateServer}
+          existingServers={servers}
         />
       )}
     </div>

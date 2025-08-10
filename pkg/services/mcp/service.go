@@ -5,16 +5,19 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
+	"sync"
+	"time"
 
 	"github.com/catkins/mcp-bouncer-poc/pkg/services/settings"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 type MCPService struct {
-	listenAddr string
-	callback   func(e *application.CustomEvent)
-	server     *Server
-	settings   *settings.SettingsService
+	listenAddr     string
+	callbacks      []func(e *application.CustomEvent)
+	callbacksMutex sync.RWMutex
+	server         *Server
+	settings       *settings.SettingsService
 }
 
 const defaultListenAddr = "localhost:8091"
@@ -33,12 +36,20 @@ func (s *MCPService) ServiceStartup(ctx context.Context, options application.Ser
 		s.listenAddr = s.settings.GetListenAddr()
 		s.server = NewServer(s.listenAddr)
 
-		// Subscribe to settings updates
+		// Subscribe to settings updates - only reload clients if listen address changes
 		s.settings.Subscribe(func(event *application.CustomEvent) {
 			if event.Name == "settings:updated" {
-				slog.Info("Settings updated, reloading clients")
-				if err := s.ReloadClients(); err != nil {
-					slog.Error("Failed to reload clients", "error", err)
+				// Check if listen address changed
+				newAddr := s.settings.GetListenAddr()
+				if newAddr != s.listenAddr {
+					slog.Info("Listen address changed, reloading all clients", "old", s.listenAddr, "new", newAddr)
+					s.listenAddr = newAddr
+					s.server = NewServer(s.listenAddr)
+					if err := s.ReloadClients(); err != nil {
+						slog.Error("Failed to reload clients", "error", err)
+					}
+				} else {
+					slog.Debug("Settings updated but no client reload needed")
 				}
 			}
 		})
@@ -70,7 +81,39 @@ func (s *MCPService) IsActive() bool {
 }
 
 func (s *MCPService) Subscribe(callback func(e *application.CustomEvent)) {
-	s.callback = callback
+	s.callbacksMutex.Lock()
+	defer s.callbacksMutex.Unlock()
+	s.callbacks = append(s.callbacks, callback)
+}
+
+// Unsubscribe removes a callback from the list of callbacks
+// Note: This removes the first matching callback. If you have multiple identical callbacks,
+// you may need to call this multiple times.
+func (s *MCPService) Unsubscribe(callback func(e *application.CustomEvent)) {
+	s.callbacksMutex.Lock()
+	defer s.callbacksMutex.Unlock()
+
+	for i, cb := range s.callbacks {
+		if fmt.Sprintf("%p", cb) == fmt.Sprintf("%p", callback) {
+			// Remove the callback by slicing
+			s.callbacks = append(s.callbacks[:i], s.callbacks[i+1:]...)
+			break
+		}
+	}
+}
+
+// ClearCallbacks removes all callbacks
+func (s *MCPService) ClearCallbacks() {
+	s.callbacksMutex.Lock()
+	defer s.callbacksMutex.Unlock()
+	s.callbacks = nil
+}
+
+// GetCallbackCount returns the number of registered callbacks
+func (s *MCPService) GetCallbackCount() int {
+	s.callbacksMutex.RLock()
+	defer s.callbacksMutex.RUnlock()
+	return len(s.callbacks)
 }
 
 func (s *MCPService) List() ([]settings.MCPServerConfig, error) {
@@ -102,8 +145,31 @@ func (s *MCPService) AddMCPServer(config settings.MCPServerConfig) error {
 		if err != nil {
 			return err
 		}
+
+		// Start the client if it's enabled
+		if config.Enabled && s.server != nil {
+			go func() {
+				if err := s.server.GetClientManager().StartClient(context.Background(), config); err != nil {
+					slog.Error("Failed to start client after adding", "name", config.Name, "error", err)
+					s.emitEvent("mcp:client_error", map[string]any{
+						"server_name": config.Name,
+						"error":       err.Error(),
+						"action":      "start",
+					})
+				} else {
+					s.emitEvent("mcp:client_status_changed", map[string]any{
+						"server_name": config.Name,
+						"status":      "started",
+					})
+				}
+			}()
+		}
+
 		// Emit event to notify frontend that servers have been updated
-		s.emitEvent("mcp:servers_updated", map[string]any{})
+		s.emitEvent("mcp:servers_updated", map[string]any{
+			"added_server": config.Name,
+			"action":       "added",
+		})
 		return nil
 	}
 	return fmt.Errorf("settings service not available")
@@ -112,12 +178,31 @@ func (s *MCPService) AddMCPServer(config settings.MCPServerConfig) error {
 // RemoveMCPServer removes an MCP server configuration
 func (s *MCPService) RemoveMCPServer(name string) error {
 	if s.settings != nil {
+		// Stop the client if it's running (asynchronously)
+		if s.server != nil {
+			go func() {
+				if err := s.server.GetClientManager().StopClient(name); err != nil {
+					slog.Error("Failed to stop client before removal", "name", name, "error", err)
+					// Continue with removal even if stop fails
+				} else {
+					s.emitEvent("mcp:client_status_changed", map[string]any{
+						"server_name": name,
+						"status":      "stopped",
+					})
+				}
+			}()
+		}
+
 		err := s.settings.RemoveMCPServer(name)
 		if err != nil {
 			return err
 		}
+
 		// Emit event to notify frontend that servers have been updated
-		s.emitEvent("mcp:servers_updated", map[string]any{})
+		s.emitEvent("mcp:servers_updated", map[string]any{
+			"removed_server": name,
+			"action":         "removed",
+		})
 		return nil
 	}
 	return fmt.Errorf("settings service not available")
@@ -126,69 +211,110 @@ func (s *MCPService) RemoveMCPServer(name string) error {
 // UpdateMCPServer updates an MCP server configuration
 func (s *MCPService) UpdateMCPServer(name string, config settings.MCPServerConfig) error {
 	if s.settings != nil {
+		// Get the old configuration before updating
+		var oldConfig *settings.MCPServerConfig
+		for _, server := range s.settings.GetMCPServers() {
+			if server.Name == name {
+				oldConfig = &server
+				break
+			}
+		}
+
+		if oldConfig == nil {
+			return fmt.Errorf("server '%s' not found", name)
+		}
+
+		slog.Info("Updating MCP server configuration",
+			"name", name,
+			"old_enabled", oldConfig.Enabled,
+			"new_enabled", config.Enabled,
+			"enabled_changed", oldConfig.Enabled != config.Enabled)
+
+		// Update the settings
 		err := s.settings.UpdateMCPServer(name, config)
 		if err != nil {
 			return err
 		}
-		
+
 		// Emit event to notify frontend that servers have been updated
 		s.emitEvent("mcp:servers_updated", map[string]any{
 			"updated_server": name,
-			"action": "updated",
+			"action":         "updated",
 		})
-		
-		// If this is a toggle operation, handle client start/stop immediately
+
+		// Handle client connection/disconnection based on toggle state
 		if s.server != nil {
-			// Find the old configuration to check if this is a toggle
-			var oldConfig *settings.MCPServerConfig
-			for _, server := range s.settings.GetMCPServers() {
-				if server.Name == name {
-					oldConfig = &server
-					break
-				}
-			}
-			
-			if oldConfig != nil && oldConfig.Enabled != config.Enabled {
+			// Check if this is a toggle operation (enabled state changed)
+			if oldConfig.Enabled != config.Enabled {
 				if config.Enabled {
-					// Start the client asynchronously
+					// Server was enabled - start the client
+					slog.Info("Starting client after enabling server", "name", name)
 					go func() {
 						if err := s.server.GetClientManager().StartClient(context.Background(), config); err != nil {
-							slog.Error("Failed to start client after toggle", "name", name, "error", err)
+							slog.Error("Failed to start client after enabling", "name", name, "error", err)
 							// Emit error event for the frontend
 							s.emitEvent("mcp:client_error", map[string]any{
 								"server_name": name,
-								"error": err.Error(),
-								"action": "start",
+								"error":       err.Error(),
+								"action":      "start",
 							})
 						} else {
 							// Emit success event
 							s.emitEvent("mcp:client_status_changed", map[string]any{
 								"server_name": name,
-								"status": "started",
+								"status":      "started",
 							})
 						}
 					}()
 				} else {
-					// Stop the client
-					if err := s.server.GetClientManager().StopClient(name); err != nil {
-						slog.Error("Failed to stop client after toggle", "name", name, "error", err)
-						// Emit error event for the frontend
-						s.emitEvent("mcp:client_error", map[string]any{
-							"server_name": name,
-							"error": err.Error(),
-							"action": "stop",
-						})
-					} else {
-						// Emit success event
-						s.emitEvent("mcp:client_status_changed", map[string]any{
-							"server_name": name,
-							"status": "stopped",
-						})
-					}
+					// Server was disabled - stop the client asynchronously
+					slog.Info("Stopping client after disabling server", "name", name)
+					go func() {
+						slog.Debug("Starting async stop operation", "name", name)
+						startTime := time.Now()
+
+						if err := s.server.GetClientManager().StopClient(name); err != nil {
+							slog.Error("Failed to stop client after disabling", "name", name, "error", err, "duration", time.Since(startTime))
+							// Emit error event for the frontend
+							s.emitEvent("mcp:client_error", map[string]any{
+								"server_name": name,
+								"error":       err.Error(),
+								"action":      "stop",
+							})
+						} else {
+							slog.Info("Successfully stopped client after disabling", "name", name, "duration", time.Since(startTime))
+							// Emit success event
+							s.emitEvent("mcp:client_status_changed", map[string]any{
+								"server_name": name,
+								"status":      "stopped",
+							})
+						}
+					}()
+				}
+			} else {
+				// Configuration changed but enabled state didn't change
+				// If the server is enabled, restart it to apply new configuration
+				if config.Enabled {
+					slog.Info("Restarting client to apply configuration changes", "name", name)
+					go func() {
+						if err := s.server.GetClientManager().RestartClient(context.Background(), name); err != nil {
+							slog.Error("Failed to restart client after config change", "name", name, "error", err)
+							s.emitEvent("mcp:client_error", map[string]any{
+								"server_name": name,
+								"error":       err.Error(),
+								"action":      "restart",
+							})
+						} else {
+							s.emitEvent("mcp:client_status_changed", map[string]any{
+								"server_name": name,
+								"status":      "restarted",
+							})
+						}
+					}()
 				}
 			}
 		}
-		
+
 		return nil
 	}
 	return fmt.Errorf("settings service not available")
@@ -260,14 +386,30 @@ func (s *MCPService) ReloadClients() error {
 }
 
 func (s *MCPService) emitEvent(name string, data any) {
-	slog.Info("Emitting event", "name", name, "data", data)
-	if s.callback != nil {
-		s.callback(&application.CustomEvent{
-			Name:   name,
-			Data:   data,
-			Sender: "mcp_service",
-		})
-	} else {
-		slog.Warn("No callback set for MCP service, cannot emit event", "name", name)
+	slog.Info("Emitting event", "name", name, "data", data, "callback_count", s.GetCallbackCount())
+
+	s.callbacksMutex.RLock()
+	defer s.callbacksMutex.RUnlock()
+
+	if len(s.callbacks) == 0 {
+		slog.Debug("No callbacks registered for MCP service event", "name", name)
+		return
+	}
+
+	event := &application.CustomEvent{
+		Name:   name,
+		Data:   data,
+		Sender: "mcp_service",
+	}
+
+	for i, callback := range s.callbacks {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					slog.Error("Panic in MCP service callback", "callback_index", i, "event_name", name, "panic", r)
+				}
+			}()
+			callback(event)
+		}()
 	}
 }
