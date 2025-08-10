@@ -46,16 +46,34 @@ function App() {
   }, [])
 
   return (
-    <div className="container">
-      <h1>🤖 MCP Bouncer</h1>
-      <div>
-        <code>{listenAddr}</code>
+    <div className="h-screen bg-white p-6">
+      <h1 className="text-3xl font-bold text-gray-800 mb-6 flex items-center gap-3">
+        🤖 MCP Bouncer
+      </h1>
+      
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold text-gray-700 mb-2">Listen Address</h2>
+        <code className="bg-gray-100 px-3 py-2 rounded-md text-sm font-mono text-gray-800">
+          {listenAddr || 'Not available'}
+        </code>
       </div>
       
-      <div id="servers">
-        {servers.map((server, index) => (
-          <div key={index}>{server}</div>
-        ))}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-700 mb-4">Connected Servers</h2>
+        <div className="space-y-2">
+          {servers.length > 0 ? (
+            servers.map((server, index) => (
+              <div 
+                key={index} 
+                className="bg-blue-50 border border-blue-200 rounded-md p-3 text-gray-700"
+              >
+                {server}
+              </div>
+            ))
+          ) : (
+            <div className="text-gray-500 italic">No servers connected</div>
+          )}
+        </div>
       </div>
     </div>
   )
