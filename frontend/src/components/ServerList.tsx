@@ -12,6 +12,7 @@ interface ServerListProps {
   onAddServer: (server: MCPServerConfig) => Promise<void>
   onUpdateServer: (name: string, server: MCPServerConfig) => Promise<void>
   onRemoveServer: (name: string) => Promise<void>
+  onToggleServer: (name: string, enabled: boolean) => Promise<void>
   onRefreshStatus?: (serverName: string) => Promise<void>
   loadingStates: {
     addServer: boolean
@@ -33,6 +34,7 @@ export function ServerList({
   onAddServer, 
   onUpdateServer, 
   onRemoveServer,
+  onToggleServer,
   onRefreshStatus,
   loadingStates,
   errors
@@ -130,7 +132,8 @@ export function ServerList({
               clientStatus={clientStatus[server.name] || {}}
               onEdit={handleEditServer}
               onRemove={handleRemoveServer}
-              loading={loadingStates.removeServer}
+              onToggle={onToggleServer}
+              loading={loadingStates.updateServer}
               onRefreshStatus={onRefreshStatus}
             />
           ))}

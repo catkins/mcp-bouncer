@@ -137,6 +137,26 @@ export function useMCPService() {
     }
   }
 
+  const toggleServer = async (serverName: string, enabled: boolean) => {
+    try {
+      setLoading('updateServer', true)
+      setError('updateServer')
+      const server = servers.find(s => s.name === serverName)
+      if (server) {
+        const updatedServer = { ...server, enabled }
+        await MCPService.UpdateMCPServer(serverName, updatedServer)
+        await loadServers()
+        await loadClientStatus()
+      }
+    } catch (error) {
+      console.error('Failed to toggle server:', error)
+      setError('updateServer', 'Failed to toggle server')
+      throw error
+    } finally {
+      setLoading('updateServer', false)
+    }
+  }
+
   const openConfigDirectory = async () => {
     try {
       await SettingsService.OpenConfigDirectory()
@@ -190,6 +210,7 @@ export function useMCPService() {
     addServer,
     updateServer,
     removeServer,
+    toggleServer,
     openConfigDirectory,
     loadServers,
     loadSettings,

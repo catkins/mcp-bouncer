@@ -6,7 +6,7 @@ import { ToastContainer } from './components/Toast'
 import { useToast } from './contexts/ToastContext'
 
 function AppContent() {
-  const { servers, clientStatus, mcpUrl, isActive, loadingStates, errors, addServer, updateServer, removeServer, loadClientStatus, openConfigDirectory } = useMCPService()
+  const { servers, clientStatus, mcpUrl, isActive, loadingStates, errors, addServer, updateServer, removeServer, toggleServer, loadClientStatus, openConfigDirectory } = useMCPService()
   const { theme, toggleTheme } = useTheme()
   const { toasts, removeToast } = useToast()
 
@@ -15,7 +15,7 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-radial dark:from-gray-800 dark:via-gray-700 dark:to-gray-900">
+    <div className="min-h-screen bg-gray-100 dark:bg-radial dark:from-gray-800 dark:via-gray-800 dark:to-gray-900">
       <Header 
         isActive={isActive} 
         toggleTheme={toggleTheme}
@@ -31,6 +31,7 @@ function AppContent() {
           onAddServer={addServer}
           onUpdateServer={updateServer}
           onRemoveServer={removeServer}
+          onToggleServer={toggleServer}
           onRefreshStatus={handleRefreshStatus}
           loadingStates={loadingStates}
           errors={errors}

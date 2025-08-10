@@ -2,17 +2,19 @@ import { PencilIcon, TrashIcon, WrenchScrewdriverIcon, CheckCircleIcon, XCircleI
 import { MCPServerConfig } from '../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/settings/models'
 import { ClientStatus } from '../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/mcp/models'
 import { LoadingButton } from './LoadingButton'
+import { ToggleSwitch } from './ToggleSwitch'
 
 interface ServerCardProps {
   server: MCPServerConfig
   clientStatus?: ClientStatus
   onEdit: (server: MCPServerConfig) => void
   onRemove: (serverName: string) => Promise<void>
+  onToggle: (serverName: string, enabled: boolean) => Promise<void>
   onRefreshStatus?: (serverName: string) => Promise<void>
   loading?: boolean
 }
 
-export function ServerCard({ server, clientStatus, onEdit, onRemove, onRefreshStatus, loading = false }: ServerCardProps) {
+export function ServerCard({ server, clientStatus, onEdit, onRemove, onToggle, onRefreshStatus, loading = false }: ServerCardProps) {
 
   return (
     <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-shadow">
@@ -21,37 +23,37 @@ export function ServerCard({ server, clientStatus, onEdit, onRemove, onRefreshSt
           <h3 className="text-base font-semibold text-gray-900 dark:text-white">
             {server.name}
           </h3>
-          {server.enabled ? (
-            clientStatus && (
-              <div className="flex items-center gap-2">
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${
-                  clientStatus.connected
-                    ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-400'
-                    : 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-400'
-                }`}>
-                  {clientStatus.connected ? (
-                    <CheckCircleIcon className="w-3 h-3" />
-                  ) : (
-                    <XCircleIcon className="w-3 h-3" />
-                  )}
-                  {clientStatus.connected ? 'Connected' : 'Disconnected'}
-                </span>
-                {clientStatus.connected && clientStatus.tools > 0 && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-400 rounded-full text-xs font-medium">
-                    <WrenchScrewdriverIcon className="w-3 h-3" />
-                    {clientStatus.tools}
-                  </span>
+          {clientStatus && (
+            <div className="flex items-center gap-2">
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${
+                clientStatus.connected
+                  ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-400'
+                  : 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-400'
+              }`}>
+                {clientStatus.connected ? (
+                  <CheckCircleIcon className="w-3 h-3" />
+                ) : (
+                  <XCircleIcon className="w-3 h-3" />
                 )}
-              </div>
-            )
-          ) : (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
-              <NoSymbolIcon className="w-3 h-3" />
-              Disabled
-            </span>
+                {clientStatus.connected ? 'Connected' : 'Disconnected'}
+              </span>
+              {clientStatus.connected && clientStatus.tools > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-400 rounded-full text-xs font-medium">
+                  <WrenchScrewdriverIcon className="w-3 h-3" />
+                  {clientStatus.tools}
+                </span>
+              )}
+            </div>
           )}
         </div>
         <div className="flex items-center gap-3">
+          <ToggleSwitch
+            checked={server.enabled}
+            onChange={(enabled) => onToggle(server.name, enabled)}
+            disabled={loading}
+            size="sm"
+            className="mr-2"
+          />
           <LoadingButton
             onClick={() => onEdit(server)}
             disabled={loading}
