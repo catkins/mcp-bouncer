@@ -1,4 +1,4 @@
-import { ListenAddress, ServerList, Header } from './components'
+import { ServerList, Header } from './components'
 import { useMCPService } from './hooks/useMCPService'
 import { useTheme } from './hooks/useTheme'
 import { ToastProvider } from './contexts/ToastContext'
@@ -15,16 +15,16 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen bg-gray-50 dark:bg-radial dark:from-gray-800 dark:via-gray-700 dark:to-gray-900">
       <Header 
         isActive={isActive} 
         toggleTheme={toggleTheme}
         theme={theme}
         onOpenConfig={openConfigDirectory}
+        mcpUrl={mcpUrl}
       />
       <ToastContainer toasts={toasts} onClose={removeToast} />
       <main className="pt-16 px-6 pb-6 max-w-5xl mx-auto">
-        <ListenAddress mcpUrl={mcpUrl} />
         <ServerList 
           servers={servers}
           clientStatus={clientStatus}
