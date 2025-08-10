@@ -13,12 +13,12 @@ export function ServerList({ servers, onAddServer, onEditServer, onRemoveServer 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-700">MCP Servers</h2>
+        <h2 className="text-base font-semibold text-gray-900 dark:text-white">MCP Servers</h2>
         <button
           onClick={onAddServer}
-          className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors text-sm"
+          className="flex items-center gap-1.5 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all duration-200 hover:shadow-md active:scale-95 text-sm font-medium"
         >
-          <PlusIcon className="h-4 w-4" />
+          <PlusIcon className="h-3.5 w-3.5" />
           Add Server
         </button>
       </div>
@@ -34,10 +34,19 @@ export function ServerList({ servers, onAddServer, onEditServer, onRemoveServer 
             />
           ))
         ) : (
-          <div className="text-gray-500 italic text-center py-8">
-            <Cog6ToothIcon className="h-12 w-12 mx-auto mb-2 text-gray-300" />
-            <p>No MCP servers configured</p>
-            <p className="text-sm">Click "Add Server" to get started</p>
+          <div className="text-center py-8">
+            <div className="inline-flex items-center justify-center w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-full mb-3">
+              <Cog6ToothIcon className="h-6 w-6 text-gray-400 dark:text-gray-500" />
+            </div>
+            <h3 className="text-base font-medium text-gray-900 dark:text-white mb-1">No MCP servers configured</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Get started by adding your first MCP server</p>
+            <button
+              onClick={onAddServer}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium"
+            >
+              <PlusIcon className="h-3.5 w-3.5" />
+              Add Server
+            </button>
           </div>
         )}
       </div>

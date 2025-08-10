@@ -8,6 +8,7 @@ This document describes the refactored component architecture for the MCP Bounce
 src/
 ├── components/           # Reusable UI components
 │   ├── index.ts         # Component exports
+│   ├── Header.tsx       # Fixed header with app icon
 │   ├── StatusIndicator.tsx
 │   ├── ListenAddress.tsx
 │   ├── ServerCard.tsx
@@ -20,6 +21,12 @@ src/
 ```
 
 ## Components
+
+### Header
+Fixed header component that displays the app icon, title, and status indicator at the top of the window.
+
+**Props:**
+- `isActive: boolean | null` - The current status of the MCP service
 
 ### StatusIndicator
 Displays the active/inactive status of the MCP service with appropriate icons and loading states.
@@ -83,26 +90,29 @@ Custom hook that manages all MCP service state and operations.
 4. **Testability**: Individual components can be tested in isolation
 5. **State Management**: Custom hook centralizes all MCP service logic
 6. **Type Safety**: Full TypeScript support with proper interfaces
+7. **Fixed Header**: Header stays visible while scrolling for better UX
 
 ## Usage Example
 
 ```tsx
 import { useMCPService } from './hooks/useMCPService'
-import { StatusIndicator, ListenAddress, ServerList } from './components'
+import { Header, ListenAddress, ServerList } from './components'
 
 function App() {
   const { servers, settings, mcpUrl, isActive, addServer, updateServer, removeServer } = useMCPService()
   
   return (
-    <div>
-      <h1>MCP Bouncer <StatusIndicator isActive={isActive} /></h1>
-      <ListenAddress mcpUrl={mcpUrl} settings={settings} />
-      <ServerList 
-        servers={servers}
-        onAddServer={() => {/* handle add */}}
-        onEditServer={(server) => {/* handle edit */}}
-        onRemoveServer={removeServer}
-      />
+    <div className="h-screen bg-white">
+      <Header isActive={isActive} />
+      <main className="pt-20 px-6 pb-6">
+        <ListenAddress mcpUrl={mcpUrl} settings={settings} />
+        <ServerList 
+          servers={servers}
+          onAddServer={() => {/* handle add */}}
+          onEditServer={(server) => {/* handle edit */}}
+          onRemoveServer={removeServer}
+        />
+      </main>
     </div>
   )
 }
