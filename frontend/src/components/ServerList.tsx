@@ -102,8 +102,8 @@ export function ServerList({
       </div>
 
       {servers.length === 0 ? (
-        <div className="text-center py-8 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-          <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+        <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+          <div className="w-12 h-12 mx-auto mb-3 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
             <PlusIcon className="h-6 w-6 text-gray-400 dark:text-gray-500" />
           </div>
           <h3 className="text-base font-medium text-gray-900 dark:text-white mb-1">

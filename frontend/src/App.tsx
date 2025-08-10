@@ -15,7 +15,7 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-radial dark:from-gray-800 dark:via-gray-700 dark:to-gray-900">
+    <div className="min-h-screen bg-gray-100 dark:bg-radial dark:from-gray-800 dark:via-gray-700 dark:to-gray-900">
       <Header 
         isActive={isActive} 
         toggleTheme={toggleTheme}

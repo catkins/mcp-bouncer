@@ -15,7 +15,7 @@ interface ServerCardProps {
 export function ServerCard({ server, clientStatus, onEdit, onRemove, onRefreshStatus, loading = false }: ServerCardProps) {
 
   return (
-    <div className="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+    <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between mb-1.5">
         <div className="flex items-center gap-2">
           <h3 className="text-base font-semibold text-gray-900 dark:text-white">
@@ -45,7 +45,7 @@ export function ServerCard({ server, clientStatus, onEdit, onRemove, onRefreshSt
               </div>
             )
           ) : (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
               <NoSymbolIcon className="w-3 h-3" />
               Disabled
             </span>
@@ -88,7 +88,7 @@ export function ServerCard({ server, clientStatus, onEdit, onRemove, onRefreshSt
       <div className="space-y-1.5">
         <div>
           <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Command:</span>
-          <code className="ml-2 px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
+          <code className="ml-2 px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
             {server.command}
           </code>
         </div>
@@ -98,7 +98,7 @@ export function ServerCard({ server, clientStatus, onEdit, onRemove, onRefreshSt
             <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Arguments:</span>
             <div className="mt-1 flex flex-wrap gap-1">
               {server.args.map((arg, index) => (
-                <code key={index} className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
+                <code key={index} className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
                   {arg}
                 </code>
               ))}
@@ -112,7 +112,7 @@ export function ServerCard({ server, clientStatus, onEdit, onRemove, onRefreshSt
             <div className="mt-1 space-y-1">
               {Object.entries(server.env).map(([key, value]) => (
                 <div key={key} className="flex items-center gap-2">
-                  <code className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
+                  <code className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
                     {key}={value}
                   </code>
                 </div>
