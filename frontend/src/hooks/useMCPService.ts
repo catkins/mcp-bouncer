@@ -3,6 +3,7 @@ import { WailsEvent } from "@wailsio/runtime/types/events"
 import { MCPService } from "../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/mcp"
 import { SettingsService } from "../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/settings"
 import { MCPServerConfig, Settings } from "../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/settings/models"
+import { ClientStatus } from "../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/mcp/models"
 import { Events } from "@wailsio/runtime"
 
 export function useMCPService() {
@@ -10,6 +11,7 @@ export function useMCPService() {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [mcpUrl, setMcpUrl] = useState<string>('')
   const [isActive, setIsActive] = useState<boolean | null>(null)
+  const [clientStatus, setClientStatus] = useState<{ [key: string]: ClientStatus }>({})
   const [loadingStates, setLoadingStates] = useState<{
     addServer: boolean
     updateServer: boolean
@@ -80,6 +82,16 @@ export function useMCPService() {
     }
   }
 
+  const loadClientStatus = async () => {
+    try {
+      const status = await MCPService.GetClientStatus()
+      setClientStatus(status)
+    } catch (error) {
+      console.error('Failed to load client status:', error)
+      setError('general', 'Failed to load client status')
+    }
+  }
+
   const addServer = async (serverConfig: MCPServerConfig) => {
     try {
       setLoading('addServer', true)
@@ -131,6 +143,7 @@ export function useMCPService() {
       await loadMcpUrl()
       await loadServers()
       await loadActive()
+      await loadClientStatus()
     }
 
     init()
@@ -140,6 +153,7 @@ export function useMCPService() {
       console.log('Received mcp:servers_updated event:', event)
       await loadServers()
       await loadActive()
+      await loadClientStatus()
     })
 
     // Listen for settings updates
@@ -148,6 +162,7 @@ export function useMCPService() {
       await loadSettings()
       await loadMcpUrl()
       await loadServers()
+      await loadClientStatus()
     })
 
     return () => {
@@ -169,6 +184,8 @@ export function useMCPService() {
     loadServers,
     loadSettings,
     loadMcpUrl,
-    loadActive
+    loadActive,
+    loadClientStatus,
+    clientStatus
   }
 }

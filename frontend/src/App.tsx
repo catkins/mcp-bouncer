@@ -6,9 +6,13 @@ import { ToastContainer } from './components/Toast'
 import { useToast } from './contexts/ToastContext'
 
 function AppContent() {
-  const { servers, mcpUrl, isActive, loadingStates, errors, addServer, updateServer, removeServer } = useMCPService()
+  const { servers, clientStatus, mcpUrl, isActive, loadingStates, errors, addServer, updateServer, removeServer, loadClientStatus } = useMCPService()
   const { theme, toggleTheme } = useTheme()
   const { toasts, removeToast } = useToast()
+
+  const handleRefreshStatus = async (serverName: string) => {
+    await loadClientStatus()
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -22,9 +26,11 @@ function AppContent() {
         <ListenAddress mcpUrl={mcpUrl} />
         <ServerList 
           servers={servers}
+          clientStatus={clientStatus}
           onAddServer={addServer}
           onUpdateServer={updateServer}
           onRemoveServer={removeServer}
+          onRefreshStatus={handleRefreshStatus}
           loadingStates={loadingStates}
           errors={errors}
         />

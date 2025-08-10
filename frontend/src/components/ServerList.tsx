@@ -3,13 +3,16 @@ import { PlusIcon } from '@heroicons/react/24/outline'
 import { ServerCard } from './ServerCard'
 import { ServerForm } from './ServerForm'
 import { MCPServerConfig } from '../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/settings/models'
+import { ClientStatus } from '../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/mcp/models'
 import { LoadingButton } from './LoadingButton'
 
 interface ServerListProps {
   servers: MCPServerConfig[]
+  clientStatus: { [key: string]: ClientStatus }
   onAddServer: (server: MCPServerConfig) => Promise<void>
   onUpdateServer: (name: string, server: MCPServerConfig) => Promise<void>
   onRemoveServer: (name: string) => Promise<void>
+  onRefreshStatus?: (serverName: string) => Promise<void>
   loadingStates: {
     addServer: boolean
     updateServer: boolean
@@ -26,9 +29,11 @@ interface ServerListProps {
 
 export function ServerList({ 
   servers, 
+  clientStatus,
   onAddServer, 
   onUpdateServer, 
   onRemoveServer,
+  onRefreshStatus,
   loadingStates,
   errors
 }: ServerListProps) {
@@ -122,9 +127,11 @@ export function ServerList({
             <ServerCard
               key={server.name}
               server={server}
+              clientStatus={clientStatus[server.name] || {}}
               onEdit={handleEditServer}
               onRemove={handleRemoveServer}
               loading={loadingStates.removeServer}
+              onRefreshStatus={onRefreshStatus}
             />
           ))}
         </div>
