@@ -100,7 +100,7 @@ export function ServerList({
           size="md"
           className="whitespace-nowrap flex-shrink-0"
         >
-          <PlusIcon className="h-4 w-4" />
+          <PlusIcon className="h-4 w-4 inline-block" />
           Add Server
         </LoadingButton>
       </div>
@@ -121,7 +121,7 @@ export function ServerList({
             loading={loadingStates.addServer}
             size="md"
           >
-            <PlusIcon className="h-4 w-4" />
+            <PlusIcon className="h-4 w-4 inline-block" />
             Add Server
           </LoadingButton>
         </div>

@@ -238,6 +238,16 @@ func (cm *ClientManager) registerClientTools(ctx context.Context, mc *ManagedCli
 	for _, tool := range listToolsResult.Tools {
 		// Create a proxy handler that forwards calls to the client
 		handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			// Strip the prefix from the tool name for the client call
+			request.Params.Name = tool.Name
+
+			slog.Info("Calling tool",
+				"client", mc.Config.Name,
+				"original_tool", tool.Name,
+				"prefixed_tool", request.Params.Name,
+				"request", request)
+
+			// Call the client with the original tool name
 			return mc.Client.CallTool(ctx, request)
 		}
 
