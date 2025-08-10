@@ -10,6 +10,10 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 // @ts-ignore: Unused imports
 import * as settings$0 from "../settings/models.js";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as $models from "./models.js";
+
 /**
  * AddMCPServer adds a new MCP server configuration
  * @param {settings$0.MCPServerConfig} config
@@ -20,12 +24,22 @@ export function AddMCPServer(config) {
 }
 
 /**
+ * GetClientStatus returns the status of all clients
+ * @returns {$CancellablePromise<{ [_: string]: $models.ClientStatus }>}
+ */
+export function GetClientStatus() {
+    return $Call.ByID(3377848763).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType1($result);
+    }));
+}
+
+/**
  * GetSettings returns the current settings
  * @returns {$CancellablePromise<settings$0.Settings | null>}
  */
 export function GetSettings() {
     return $Call.ByID(3884386303).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType1($result);
+        return $$createType3($result);
     }));
 }
 
@@ -41,7 +55,7 @@ export function IsActive() {
  */
 export function List() {
     return $Call.ByID(287741050).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType3($result);
+        return $$createType5($result);
     }));
 }
 
@@ -53,12 +67,47 @@ export function ListenAddr() {
 }
 
 /**
+ * ReloadClients reloads all clients from settings
+ * @returns {$CancellablePromise<void>}
+ */
+export function ReloadClients() {
+    return $Call.ByID(3502122629);
+}
+
+/**
  * RemoveMCPServer removes an MCP server configuration
  * @param {string} name
  * @returns {$CancellablePromise<void>}
  */
 export function RemoveMCPServer(name) {
     return $Call.ByID(255493505, name);
+}
+
+/**
+ * RestartClient restarts an MCP client
+ * @param {string} name
+ * @returns {$CancellablePromise<void>}
+ */
+export function RestartClient(name) {
+    return $Call.ByID(3792849082, name);
+}
+
+/**
+ * StartClient starts an MCP client
+ * @param {settings$0.MCPServerConfig} config
+ * @returns {$CancellablePromise<void>}
+ */
+export function StartClient(config) {
+    return $Call.ByID(2765291965, config);
+}
+
+/**
+ * StopClient stops an MCP client
+ * @param {string} name
+ * @returns {$CancellablePromise<void>}
+ */
+export function StopClient(name) {
+    return $Call.ByID(2947742357, name);
 }
 
 /**
@@ -89,7 +138,9 @@ export function UpdateSettings(settings) {
 }
 
 // Private type creation functions
-const $$createType0 = settings$0.Settings.createFrom;
-const $$createType1 = $Create.Nullable($$createType0);
-const $$createType2 = settings$0.MCPServerConfig.createFrom;
-const $$createType3 = $Create.Array($$createType2);
+const $$createType0 = $models.ClientStatus.createFrom;
+const $$createType1 = $Create.Map($Create.Any, $$createType0);
+const $$createType2 = settings$0.Settings.createFrom;
+const $$createType3 = $Create.Nullable($$createType2);
+const $$createType4 = settings$0.MCPServerConfig.createFrom;
+const $$createType5 = $Create.Array($$createType4);

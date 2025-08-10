@@ -2,21 +2,15 @@ package mcp
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 func NewServer(listenAddr string) *Server {
-	mcpServer := server.NewMCPServer("mcp-bouncer", "0.0.1")
-	mcpServer.AddTool(mcp.Tool{
-		Name: "hello",
-	}, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return mcp.NewToolResultText(fmt.Sprintf("hello: %s", time.Now().UTC().Format(time.RFC1123Z))), nil
-	})
+	mcpServer := server.NewMCPServer("mcp-bouncer", "0.0.1",
+		server.WithToolCapabilities(true))
 	streamableHttp := server.NewStreamableHTTPServer(mcpServer)
 	mux := http.NewServeMux()
 	mux.Handle("/mcp", streamableHttp)
@@ -25,18 +19,25 @@ func NewServer(listenAddr string) *Server {
 		Addr:    listenAddr,
 		Handler: mux,
 	}
-	return &Server{
+
+	server := &Server{
 		listenAddr: listenAddr,
 		mcp:        mcpServer,
 		httpServer: httpServer,
 	}
+
+	// Create client manager
+	server.clientManager = NewClientManager(server)
+
+	return server
 }
 
 type Server struct {
-	listenAddr string
-	mcp        *server.MCPServer
-	httpServer *http.Server
-	active     bool
+	listenAddr    string
+	mcp           *server.MCPServer
+	httpServer    *http.Server
+	active        bool
+	clientManager *ClientManager
 }
 
 func (s *Server) Start(ctx context.Context) error {
@@ -54,4 +55,9 @@ func (s *Server) Start(ctx context.Context) error {
 		defer cancel()
 		return s.httpServer.Shutdown(shutdownCtx)
 	}
+}
+
+// GetClientManager returns the client manager
+func (s *Server) GetClientManager() *ClientManager {
+	return s.clientManager
 }

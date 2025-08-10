@@ -56,6 +56,7 @@ function App() {
   const loadServers = async () => {
     try {
       const serverList = await MCPService.List()
+      console.log('Loaded servers:', serverList)
       setServers(serverList)
     } catch (error) {
       console.error('Failed to load servers:', error)
@@ -110,12 +111,14 @@ function App() {
 
     // Listen for server updates
     const unsubscribe = Events.On("mcp:servers_updated", async (event: WailsEvent) => {
+      console.log('Received mcp:servers_updated event:', event)
       await loadServers()
       await loadActive()
     })
 
     // Listen for settings updates
     const unsubscribeSettings = Events.On("settings:updated", async (event: WailsEvent) => {
+      console.log('Received settings:updated event:', event)
       await loadSettings()
       await loadServers()
     })
@@ -125,6 +128,11 @@ function App() {
       unsubscribeSettings()
     }
   }, [])
+
+  // Debug modal state changes
+  useEffect(() => {
+    console.log('Modal state changed:', { showAddServer, editingServer: !!editingServer })
+  }, [showAddServer, editingServer])
 
   return (
     <div className="h-screen bg-white p-6">
@@ -251,14 +259,25 @@ function App() {
         <ServerForm
           server={editingServer}
           onSave={async (serverConfig) => {
-            if (editingServer && editingServer.name) {
-              await MCPService.UpdateMCPServer(editingServer.name, serverConfig)
-            } else {
-              await MCPService.AddMCPServer(serverConfig)
+            try {
+              console.log('Saving server config:', serverConfig)
+              if (editingServer && editingServer.name) {
+                console.log('Updating existing server:', editingServer.name)
+                await MCPService.UpdateMCPServer(editingServer.name, serverConfig)
+              } else {
+                console.log('Adding new server')
+                await MCPService.AddMCPServer(serverConfig)
+              }
+              console.log('Server saved, loading updated list...')
+              await loadServers()
+              console.log('Closing modal...')
+              setShowAddServer(false)
+              setEditingServer(null)
+              console.log('Modal state reset')
+            } catch (error) {
+              console.error('Failed to save server configuration:', error)
+              // Keep the modal open if there's an error
             }
-            await loadServers()
-            setShowAddServer(false)
-            setEditingServer(null)
           }}
           onCancel={() => {
             setShowAddServer(false)
@@ -273,7 +292,7 @@ function App() {
 // Server Form Component
 interface ServerFormProps {
   server?: MCPServerConfig | null
-  onSave: (server: MCPServerConfig) => void
+  onSave: (server: MCPServerConfig) => Promise<void>
   onCancel: () => void
 }
 
@@ -291,9 +310,14 @@ function ServerForm({ server, onSave, onCancel }: ServerFormProps) {
   const [newEnvKey, setNewEnvKey] = useState('')
   const [newEnvValue, setNewEnvValue] = useState('')
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    onSave(formData)
+    try {
+      await onSave(formData)
+    } catch (error) {
+      console.error('Failed to save server:', error)
+      // You might want to show an error message to the user here
+    }
   }
 
   const addArg = () => {

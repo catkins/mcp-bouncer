@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -93,14 +94,20 @@ func (s *SettingsService) Load() error {
 
 // Save saves settings to file
 func (s *SettingsService) Save() error {
+	slog.Debug("Saving settings", "file_path", s.filePath, "server_count", len(s.settings.MCPServers))
+
 	data, err := json.MarshalIndent(s.settings, "", "  ")
 	if err != nil {
+		slog.Error("Failed to marshal settings", "error", err)
 		return err
 	}
 
 	if err := os.WriteFile(s.filePath, data, 0644); err != nil {
+		slog.Error("Failed to write settings file", "file_path", s.filePath, "error", err)
 		return err
 	}
+
+	slog.Debug("Settings saved successfully", "file_path", s.filePath)
 
 	// Emit settings updated event
 	s.emitEvent("settings:updated", s.settings)
@@ -120,8 +127,14 @@ func (s *SettingsService) UpdateSettings(settings *Settings) error {
 
 // AddMCPServer adds a new MCP server configuration
 func (s *SettingsService) AddMCPServer(config MCPServerConfig) error {
+	slog.Info("Adding MCP server", "name", config.Name, "command", config.Command)
 	s.settings.MCPServers = append(s.settings.MCPServers, config)
-	return s.Save()
+	if err := s.Save(); err != nil {
+		slog.Error("Failed to save settings after adding server", "error", err)
+		return err
+	}
+	slog.Info("Successfully added MCP server", "name", config.Name, "total_servers", len(s.settings.MCPServers))
+	return nil
 }
 
 // RemoveMCPServer removes an MCP server configuration by name

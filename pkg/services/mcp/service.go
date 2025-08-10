@@ -3,8 +3,8 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"math/rand"
-	"time"
 
 	"github.com/catkins/mcp-bouncer-poc/pkg/services/settings"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -32,30 +32,37 @@ func (s *MCPService) ServiceStartup(ctx context.Context, options application.Ser
 	if s.settings != nil {
 		s.listenAddr = s.settings.GetListenAddr()
 		s.server = NewServer(s.listenAddr)
+
+		// Subscribe to settings updates
+		s.settings.Subscribe(func(event *application.CustomEvent) {
+			if event.Name == "settings:updated" {
+				slog.Info("Settings updated, reloading clients")
+				if err := s.ReloadClients(); err != nil {
+					slog.Error("Failed to reload clients", "error", err)
+				}
+			}
+		})
 	}
 
+	// Start the server
 	go func() {
 		s.server.Start(ctx)
 	}()
 
+	// Load clients from settings asynchronously
 	go func() {
-		s.startTicker(ctx)
+		if s.settings != nil {
+			settings := s.settings.GetSettings()
+			if settings != nil {
+				slog.Info("Loading clients from settings", "client_count", len(settings.MCPServers))
+				if err := s.server.GetClientManager().LoadClientsFromSettings(ctx, settings); err != nil {
+					slog.Error("Failed to load clients from settings", "error", err)
+				}
+			}
+		}
 	}()
 
 	return nil
-}
-
-func (s *MCPService) startTicker(ctx context.Context) error {
-	ticker := time.NewTicker(5 * time.Second)
-	for {
-		select {
-		case <-ticker.C:
-			s.emitEvent("mcp:servers_updated", map[string]any{})
-
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
 }
 
 func (s *MCPService) IsActive() bool {
@@ -91,7 +98,13 @@ func (s *MCPService) ListenAddr() string {
 // AddMCPServer adds a new MCP server configuration
 func (s *MCPService) AddMCPServer(config settings.MCPServerConfig) error {
 	if s.settings != nil {
-		return s.settings.AddMCPServer(config)
+		err := s.settings.AddMCPServer(config)
+		if err != nil {
+			return err
+		}
+		// Emit event to notify frontend that servers have been updated
+		s.emitEvent("mcp:servers_updated", map[string]any{})
+		return nil
 	}
 	return fmt.Errorf("settings service not available")
 }
@@ -99,7 +112,13 @@ func (s *MCPService) AddMCPServer(config settings.MCPServerConfig) error {
 // RemoveMCPServer removes an MCP server configuration
 func (s *MCPService) RemoveMCPServer(name string) error {
 	if s.settings != nil {
-		return s.settings.RemoveMCPServer(name)
+		err := s.settings.RemoveMCPServer(name)
+		if err != nil {
+			return err
+		}
+		// Emit event to notify frontend that servers have been updated
+		s.emitEvent("mcp:servers_updated", map[string]any{})
+		return nil
 	}
 	return fmt.Errorf("settings service not available")
 }
@@ -107,7 +126,13 @@ func (s *MCPService) RemoveMCPServer(name string) error {
 // UpdateMCPServer updates an MCP server configuration
 func (s *MCPService) UpdateMCPServer(name string, config settings.MCPServerConfig) error {
 	if s.settings != nil {
-		return s.settings.UpdateMCPServer(name, config)
+		err := s.settings.UpdateMCPServer(name, config)
+		if err != nil {
+			return err
+		}
+		// Emit event to notify frontend that servers have been updated
+		s.emitEvent("mcp:servers_updated", map[string]any{})
+		return nil
 	}
 	return fmt.Errorf("settings service not available")
 }
@@ -128,10 +153,64 @@ func (s *MCPService) UpdateSettings(settings *settings.Settings) error {
 	return fmt.Errorf("settings service not available")
 }
 
+// StartClient starts an MCP client
+func (s *MCPService) StartClient(config settings.MCPServerConfig) error {
+	if s.server != nil {
+		return s.server.GetClientManager().StartClient(context.Background(), config)
+	}
+	return fmt.Errorf("server not available")
+}
+
+// StopClient stops an MCP client
+func (s *MCPService) StopClient(name string) error {
+	if s.server != nil {
+		return s.server.GetClientManager().StopClient(name)
+	}
+	return fmt.Errorf("server not available")
+}
+
+// RestartClient restarts an MCP client
+func (s *MCPService) RestartClient(name string) error {
+	if s.server != nil {
+		return s.server.GetClientManager().RestartClient(context.Background(), name)
+	}
+	return fmt.Errorf("server not available")
+}
+
+// GetClientStatus returns the status of all clients
+func (s *MCPService) GetClientStatus() map[string]ClientStatus {
+	if s.server != nil {
+		return s.server.GetClientManager().GetClientStatus()
+	}
+	return make(map[string]ClientStatus)
+}
+
+// ReloadClients reloads all clients from settings
+func (s *MCPService) ReloadClients() error {
+	if s.settings != nil && s.server != nil {
+		settings := s.settings.GetSettings()
+		if settings != nil {
+			err := s.server.GetClientManager().LoadClientsFromSettings(context.Background(), settings)
+			if err != nil {
+				return err
+			}
+			// Emit event to notify frontend that servers have been updated
+			s.emitEvent("mcp:servers_updated", map[string]any{})
+			return nil
+		}
+	}
+	return fmt.Errorf("settings or server not available")
+}
+
 func (s *MCPService) emitEvent(name string, data any) {
-	s.callback(&application.CustomEvent{
-		Name:   name,
-		Data:   data,
-		Sender: "mcp_service",
-	})
+	slog.Info("Emitting event", "name", name, "data", data)
+	if s.callback != nil {
+		s.callback(&application.CustomEvent{
+			Name:   name,
+			Data:   data,
+			Sender: "mcp_service",
+		})
+	} else {
+		slog.Warn("No callback set for MCP service, cannot emit event", "name", name)
+	}
 }
