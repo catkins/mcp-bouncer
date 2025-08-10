@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/catkins/mcp-bouncer-poc/pkg/services/mcp"
+	"github.com/catkins/mcp-bouncer-poc/pkg/services/settings"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -21,7 +22,8 @@ var assets embed.FS
 // and starts a goroutine that emits a time-based event every second. It subsequently runs the application and
 // logs any error that might occur.
 func main() {
-	mcpService := mcp.NewMCPService()
+	settingsService := settings.NewSettingsService()
+	mcpService := mcp.NewMCPService(settingsService)
 
 	// Create a new Wails application by providing the necessary options.
 	// Variables 'Name' and 'Description' are for application metadata.
@@ -29,9 +31,10 @@ func main() {
 	// 'Bind' is a list of Go struct instances. The frontend has access to the methods of these instances.
 	// 'Mac' options tailor the application when running an macOS.
 	app := application.New(application.Options{
-		Name:        "mcp-bouncer-poc",
-		Description: "A demo of using raw HTML & CSS",
+		Name:        "MCP Bouncer",
+		Description: "A MCP server gateway",
 		Services: []application.Service{
+			application.NewService(settingsService),
 			application.NewService(mcpService),
 		},
 		Assets: application.AssetOptions{
@@ -40,6 +43,11 @@ func main() {
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
+	})
+
+	// Subscribe to events from both services
+	settingsService.Subscribe(func(event *application.CustomEvent) {
+		app.Event.EmitEvent(event)
 	})
 	mcpService.Subscribe(func(event *application.CustomEvent) {
 		app.Event.EmitEvent(event)

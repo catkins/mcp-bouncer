@@ -1,6 +1,15 @@
-# Welcome to Your New Wails3 Project!
+# MCP Bouncer
 
-Congratulations on generating your Wails3 application! This README will guide you through the next steps to get your project up and running.
+A Wails3 application that serves as a gateway for Model Context Protocol (MCP) servers. This application provides a user-friendly interface for managing and configuring MCP servers.
+
+## Features
+
+- **MCP Server Management**: Add, remove, and configure MCP servers
+- **Settings Persistence**: Automatic settings management with JSON configuration files
+- **Cross-platform**: Works on macOS, Windows, and Linux
+- **Modern UI**: Built with Wails3 and modern web technologies
+
+## Getting Started
 
 ## Getting Started
 
@@ -40,14 +49,55 @@ Now that you have your project set up, it's time to explore the features that Wa
 
 4. **Join the community**: Have questions or want to share your progress? Join the [Wails Discord](https://discord.gg/JDdSxwjhGf) or visit the [Wails discussions on GitHub](https://github.com/wailsapp/wails/discussions).
 
-## Project Structure
+## Configuration
 
-Take a moment to familiarize yourself with your project structure:
+The application automatically manages settings in a JSON configuration file. The settings file is located at:
+
+- **macOS**: `~/Library/Application Support/mcp-bouncer/settings.json`
+- **Linux**: `~/.config/mcp-bouncer/settings.json`
+- **Windows**: `%APPDATA%\mcp-bouncer\settings.json`
+
+### Settings Structure
+
+The settings file contains the following configuration:
+
+```json
+{
+  "mcp_servers": [
+    {
+      "name": "filesystem",
+      "description": "Filesystem MCP server for file operations",
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-filesystem"],
+      "env": {
+        "MCP_FILESYSTEM_ROOT": "/Users/username/Documents"
+      },
+      "enabled": true
+    }
+  ],
+  "listen_addr": "localhost:8091",
+  "auto_start": false
+}
+```
+
+### MCP Server Configuration
+
+Each MCP server configuration includes:
+
+- **name**: Unique identifier for the server
+- **description**: Human-readable description
+- **command**: The command to execute (e.g., `npx`, `python`, `node`)
+- **args**: Array of command-line arguments
+- **env**: Environment variables as key-value pairs
+- **enabled**: Whether the server should be started automatically
+
+## Project Structure
 
 - `frontend/`: Contains your frontend code (HTML, CSS, JavaScript/TypeScript)
 - `main.go`: The entry point of your Go backend
-- `app.go`: Define your application structure and methods here
-- `wails.json`: Configuration file for your Wails project
+- `pkg/services/mcp/`: MCP server management service
+- `pkg/services/settings/`: Settings management service
+- `settings.example.json`: Example configuration file
 
 ## Next Steps
 

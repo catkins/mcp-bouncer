@@ -1,0 +1,36 @@
+{
+  "mcp_servers": [
+    {
+      "name": "filesystem",
+      "description": "Filesystem MCP server for file operations",
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-filesystem"],
+      "env": {
+        "MCP_FILESYSTEM_ROOT": "/Users/username/Documents"
+      },
+      "enabled": true
+    },
+    {
+      "name": "github",
+      "description": "GitHub MCP server for repository operations",
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_TOKEN": "your-github-token-here"
+      },
+      "enabled": false
+    },
+    {
+      "name": "postgres",
+      "description": "PostgreSQL MCP server for database operations",
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-postgres"],
+      "env": {
+        "DATABASE_URL": "postgresql://user:password@localhost:5432/dbname"
+      },
+      "enabled": true
+    }
+  ],
+  "listen_addr": "localhost:8091",
+  "auto_start": false
+}
