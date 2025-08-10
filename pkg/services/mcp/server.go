@@ -2,53 +2,55 @@ package mcp
 
 import (
 	"context"
-	"fmt"
-	"math/rand"
+	"net/http"
 	"time"
 
-	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
 )
 
-type MCPService struct {
-	addr     string
-	callback func(e *application.CustomEvent)
-}
+func NewServer(listenAddr string) *Server {
+	mcpServer := server.NewMCPServer("mcp-bouncer", "0.0.1")
+	mcpServer.AddTool(mcp.Tool{
+		Name: "hello",
+	}, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return mcp.NewToolResultText("hello"), nil
+	})
+	streamableHttp := server.NewStreamableHTTPServer(mcpServer)
+	mux := http.NewServeMux()
+	mux.Handle("/mcp", streamableHttp)
 
-func NewMCPService() *MCPService {
-	return &MCPService{
-		addr: "http://localhost:8080/mcp",
+	httpServer := &http.Server{
+		Addr:    listenAddr,
+		Handler: mux,
+	}
+	return &Server{
+		listenAddr: listenAddr,
+		mcp:        mcpServer,
+		httpServer: httpServer,
 	}
 }
 
-func (s *MCPService) Start(ctx context.Context) error {
-	ticker := time.NewTicker(5 * time.Second)
-	for {
-		select {
-		case <-ticker.C:
+type Server struct {
+	listenAddr string
+	mcp        *server.MCPServer
+	httpServer *http.Server
+	active     bool
+}
 
-			s.callback(&application.CustomEvent{
-				Name: "mcp:servers_updated",
-				Data: map[string]any{},
-			})
+func (s *Server) Start(ctx context.Context) error {
+	errCh := make(chan error)
+	go func() {
+		s.active = true
+		errCh <- s.httpServer.ListenAndServe()
+	}()
 
-		case <-ctx.Done():
-			return ctx.Err()
-		}
+	select {
+	case err := <-errCh:
+		return err
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		defer cancel()
+		return s.httpServer.Shutdown(shutdownCtx)
 	}
-}
-
-func (s *MCPService) Subscribe(callback func(e *application.CustomEvent)) {
-	s.callback = callback
-}
-
-func (s *MCPService) List() ([]string, error) {
-	servers := []string{}
-	for i := range rand.Intn(10) {
-		servers = append(servers, fmt.Sprintf("service%d", i+1))
-	}
-	return servers, nil
-}
-
-func (s *MCPService) ListenAddr() string {
-	return s.addr
 }

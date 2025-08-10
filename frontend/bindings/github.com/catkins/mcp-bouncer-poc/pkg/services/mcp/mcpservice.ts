@@ -5,6 +5,10 @@
 // @ts-ignore: Unused imports
 import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Create } from "@wailsio/runtime";
 
+export function IsActive(): $CancellablePromise<boolean> {
+    return $Call.ByID(2504495108);
+}
+
 export function List(): $CancellablePromise<string[]> {
     return $Call.ByID(287741050).then(($result: any) => {
         return $$createType0($result);
