@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	"github.com/adrg/xdg"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -206,4 +208,23 @@ func (s *SettingsService) emitEvent(name string, data any) {
 			Sender: "settings_service",
 		})
 	}
+}
+
+// OpenConfigDirectory opens the config directory in the platform's file manager
+func (s *SettingsService) OpenConfigDirectory() error {
+	configDir := filepath.Dir(s.filePath)
+	
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", configDir)
+	case "windows":
+		cmd = exec.Command("explorer", configDir)
+	case "linux":
+		cmd = exec.Command("xdg-open", configDir)
+	default:
+		return fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
+	}
+	
+	return cmd.Run()
 }

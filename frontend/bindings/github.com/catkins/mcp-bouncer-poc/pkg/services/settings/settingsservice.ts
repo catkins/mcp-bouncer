@@ -70,6 +70,13 @@ export function Load(): $CancellablePromise<void> {
 }
 
 /**
+ * OpenConfigDirectory opens the config directory in the platform's file manager
+ */
+export function OpenConfigDirectory(): $CancellablePromise<void> {
+    return $Call.ByID(2116746777);
+}
+
+/**
  * RemoveMCPServer removes an MCP server configuration by name
  */
 export function RemoveMCPServer(name: string): $CancellablePromise<void> {

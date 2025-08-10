@@ -137,6 +137,15 @@ export function useMCPService() {
     }
   }
 
+  const openConfigDirectory = async () => {
+    try {
+      await SettingsService.OpenConfigDirectory()
+    } catch (error) {
+      console.error('Failed to open config directory:', error)
+      setError('general', 'Failed to open config directory')
+    }
+  }
+
   useEffect(() => {
     const init = async () => {
       await loadSettings()
@@ -181,6 +190,7 @@ export function useMCPService() {
     addServer,
     updateServer,
     removeServer,
+    openConfigDirectory,
     loadServers,
     loadSettings,
     loadMcpUrl,

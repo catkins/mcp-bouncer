@@ -1,13 +1,14 @@
 import { StatusIndicator } from './StatusIndicator'
-import { SunIcon, MoonIcon } from '@heroicons/react/24/outline'
+import { SunIcon, MoonIcon, Cog6ToothIcon } from '@heroicons/react/24/outline'
 
 interface HeaderProps {
   isActive: boolean | null
   toggleTheme: () => void
   theme: 'light' | 'dark'
+  onOpenConfig: () => void
 }
 
-export function Header({ isActive, toggleTheme, theme }: HeaderProps) {
+export function Header({ isActive, toggleTheme, theme, onOpenConfig }: HeaderProps) {
   return (
     <header className="fixed top-0 left-0 right-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-100 dark:border-gray-800">
       <div className="flex items-center justify-between px-4 py-2">
@@ -18,6 +19,13 @@ export function Header({ isActive, toggleTheme, theme }: HeaderProps) {
         
         <div className="flex items-center gap-3">
           <StatusIndicator isActive={isActive} />
+          <button
+            onClick={onOpenConfig}
+            className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+            aria-label="Open config directory"
+          >
+            <Cog6ToothIcon className="h-4 w-4" />
+          </button>
           <button
             onClick={toggleTheme}
             className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
