@@ -6,12 +6,12 @@
 name: "mcp-bouncer-poc"
 arch: ${GOARCH}
 platform: "linux"
-version: "0.1.0"
+version: "0.0.1"
 section: "default"
 priority: "extra"
 maintainer: ${GIT_COMMITTER_NAME} <${GIT_COMMITTER_EMAIL}>
-description: "My Product Description"
-vendor: "My Company"
+description: "Local gateway for MCP servers"
+vendor: "Catkins"
 homepage: "https://wails.io"
 license: "MIT"
 release: "1"
