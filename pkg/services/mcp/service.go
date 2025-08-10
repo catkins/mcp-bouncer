@@ -24,10 +24,19 @@ func NewMCPService() *MCPService {
 	}
 }
 
-func (s *MCPService) Start(ctx context.Context) error {
+func (s *MCPService) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
 	go func() {
 		s.server.Start(ctx)
 	}()
+
+	go func() {
+		s.startTicker(ctx)
+	}()
+
+	return nil
+}
+
+func (s *MCPService) startTicker(ctx context.Context) error {
 	ticker := time.NewTicker(5 * time.Second)
 	for {
 		select {

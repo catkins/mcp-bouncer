@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -14,7 +15,7 @@ func NewServer(listenAddr string) *Server {
 	mcpServer.AddTool(mcp.Tool{
 		Name: "hello",
 	}, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return mcp.NewToolResultText("hello"), nil
+		return mcp.NewToolResultText(fmt.Sprintf("hello: %s", time.Now().UTC().Format(time.RFC1123Z))), nil
 	})
 	streamableHttp := server.NewStreamableHTTPServer(mcpServer)
 	mux := http.NewServeMux()

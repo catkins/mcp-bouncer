@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"embed"
 	_ "embed"
 	"log"
@@ -45,13 +44,6 @@ func main() {
 	mcpService.Subscribe(func(event *application.CustomEvent) {
 		app.Event.EmitEvent(event)
 	})
-
-	go func() {
-		err := mcpService.Start(context.TODO())
-		if err != nil {
-			log.Fatal(err)
-		}
-	}()
 
 	// Create a new window with the necessary options.
 	// 'Title' is the title of the window.
