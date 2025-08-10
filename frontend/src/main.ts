@@ -1,23 +1,36 @@
-import { GreetService } from "../bindings/github.com/catkins/mcp-bouncer-poc";
+import { WailsEvent } from "@wailsio/runtime/types/events";
+import { MCPService } from "../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/mcp";
 import { Events } from "@wailsio/runtime";
 
-const greetButton = document.getElementById('greet')! as HTMLButtonElement;
-const resultElement = document.getElementById('result')! as HTMLDivElement;
-const nameElement: HTMLInputElement = document.getElementById('name')! as HTMLInputElement;
-const timeElement = document.getElementById('time')! as HTMLDivElement;
+let serverListDiv = document.getElementById('servers');
+let listenAddrDiv = document.getElementById('listen-addr');
 
-greetButton.addEventListener('click', () => {
-  let name = (nameElement as HTMLInputElement).value
-  if (!name) {
-    name = 'anonymous';
+async function init() {
+  let servers = await MCPService.List()
+  for (let server of servers) {
+    let serverDiv = document.createElement('div');
+    serverDiv.innerHTML = server;
+    serverListDiv?.appendChild(serverDiv);
   }
-  GreetService.Greet(name).then((result: string) => {
-    resultElement.innerText = result;
-  }).catch((err: Error) => {
-    console.log(err);
-  });
+
+  if (listenAddrDiv) {
+    listenAddrDiv.innerHTML = await MCPService.ListenAddr();
+  }
+}
+
+Events.On("mcp:servers_updated", async (event: WailsEvent) => {
+  if (serverListDiv) {
+    serverListDiv.innerHTML = '';
+  }
+  let servers = await MCPService.List()
+  for (let server of servers) {
+    let serverDiv = document.createElement('div');
+    serverDiv.innerHTML = server;
+    serverListDiv?.appendChild(serverDiv);
+  }
 });
 
-Events.On('time', (time: { data: any }) => {
-  timeElement.innerText = time.data;
-});
+async function main() {
+  await init();
+}
+main();

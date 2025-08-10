@@ -11,5 +11,17 @@ export function List(): $CancellablePromise<string[]> {
     });
 }
 
+export function ListenAddr(): $CancellablePromise<string> {
+    return $Call.ByID(707727382);
+}
+
+export function Start(): $CancellablePromise<void> {
+    return $Call.ByID(1640392478);
+}
+
+export function Subscribe(callback: any): $CancellablePromise<void> {
+    return $Call.ByID(103217282, callback);
+}
+
 // Private type creation functions
 const $$createType0 = $Create.Array($Create.Any);
