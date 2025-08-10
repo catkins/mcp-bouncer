@@ -92,15 +92,15 @@ export function ServerList({
     <div className="mb-4">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-          MCP Servers
+          Servers
         </h2>
         <LoadingButton
           onClick={handleAddServer}
           loading={loadingStates.addServer}
-          size="md"
-          className="whitespace-nowrap flex-shrink-0"
+          size="sm"
+          className="whitespace-nowrap flex-shrink-0 text-xs px-2 py-1 h-6"
         >
-          <PlusIcon className="h-4 w-4 inline-block" />
+          <PlusIcon className="h-3 w-3 inline-block" />
           Add Server
         </LoadingButton>
       </div>
@@ -119,9 +119,10 @@ export function ServerList({
           <LoadingButton
             onClick={handleAddServer}
             loading={loadingStates.addServer}
-            size="md"
+            size="sm"
+            className="text-xs px-2 py-1 h-6"
           >
-            <PlusIcon className="h-4 w-4 inline-block" />
+            <PlusIcon className="h-3 w-3 inline-block" />
             Add Server
           </LoadingButton>
         </div>

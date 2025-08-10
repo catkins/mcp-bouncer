@@ -47,7 +47,7 @@ export function ToggleSwitch({
           relative inline-flex items-center rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
           ${sizeClasses[size]}
           ${checked 
-            ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 shadow-lg' 
+            ? 'bg-gradient-to-r from-blue-400 via-blue-500 to-purple-500 shadow-lg' 
             : 'bg-gray-300 dark:bg-gray-600'
           }
           ${disabled 
@@ -62,7 +62,7 @@ export function ToggleSwitch({
           className={`
             inline-block rounded-full bg-white shadow transform transition-all duration-300 ease-in-out
             ${thumbSizeClasses[size]}
-            ${checked ? 'translate-x-5' : 'translate-x-0.5'}
+            ${checked ? 'translate-x-4' : 'translate-x-0.5'}
             ${disabled ? 'opacity-75' : ''}
           `}
         />
