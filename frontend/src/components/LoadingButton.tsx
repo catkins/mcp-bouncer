@@ -24,7 +24,7 @@ export function LoadingButton({
   const baseClasses = "inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden"
   
   const variantClasses = {
-    primary: "bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 hover:from-blue-600 hover:via-purple-600 hover:to-pink-600 focus:ring-purple-500 text-white shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95 animate-gradient bg-[length:200%_200%]",
+    primary: "bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 hover:from-blue-600 hover:via-purple-600 hover:to-pink-600 focus:ring-purple-500 text-white shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95 bg-[length:200%_100%]",
     secondary: "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 focus:ring-gray-500 hover:shadow-md transform hover:scale-105 active:scale-95",
     danger: "bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 focus:ring-red-500 text-white shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
   }
@@ -53,7 +53,7 @@ export function LoadingButton({
       disabled={loading || disabled}
       className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className} ${
         loading ? 'animate-pulse' : ''
-      }`}
+      } ${variant === 'primary' && !loading ? 'animate-gradient' : ''}`}
     >
       {loading && (
         <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />

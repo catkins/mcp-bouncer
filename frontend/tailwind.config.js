@@ -25,8 +25,8 @@ export default {
       animation: {
         'pulse': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'spin': 'spin 1s linear infinite',
-        'gradient': 'gradient 3s ease infinite',
-        'shimmer': 'shimmer 2s linear infinite',
+        'gradient': 'gradient 4s ease-in-out infinite',
+        'shimmer': 'shimmer 2s ease-in-out infinite',
       },
       keyframes: {
         pulse: {
@@ -38,14 +38,8 @@ export default {
           '100%': { transform: 'rotate(360deg)' },
         },
         gradient: {
-          '0%, 100%': {
-            'background-size': '200% 200%',
-            'background-position': 'left center'
-          },
-          '50%': {
-            'background-size': '200% 200%',
-            'background-position': 'right center'
-          },
+          '0%': { 'background-position': '0% 50%' },
+          '100%': { 'background-position': '200% 50%' },
         },
         shimmer: {
           '0%': { transform: 'translateX(-100%)' },
