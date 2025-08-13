@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os/exec"
 	"sync"
 	"time"
 
@@ -196,17 +195,48 @@ type ClientStatus struct {
 
 // startClientProcess starts the client process
 func (cm *ClientManager) startClientProcess(mc *ManagedClient) error {
-	cmd := exec.Command(mc.Config.Command, mc.Config.Args...)
+	switch mc.Config.Transport {
+	case settings.TransportStdio:
+		// Create stdio transport
+		mc.Transport = transport.NewStdio(mc.Config.Command, []string{}, mc.Config.Args...)
 
-	// Set environment variables
-	if mc.Config.Env != nil {
-		for key, value := range mc.Config.Env {
-			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", key, value))
+	case settings.TransportSSE:
+		// Create SSE transport
+		if mc.Config.Endpoint == "" {
+			return fmt.Errorf("endpoint is required for SSE transport")
 		}
-	}
 
-	// Create transport - the transport will handle the process internally
-	mc.Transport = transport.NewStdio(mc.Config.Command, []string{}, mc.Config.Args...)
+		var options []transport.ClientOption
+		if mc.Config.Headers != nil {
+			options = append(options, transport.WithHeaders(mc.Config.Headers))
+		}
+
+		sseTransport, err := transport.NewSSE(mc.Config.Endpoint, options...)
+		if err != nil {
+			return fmt.Errorf("failed to create SSE transport: %w", err)
+		}
+		mc.Transport = sseTransport
+
+	case settings.TransportStreamableHTTP:
+		// Create streamable HTTP transport
+		if mc.Config.Endpoint == "" {
+			return fmt.Errorf("endpoint is required for streamable HTTP transport")
+		}
+
+		var options []transport.StreamableHTTPCOption
+		if mc.Config.Headers != nil {
+			options = append(options, transport.WithHTTPHeaders(mc.Config.Headers))
+		}
+
+		httpTransport, err := transport.NewStreamableHTTP(mc.Config.Endpoint, options...)
+		if err != nil {
+			return fmt.Errorf("failed to create streamable HTTP transport: %w", err)
+		}
+		mc.Transport = httpTransport
+
+	default:
+		return fmt.Errorf("unsupported transport type: %s", mc.Config.Transport)
+	}
 
 	return nil
 }

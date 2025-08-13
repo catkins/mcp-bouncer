@@ -67,12 +67,23 @@ The settings file contains the following configuration:
     {
       "name": "filesystem",
       "description": "Filesystem MCP server for file operations",
+      "transport": "stdio",
       "command": "npx",
       "args": ["@modelcontextprotocol/server-filesystem"],
       "env": {
         "MCP_FILESYSTEM_ROOT": "/Users/username/Documents"
       },
       "enabled": true
+    },
+    {
+      "name": "remote-server",
+      "description": "Remote MCP server using HTTP transport",
+      "transport": "streamable_http",
+      "endpoint": "https://example.com/mcp/stream",
+      "headers": {
+        "Authorization": "Bearer your-token-here"
+      },
+      "enabled": false
     }
   ],
   "listen_addr": "localhost:8091",
@@ -86,10 +97,19 @@ Each MCP server configuration includes:
 
 - **name**: Unique identifier for the server
 - **description**: Human-readable description
-- **command**: The command to execute (e.g., `npx`, `python`, `node`)
-- **args**: Array of command-line arguments
-- **env**: Environment variables as key-value pairs
+- **transport**: Transport type (`stdio`, `sse`, or `streamable_http`)
+- **command**: The command to execute (required for `stdio` transport)
+- **args**: Array of command-line arguments (for `stdio` transport)
+- **env**: Environment variables as key-value pairs (for `stdio` transport)
+- **endpoint**: HTTP endpoint URL (required for `sse` and `streamable_http` transports)
+- **headers**: HTTP headers as key-value pairs (for `sse` and `streamable_http` transports)
 - **enabled**: Whether the server should be started automatically
+
+#### Transport Types
+
+- **stdio**: Traditional process-based transport using standard input/output
+- **sse**: Server-Sent Events transport for HTTP-based MCP servers
+- **streamable_http**: Streamable HTTP transport for HTTP-based MCP servers
 
 ## Project Structure
 

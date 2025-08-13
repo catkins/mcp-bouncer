@@ -8,5 +8,6 @@ export {
 
 export {
     MCPServerConfig,
-    Settings
+    Settings,
+    TransportType
 } from "./models.js";

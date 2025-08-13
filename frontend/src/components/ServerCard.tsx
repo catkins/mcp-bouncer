@@ -1,4 +1,4 @@
-import { PencilIcon, TrashIcon, WrenchScrewdriverIcon, CheckCircleIcon, XCircleIcon, NoSymbolIcon } from '@heroicons/react/24/outline'
+import { PencilIcon, TrashIcon, WrenchScrewdriverIcon, CheckCircleIcon, XCircleIcon, NoSymbolIcon, CommandLineIcon, SignalIcon, GlobeAltIcon } from '@heroicons/react/24/outline'
 import { MCPServerConfig } from '../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/settings/models'
 import { ClientStatus } from '../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/mcp/models'
 import { LoadingButton } from './LoadingButton'
@@ -36,6 +36,19 @@ export function ServerCard({
     }
   }
 
+  const getTransportIcon = () => {
+    switch (server.transport) {
+      case 'stdio':
+        return <CommandLineIcon className="w-3 h-3" />
+      case 'sse':
+        return <SignalIcon className="w-3 h-3" />
+      case 'streamable_http':
+        return <GlobeAltIcon className="w-3 h-3" />
+      default:
+        return <CommandLineIcon className="w-3 h-3" />
+    }
+  }
+
   return (
     <div className={`
       relative p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm 
@@ -68,6 +81,10 @@ export function ServerCard({
                   <XCircleIcon className="w-3 h-3" />
                 )}
                 {clientStatus.connected ? 'Connected' : 'Disconnected'}
+              </span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-400 rounded-full text-xs font-medium">
+                {getTransportIcon()}
+                {server.transport || 'stdio'}
               </span>
               {clientStatus.connected && clientStatus.tools > 0 && (
                 <button
@@ -144,39 +161,73 @@ export function ServerCard({
       )}
       
       <div className={`space-y-1.5 transition-all duration-200 ${toggleLoading ? 'opacity-75' : ''}`}>
-        <div>
-          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Command:</span>
-          <code className="ml-2 px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
-            {server.command}
-          </code>
-        </div>
-        
-        {server.args && server.args.length > 0 && (
-          <div>
-            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Arguments:</span>
-            <div className="mt-1 flex flex-wrap gap-1">
-              {server.args.map((arg, index) => (
-                <code key={index} className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
-                  {arg}
-                </code>
-              ))}
+        {/* stdio transport fields */}
+        {(server.transport === 'stdio' || !server.transport) && (
+          <>
+            <div>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Command:</span>
+              <code className="ml-2 px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
+                {server.command}
+              </code>
             </div>
-          </div>
-        )}
-        
-        {server.env && Object.keys(server.env).length > 0 && (
-          <div>
-            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Environment:</span>
-            <div className="mt-1 space-y-1">
-              {Object.entries(server.env).map(([key, value]) => (
-                <div key={key} className="flex items-center gap-2">
-                  <code className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
-                    {key}={value}
-                  </code>
+            
+            {server.args && server.args.length > 0 && (
+              <div>
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Arguments:</span>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {server.args.map((arg, index) => (
+                    <code key={index} className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
+                      {arg}
+                    </code>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
+              </div>
+            )}
+            
+            {server.env && Object.keys(server.env).length > 0 && (
+              <div>
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Environment:</span>
+                <div className="mt-1 space-y-1">
+                  {Object.entries(server.env).map(([key, value]) => (
+                    <div key={key} className="flex items-center gap-2">
+                      <code className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
+                        {key}={value}
+                      </code>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* HTTP transport fields (SSE and streamable HTTP) */}
+        {(server.transport === 'sse' || server.transport === 'streamable_http') && (
+          <>
+            {server.endpoint && (
+              <div>
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Endpoint:</span>
+                <code className="ml-2 px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
+                  {server.endpoint}
+                </code>
+              </div>
+            )}
+            
+            {server.headers && Object.keys(server.headers).length > 0 && (
+              <div>
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Headers:</span>
+                <div className="mt-1 space-y-1">
+                  {Object.entries(server.headers).map(([key, value]) => (
+                    <div key={key} className="flex items-center gap-2">
+                      <code className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
+                        {key}: {value}
+                      </code>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

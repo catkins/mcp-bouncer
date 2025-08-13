@@ -3,6 +3,7 @@
     {
       "name": "filesystem",
       "description": "Filesystem MCP server for file operations",
+      "transport": "stdio",
       "command": "npx",
       "args": ["@modelcontextprotocol/server-filesystem"],
       "env": {
@@ -13,6 +14,7 @@
     {
       "name": "github",
       "description": "GitHub MCP server for repository operations",
+      "transport": "stdio",
       "command": "npx",
       "args": ["@modelcontextprotocol/server-github"],
       "env": {
@@ -23,12 +25,35 @@
     {
       "name": "postgres",
       "description": "PostgreSQL MCP server for database operations",
+      "transport": "stdio",
       "command": "npx",
       "args": ["@modelcontextprotocol/server-postgres"],
       "env": {
         "DATABASE_URL": "postgresql://user:password@localhost:5432/dbname"
       },
       "enabled": true
+    },
+    {
+      "name": "remote-sse",
+      "description": "Remote MCP server using SSE transport",
+      "transport": "sse",
+      "endpoint": "https://example.com/mcp/sse",
+      "headers": {
+        "Authorization": "Bearer your-token-here",
+        "X-Custom-Header": "custom-value"
+      },
+      "enabled": false
+    },
+    {
+      "name": "remote-http",
+      "description": "Remote MCP server using streamable HTTP transport",
+      "transport": "streamable_http",
+      "endpoint": "https://example.com/mcp/stream",
+      "headers": {
+        "Authorization": "Bearer your-token-here",
+        "Content-Type": "application/json"
+      },
+      "enabled": false
     }
   ],
   "listen_addr": "localhost:8091",

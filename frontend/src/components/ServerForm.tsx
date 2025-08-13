@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { XMarkIcon, PlusIcon, TrashIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
-import { MCPServerConfig } from '../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/settings/models'
+import { MCPServerConfig, TransportType } from '../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/settings/models'
 import { LoadingButton } from './LoadingButton'
 import { ToggleSwitch } from './ToggleSwitch'
 
@@ -57,9 +57,12 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
   const [formData, setFormData] = useState<MCPServerConfig>({
     name: '',
     description: '',
+    transport: TransportType.TransportStdio,
     command: '',
     args: [],
     env: {},
+    endpoint: '',
+    headers: {},
     enabled: true
   })
   const [errors, setErrors] = useState<{ [key: string]: string }>({})
@@ -111,9 +114,14 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
       }
     }
 
-    // Validate command
-    if (!formData.command.trim()) {
-      newErrors.command = 'Command is required'
+    // Validate command for stdio transport
+    if (formData.transport === TransportType.TransportStdio && !formData.command.trim()) {
+      newErrors.command = 'Command is required for stdio transport'
+    }
+
+    // Validate endpoint for HTTP transports
+    if ((formData.transport === TransportType.TransportSSE || formData.transport === TransportType.TransportStreamableHTTP) && !formData.endpoint?.trim()) {
+      newErrors.endpoint = 'Endpoint is required for HTTP transports'
     }
 
     setErrors(newErrors)
@@ -189,6 +197,32 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
     })
   }
 
+  const addHeader = () => {
+    setFormData(prev => ({
+      ...prev,
+      headers: { ...prev.headers, '': '' }
+    }))
+  }
+
+  const updateHeader = (oldKey: string, newKey: string, value: string) => {
+    setFormData(prev => {
+      const newHeaders = { ...prev.headers }
+      delete newHeaders[oldKey]
+      if (newKey) {
+        newHeaders[newKey] = value
+      }
+      return { ...prev, headers: newHeaders }
+    })
+  }
+
+  const removeHeader = (key: string) => {
+    setFormData(prev => {
+      const newHeaders = { ...prev.headers }
+      delete newHeaders[key]
+      return { ...prev, headers: newHeaders }
+    })
+  }
+
 
 
   return (
@@ -238,111 +272,215 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
             onChange={(value) => setFormData(prev => ({ ...prev, description: value }))}
           />
 
-          <FormInput
-            id="server-command"
-            label="Command"
-            value={formData.command}
-            onChange={(value) => {
-              setFormData(prev => ({ ...prev, command: value }))
-              if (errors.command) {
-                setErrors(prev => ({ ...prev, command: '' }))
-              }
-            }}
-            error={errors.command}
-            required
-          />
-
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
-                Arguments
-              </label>
-              <LoadingButton
-                type="button"
-                onClick={addArg}
-                variant="secondary"
-                size="sm"
-                className="text-xs px-1.5 py-0.5 h-5 text-xs"
-              >
-                <PlusIcon className="h-2.5 w-2.5 inline-block" />
-                Add
-              </LoadingButton>
-            </div>
-            <div className="space-y-1.5">
-              {(formData.args || []).map((arg, index) => (
-                <div key={index} className="flex items-center gap-1.5">
-                  <input
-                    type="text"
-                    value={arg}
-                    onChange={(e) => updateArg(index, e.target.value)}
-                    className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
-                    placeholder="Argument"
-                    aria-label={`Argument ${index + 1}`}
-                  />
-                  <LoadingButton
-                    type="button"
-                    onClick={() => removeArg(index)}
-                    variant="danger"
-                    size="sm"
-                    className="p-1.5"
-                    aria-label={`Remove argument ${index + 1}`}
-                  >
-                    <TrashIcon className="h-3 w-3 inline-block" />
-                  </LoadingButton>
-                </div>
-              ))}
-            </div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Transport Type *
+            </label>
+            <select
+              value={formData.transport}
+              onChange={(e) => {
+                const newTransport = e.target.value as TransportType
+                setFormData(prev => ({ ...prev, transport: newTransport }))
+                // Clear validation errors when switching transport types
+                setErrors(prev => {
+                  const newErrors = { ...prev }
+                  if (newTransport !== TransportType.TransportStdio) {
+                    delete newErrors.command
+                  }
+                  if (newTransport === TransportType.TransportStdio) {
+                    delete newErrors.endpoint
+                  }
+                  return newErrors
+                })
+              }}
+              className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
+            >
+              <option value={TransportType.TransportStdio}>stdio</option>
+              <option value={TransportType.TransportSSE}>sse</option>
+              <option value={TransportType.TransportStreamableHTTP}>streamable http</option>
+            </select>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
-                Environment Variables
-              </label>
-              <LoadingButton
-                type="button"
-                onClick={addEnvVar}
-                variant="secondary"
-                size="sm"
-                className="text-xs px-1.5 py-0.5 h-5 text-xs"
-              >
-                <PlusIcon className="h-2.5 w-2.5 inline-block" />
-                Add
-              </LoadingButton>
+          {(formData.transport === TransportType.TransportSSE || formData.transport === TransportType.TransportStreamableHTTP) && (
+            <FormInput
+              id="server-endpoint"
+              label="Endpoint"
+              value={formData.endpoint || ''}
+              onChange={(value) => {
+                setFormData(prev => ({ ...prev, endpoint: value }))
+                if (errors.endpoint) {
+                  setErrors(prev => ({ ...prev, endpoint: '' }))
+                }
+              }}
+              error={errors.endpoint}
+              required
+              placeholder="https://example.com/mcp"
+            />
+          )}
+
+          {(formData.transport === TransportType.TransportStdio) && (
+            <FormInput
+              id="server-command"
+              label="Command"
+              value={formData.command}
+              onChange={(value) => {
+                setFormData(prev => ({ ...prev, command: value }))
+                if (errors.command) {
+                  setErrors(prev => ({ ...prev, command: '' }))
+                }
+              }}
+              error={errors.command}
+              required
+            />
+          )}
+
+          {(formData.transport === TransportType.TransportStdio) && (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                  Arguments
+                </label>
+                <LoadingButton
+                  type="button"
+                  onClick={addArg}
+                  variant="secondary"
+                  size="sm"
+                  className="text-xs px-1.5 py-0.5 h-5 text-xs"
+                >
+                  <PlusIcon className="h-2.5 w-2.5 inline-block" />
+                  Add
+                </LoadingButton>
+              </div>
+              <div className="space-y-1.5">
+                {(formData.args || []).map((arg, index) => (
+                  <div key={index} className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={arg}
+                      onChange={(e) => updateArg(index, e.target.value)}
+                      className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
+                      placeholder="Argument"
+                      aria-label={`Argument ${index + 1}`}
+                    />
+                    <LoadingButton
+                      type="button"
+                      onClick={() => removeArg(index)}
+                      variant="danger"
+                      size="sm"
+                      className="p-1.5"
+                      aria-label={`Remove argument ${index + 1}`}
+                    >
+                      <TrashIcon className="h-3 w-3 inline-block" />
+                    </LoadingButton>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="space-y-1.5">
-              {Object.entries(formData.env || {}).map(([key, value], index) => (
-                <div key={key} className="flex items-center gap-1.5">
-                  <input
-                    type="text"
-                    value={key}
-                    onChange={(e) => updateEnvVar(key, e.target.value, value)}
-                    className="w-1/3 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
-                    placeholder="Variable name"
-                    aria-label={`Environment variable name ${index + 1}`}
-                  />
-                  <input
-                    type="text"
-                    value={value}
-                    onChange={(e) => updateEnvVar(key, key, e.target.value)}
-                    className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
-                    placeholder="Value"
-                    aria-label={`Environment variable value ${index + 1}`}
-                  />
-                  <LoadingButton
-                    type="button"
-                    onClick={() => removeEnvVar(key)}
-                    variant="danger"
-                    size="sm"
-                    className="p-1.5"
-                    aria-label={`Remove environment variable ${key}`}
-                  >
-                    <TrashIcon className="h-3 w-3" />
-                  </LoadingButton>
-                </div>
-              ))}
+          )}
+
+          {(formData.transport === TransportType.TransportStdio) && (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                  Environment Variables
+                </label>
+                <LoadingButton
+                  type="button"
+                  onClick={addEnvVar}
+                  variant="secondary"
+                  size="sm"
+                  className="text-xs px-1.5 py-0.5 h-5 text-xs"
+                >
+                  <PlusIcon className="h-2.5 w-2.5 inline-block" />
+                  Add
+                </LoadingButton>
+              </div>
+              <div className="space-y-1.5">
+                {Object.entries(formData.env || {}).map(([key, value], index) => (
+                  <div key={key} className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={key}
+                      onChange={(e) => updateEnvVar(key, e.target.value, value)}
+                      className="w-1/3 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
+                      placeholder="Variable name"
+                      aria-label={`Environment variable name ${index + 1}`}
+                    />
+                    <input
+                      type="text"
+                      value={value}
+                      onChange={(e) => updateEnvVar(key, key, e.target.value)}
+                      className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
+                      placeholder="Value"
+                      aria-label={`Environment variable value ${index + 1}`}
+                    />
+                    <LoadingButton
+                      type="button"
+                      onClick={() => removeEnvVar(key)}
+                      variant="danger"
+                      size="sm"
+                      className="p-1.5"
+                      aria-label={`Remove environment variable ${key}`}
+                    >
+                      <TrashIcon className="h-3 w-3" />
+                    </LoadingButton>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+
+          {(formData.transport === TransportType.TransportSSE || formData.transport === TransportType.TransportStreamableHTTP) && (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                  HTTP Headers
+                </label>
+                <LoadingButton
+                  type="button"
+                  onClick={addHeader}
+                  variant="secondary"
+                  size="sm"
+                  className="text-xs px-1.5 py-0.5 h-5 text-xs"
+                >
+                  <PlusIcon className="h-2.5 w-2.5 inline-block" />
+                  Add
+                </LoadingButton>
+              </div>
+              <div className="space-y-1.5">
+                {Object.entries(formData.headers || {}).map(([key, value], index) => (
+                  <div key={key} className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={key}
+                      onChange={(e) => updateHeader(key, e.target.value, value)}
+                      className="w-1/3 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
+                      placeholder="Header name"
+                      aria-label={`HTTP header name ${index + 1}`}
+                    />
+                    <input
+                      type="text"
+                      value={value}
+                      onChange={(e) => updateHeader(key, key, e.target.value)}
+                      className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
+                      placeholder="Value"
+                      aria-label={`HTTP header value ${index + 1}`}
+                    />
+                    <LoadingButton
+                      type="button"
+                      onClick={() => removeHeader(key)}
+                      variant="danger"
+                      size="sm"
+                      className="p-1.5"
+                      aria-label={`Remove HTTP header ${key}`}
+                    >
+                      <TrashIcon className="h-3 w-3" />
+                    </LoadingButton>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="pt-1">
             <ToggleSwitch

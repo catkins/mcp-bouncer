@@ -15,13 +15,25 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
+// TransportType represents the type of transport for MCP server communication
+type TransportType string
+
+const (
+	TransportStdio           TransportType = "stdio"
+	TransportSSE             TransportType = "sse"
+	TransportStreamableHTTP  TransportType = "streamable_http"
+)
+
 // MCPServerConfig represents configuration for a single MCP server
 type MCPServerConfig struct {
 	Name        string            `json:"name"`
 	Description string            `json:"description"`
+	Transport   TransportType     `json:"transport"`
 	Command     string            `json:"command"`
 	Args        []string          `json:"args,omitempty"`
 	Env         map[string]string `json:"env,omitempty"`
+	Endpoint    string            `json:"endpoint,omitempty"`
+	Headers     map[string]string `json:"headers,omitempty"`
 	Enabled     bool              `json:"enabled"`
 }
 
@@ -125,7 +137,19 @@ func (s *SettingsService) Load() error {
 		return err
 	}
 
-	return json.Unmarshal(data, s.settings)
+	err = json.Unmarshal(data, s.settings)
+	if err != nil {
+		return err
+	}
+
+	// Migrate existing configurations to include transport type
+	for i := range s.settings.MCPServers {
+		if s.settings.MCPServers[i].Transport == "" {
+			s.settings.MCPServers[i].Transport = TransportStdio
+		}
+	}
+
+	return nil
 }
 
 // Save saves settings to file

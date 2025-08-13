@@ -11,9 +11,12 @@ import { Create as $Create } from "@wailsio/runtime";
 export class MCPServerConfig {
     "name": string;
     "description": string;
+    "transport": TransportType;
     "command": string;
     "args"?: string[];
     "env"?: { [_: string]: string };
+    "endpoint"?: string;
+    "headers"?: { [_: string]: string };
     "enabled": boolean;
 
     /** Creates a new MCPServerConfig instance. */
@@ -23,6 +26,9 @@ export class MCPServerConfig {
         }
         if (!("description" in $$source)) {
             this["description"] = "";
+        }
+        if (!("transport" in $$source)) {
+            this["transport"] = TransportType.$zero;
         }
         if (!("command" in $$source)) {
             this["command"] = "";
@@ -38,14 +44,18 @@ export class MCPServerConfig {
      * Creates a new MCPServerConfig instance from a string or object.
      */
     static createFrom($$source: any = {}): MCPServerConfig {
-        const $$createField3_0 = $$createType0;
-        const $$createField4_0 = $$createType1;
+        const $$createField4_0 = $$createType0;
+        const $$createField5_0 = $$createType1;
+        const $$createField7_0 = $$createType1;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("args" in $$parsedSource) {
-            $$parsedSource["args"] = $$createField3_0($$parsedSource["args"]);
+            $$parsedSource["args"] = $$createField4_0($$parsedSource["args"]);
         }
         if ("env" in $$parsedSource) {
-            $$parsedSource["env"] = $$createField4_0($$parsedSource["env"]);
+            $$parsedSource["env"] = $$createField5_0($$parsedSource["env"]);
+        }
+        if ("headers" in $$parsedSource) {
+            $$parsedSource["headers"] = $$createField7_0($$parsedSource["headers"]);
         }
         return new MCPServerConfig($$parsedSource as Partial<MCPServerConfig>);
     }
@@ -86,6 +96,20 @@ export class Settings {
         return new Settings($$parsedSource as Partial<Settings>);
     }
 }
+
+/**
+ * TransportType represents the type of transport for MCP server communication
+ */
+export enum TransportType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    TransportStdio = "stdio",
+    TransportSSE = "sse",
+    TransportStreamableHTTP = "streamable_http",
+};
 
 // Private type creation functions
 const $$createType0 = $Create.Array($Create.Any);

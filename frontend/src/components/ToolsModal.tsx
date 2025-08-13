@@ -120,6 +120,8 @@ export function ToolsModal({ serverName, isOpen, onClose }: ToolsModalProps) {
         document.removeEventListener('keydown', handleEscape)
       }
     }
+    
+    return undefined
   }, [isOpen, onClose])
 
   if (!isOpen) return null
