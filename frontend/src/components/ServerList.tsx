@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { PlusIcon } from '@heroicons/react/24/outline'
 import { ServerCard } from './ServerCard'
 import { ServerForm } from './ServerForm'
+import { ToolsModal } from './ToolsModal'
 import { MCPServerConfig } from '../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/settings/models'
 import { ClientStatus } from '../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/mcp/models'
 import { LoadingButton } from './LoadingButton'
@@ -43,11 +44,12 @@ export function ServerList({
 }: ServerListProps) {
   const [showAddServer, setShowAddServer] = useState<boolean>(false)
   const [editingServer, setEditingServer] = useState<MCPServerConfig | null>(null)
+  const [toolsModalServer, setToolsModalServer] = useState<string | null>(null)
 
   // Debug logging
   useEffect(() => {
-    console.log('ServerList state:', { showAddServer, editingServer: !!editingServer })
-  }, [showAddServer, editingServer])
+    console.log('ServerList state:', { showAddServer, editingServer: !!editingServer, toolsModalServer })
+  }, [showAddServer, editingServer, toolsModalServer])
 
   const handleSaveServer = async (serverConfig: MCPServerConfig) => {
     try {
@@ -88,13 +90,23 @@ export function ServerList({
     setShowAddServer(true)
   }
 
+  const handleOpenTools = (serverName: string) => {
+    console.log('Opening tools modal for server:', serverName)
+    setToolsModalServer(serverName)
+  }
+
+  const handleCloseTools = () => {
+    console.log('Closing tools modal')
+    setToolsModalServer(null)
+  }
+
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Check for Cmd+A (macOS) or Ctrl+A (other platforms)
       if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
         e.preventDefault() // Prevent default "select all" behavior
-        if (!showAddServer && !editingServer) {
+        if (!showAddServer && !editingServer && !toolsModalServer) {
           handleAddServer()
         }
       }
@@ -104,7 +116,7 @@ export function ServerList({
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [showAddServer, editingServer])
+  }, [showAddServer, editingServer, toolsModalServer])
 
   return (
     <div className="mb-4">
@@ -161,6 +173,7 @@ export function ServerList({
                 onEdit={handleEditServer}
                 onRemove={handleRemoveServer}
                 onToggle={onToggleServer}
+                onOpenTools={handleOpenTools}
                 loading={loadingStates.updateServer || loadingStates.removeServer}
                 toggleLoading={loadingStates.toggleServer[server.name] || false}
                 toggleError={errors.toggleServer?.[server.name]}
@@ -178,6 +191,14 @@ export function ServerList({
           onCancel={handleCancelServer}
           loading={loadingStates.addServer || loadingStates.updateServer}
           existingServers={servers}
+        />
+      )}
+
+      {toolsModalServer && (
+        <ToolsModal
+          serverName={toolsModalServer}
+          isOpen={!!toolsModalServer}
+          onClose={handleCloseTools}
         />
       )}
     </div>

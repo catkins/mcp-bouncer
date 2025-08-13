@@ -385,6 +385,37 @@ func (s *MCPService) ReloadClients() error {
 	return fmt.Errorf("settings or server not available")
 }
 
+// GetClientTools returns the tools for a specific client
+func (s *MCPService) GetClientTools(clientName string) ([]map[string]interface{}, error) {
+	if s.server != nil {
+		tools, err := s.server.GetClientManager().GetClientTools(clientName)
+		if err != nil {
+			return nil, err
+		}
+
+		// Convert tools to map format for JSON serialization
+		toolMaps := make([]map[string]interface{}, len(tools))
+		for i, tool := range tools {
+			toolMaps[i] = map[string]interface{}{
+				"name":        tool.Name,
+				"description": tool.Description,
+				"inputSchema": tool.InputSchema,
+			}
+		}
+
+		return toolMaps, nil
+	}
+	return nil, fmt.Errorf("server not available")
+}
+
+// ToggleTool enables or disables a specific tool for a client
+func (s *MCPService) ToggleTool(clientName string, toolName string, enabled bool) error {
+	if s.server != nil {
+		return s.server.GetClientManager().ToggleTool(clientName, toolName, enabled)
+	}
+	return fmt.Errorf("server not available")
+}
+
 func (s *MCPService) emitEvent(name string, data any) {
 	slog.Info("Emitting event", "name", name, "data", data, "callback_count", s.GetCallbackCount())
 

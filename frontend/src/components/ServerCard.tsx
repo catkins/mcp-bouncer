@@ -11,6 +11,7 @@ interface ServerCardProps {
   onRemove: (serverName: string) => Promise<void>
   onToggle: (serverName: string, enabled: boolean) => Promise<void>
   onRefreshStatus?: (serverName: string) => Promise<void>
+  onOpenTools?: (serverName: string) => void
   loading?: boolean
   toggleLoading?: boolean
   toggleError?: string
@@ -23,10 +24,17 @@ export function ServerCard({
   onRemove, 
   onToggle, 
   onRefreshStatus, 
+  onOpenTools,
   loading = false,
   toggleLoading = false,
   toggleError
 }: ServerCardProps) {
+
+  const handleToolsClick = () => {
+    if (clientStatus?.connected && clientStatus.tools > 0 && onOpenTools) {
+      onOpenTools(server.name)
+    }
+  }
 
   return (
     <div className={`
@@ -62,12 +70,16 @@ export function ServerCard({
                 {clientStatus.connected ? 'Connected' : 'Disconnected'}
               </span>
               {clientStatus.connected && clientStatus.tools > 0 && (
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-400 rounded-full text-xs font-medium transition-all duration-200 ${
-                  toggleLoading ? 'animate-pulse' : ''
-                }`}>
+                <button
+                  onClick={handleToolsClick}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-400 rounded-full text-xs font-medium transition-all duration-200 hover:bg-blue-200 dark:hover:bg-blue-800/70 hover:scale-105 active:scale-95 cursor-pointer ${
+                    toggleLoading ? 'animate-pulse' : ''
+                  }`}
+                  title="Click to manage tools"
+                >
                   <WrenchScrewdriverIcon className="w-3 h-3" />
                   {clientStatus.tools}
-                </span>
+                </button>
               )}
             </div>
           )}

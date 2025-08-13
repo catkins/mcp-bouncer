@@ -44,11 +44,20 @@ export function GetClientStatus(): $CancellablePromise<{ [_: string]: $models.Cl
 }
 
 /**
+ * GetClientTools returns the tools for a specific client
+ */
+export function GetClientTools(clientName: string): $CancellablePromise<{ [_: string]: any }[]> {
+    return $Call.ByID(4069391112, clientName).then(($result: any) => {
+        return $$createType3($result);
+    });
+}
+
+/**
  * GetSettings returns the current settings
  */
 export function GetSettings(): $CancellablePromise<settings$0.Settings | null> {
     return $Call.ByID(3884386303).then(($result: any) => {
-        return $$createType3($result);
+        return $$createType5($result);
     });
 }
 
@@ -58,7 +67,7 @@ export function IsActive(): $CancellablePromise<boolean> {
 
 export function List(): $CancellablePromise<settings$0.MCPServerConfig[]> {
     return $Call.ByID(287741050).then(($result: any) => {
-        return $$createType5($result);
+        return $$createType7($result);
     });
 }
 
@@ -106,6 +115,13 @@ export function Subscribe(callback: any): $CancellablePromise<void> {
 }
 
 /**
+ * ToggleTool enables or disables a specific tool for a client
+ */
+export function ToggleTool(clientName: string, toolName: string, enabled: boolean): $CancellablePromise<void> {
+    return $Call.ByID(1308885728, clientName, toolName, enabled);
+}
+
+/**
  * Unsubscribe removes a callback from the list of callbacks
  * Note: This removes the first matching callback. If you have multiple identical callbacks,
  * you may need to call this multiple times.
@@ -131,7 +147,9 @@ export function UpdateSettings(settings: settings$0.Settings | null): $Cancellab
 // Private type creation functions
 const $$createType0 = $models.ClientStatus.createFrom;
 const $$createType1 = $Create.Map($Create.Any, $$createType0);
-const $$createType2 = settings$0.Settings.createFrom;
-const $$createType3 = $Create.Nullable($$createType2);
-const $$createType4 = settings$0.MCPServerConfig.createFrom;
-const $$createType5 = $Create.Array($$createType4);
+const $$createType2 = $Create.Map($Create.Any, $Create.Any);
+const $$createType3 = $Create.Array($$createType2);
+const $$createType4 = settings$0.Settings.createFrom;
+const $$createType5 = $Create.Nullable($$createType4);
+const $$createType6 = settings$0.MCPServerConfig.createFrom;
+const $$createType7 = $Create.Array($$createType6);

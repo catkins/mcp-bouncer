@@ -339,3 +339,82 @@ func (cm *ClientManager) StopAllClients() {
 		cm.stopClientInternal(name)
 	}
 }
+
+// GetClientTools returns the tools for a specific client
+func (cm *ClientManager) GetClientTools(clientName string) ([]mcp.Tool, error) {
+	cm.mutex.RLock()
+	defer cm.mutex.RUnlock()
+
+	mc, exists := cm.clients[clientName]
+	if !exists {
+		return nil, fmt.Errorf("client '%s' not found", clientName)
+	}
+
+	if !mc.Connected {
+		return nil, fmt.Errorf("client '%s' is not connected", clientName)
+	}
+
+	return mc.Tools, nil
+}
+
+// ToggleTool enables or disables a specific tool for a client
+func (cm *ClientManager) ToggleTool(clientName string, toolName string, enabled bool) error {
+	cm.mutex.Lock()
+	defer cm.mutex.Unlock()
+
+	mc, exists := cm.clients[clientName]
+	if !exists {
+		return fmt.Errorf("client '%s' not found", clientName)
+	}
+
+	if !mc.Connected {
+		return fmt.Errorf("client '%s' is not connected", clientName)
+	}
+
+	// Find the tool
+	var targetTool *mcp.Tool
+	for _, tool := range mc.Tools {
+		if tool.Name == toolName {
+			targetTool = &tool
+			break
+		}
+	}
+
+	if targetTool == nil {
+		return fmt.Errorf("tool '%s' not found in client '%s'", toolName, clientName)
+	}
+
+	prefixedName := fmt.Sprintf("%s:%s", clientName, toolName)
+
+	if enabled {
+		// Re-register the tool
+		handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			// Strip the prefix from the tool name for the client call
+			request.Params.Name = toolName
+
+			slog.Info("Calling tool",
+				"client", mc.Config.Name,
+				"original_tool", toolName,
+				"prefixed_tool", request.Params.Name,
+				"request", request)
+
+			// Call the client with the original tool name
+			return mc.Client.CallTool(ctx, request)
+		}
+
+		prefixedTool := mcp.Tool{
+			Name:        prefixedName,
+			Description: fmt.Sprintf("[%s] %s", mc.Config.Name, targetTool.Description),
+			InputSchema: targetTool.InputSchema,
+		}
+
+		cm.server.mcp.AddTool(prefixedTool, handler)
+		slog.Debug("Re-enabled client tool", "client", mc.Config.Name, "tool", toolName, "prefixed_name", prefixedName)
+	} else {
+		// Remove the tool
+		cm.server.mcp.DeleteTools(prefixedName)
+		slog.Debug("Disabled client tool", "client", mc.Config.Name, "tool", toolName, "prefixed_name", prefixedName)
+	}
+
+	return nil
+}
