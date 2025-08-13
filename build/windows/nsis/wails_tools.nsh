@@ -5,7 +5,7 @@
 !include "FileFunc.nsh"
 
 !ifndef INFO_PROJECTNAME
-    !define INFO_PROJECTNAME "mcp-bouncer-poc"
+    !define INFO_PROJECTNAME "mcp-bouncer"
 !endif
 !ifndef INFO_COMPANYNAME
     !define INFO_COMPANYNAME "Catkins"

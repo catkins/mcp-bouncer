@@ -1,6 +1,6 @@
 import { PencilIcon, TrashIcon, WrenchScrewdriverIcon, CheckCircleIcon, XCircleIcon, NoSymbolIcon, CommandLineIcon, SignalIcon, GlobeAltIcon } from '@heroicons/react/24/outline'
-import { MCPServerConfig } from '../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/settings/models'
-import { ClientStatus } from '../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/mcp/models'
+import { MCPServerConfig } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models'
+import { ClientStatus } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/mcp/models'
 import { LoadingButton } from './LoadingButton'
 import { ToggleSwitch } from './ToggleSwitch'
 

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { WailsEvent } from "@wailsio/runtime/types/events"
-import { MCPService } from "../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/mcp"
-import { SettingsService } from "../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/settings"
-import { MCPServerConfig, Settings } from "../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/settings/models"
-import { ClientStatus } from "../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/mcp/models"
+import { MCPService } from "../../bindings/github.com/catkins/mcp-bouncer/pkg/services/mcp"
+import { SettingsService } from "../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings"
+import { MCPServerConfig, Settings } from "../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models"
+import { ClientStatus } from "../../bindings/github.com/catkins/mcp-bouncer/pkg/services/mcp/models"
 import { Events } from "@wailsio/runtime"
 
 export function useMCPService() {

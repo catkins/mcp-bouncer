@@ -17,28 +17,28 @@ import * as $models from "./models.js";
  * AddMCPServer adds a new MCP server configuration
  */
 export function AddMCPServer(config: settings$0.MCPServerConfig): $CancellablePromise<void> {
-    return $Call.ByID(1611313896, config);
+    return $Call.ByID(4107243941, config);
 }
 
 /**
  * ClearCallbacks removes all callbacks
  */
 export function ClearCallbacks(): $CancellablePromise<void> {
-    return $Call.ByID(1475965729);
+    return $Call.ByID(3793798780);
 }
 
 /**
  * GetCallbackCount returns the number of registered callbacks
  */
 export function GetCallbackCount(): $CancellablePromise<number> {
-    return $Call.ByID(1682848924);
+    return $Call.ByID(2582054589);
 }
 
 /**
  * GetClientStatus returns the status of all clients
  */
 export function GetClientStatus(): $CancellablePromise<{ [_: string]: $models.ClientStatus }> {
-    return $Call.ByID(3377848763).then(($result: any) => {
+    return $Call.ByID(1599896728).then(($result: any) => {
         return $$createType1($result);
     });
 }
@@ -47,7 +47,7 @@ export function GetClientStatus(): $CancellablePromise<{ [_: string]: $models.Cl
  * GetClientTools returns the tools for a specific client
  */
 export function GetClientTools(clientName: string): $CancellablePromise<{ [_: string]: any }[]> {
-    return $Call.ByID(4069391112, clientName).then(($result: any) => {
+    return $Call.ByID(840697769, clientName).then(($result: any) => {
         return $$createType3($result);
     });
 }
@@ -56,69 +56,69 @@ export function GetClientTools(clientName: string): $CancellablePromise<{ [_: st
  * GetSettings returns the current settings
  */
 export function GetSettings(): $CancellablePromise<settings$0.Settings | null> {
-    return $Call.ByID(3884386303).then(($result: any) => {
+    return $Call.ByID(2186197872).then(($result: any) => {
         return $$createType5($result);
     });
 }
 
 export function IsActive(): $CancellablePromise<boolean> {
-    return $Call.ByID(2504495108);
+    return $Call.ByID(3294933353);
 }
 
 export function List(): $CancellablePromise<settings$0.MCPServerConfig[]> {
-    return $Call.ByID(287741050).then(($result: any) => {
+    return $Call.ByID(391634795).then(($result: any) => {
         return $$createType7($result);
     });
 }
 
 export function ListenAddr(): $CancellablePromise<string> {
-    return $Call.ByID(707727382);
+    return $Call.ByID(1032405823);
 }
 
 /**
  * ReloadClients reloads all clients from settings
  */
 export function ReloadClients(): $CancellablePromise<void> {
-    return $Call.ByID(3502122629);
+    return $Call.ByID(3848519694);
 }
 
 /**
  * RemoveMCPServer removes an MCP server configuration
  */
 export function RemoveMCPServer(name: string): $CancellablePromise<void> {
-    return $Call.ByID(255493505, name);
+    return $Call.ByID(882469290, name);
 }
 
 /**
  * RestartClient restarts an MCP client
  */
 export function RestartClient(name: string): $CancellablePromise<void> {
-    return $Call.ByID(3792849082, name);
+    return $Call.ByID(1870661929, name);
 }
 
 /**
  * StartClient starts an MCP client
  */
 export function StartClient(config: settings$0.MCPServerConfig): $CancellablePromise<void> {
-    return $Call.ByID(2765291965, config);
+    return $Call.ByID(4184161018, config);
 }
 
 /**
  * StopClient stops an MCP client
  */
 export function StopClient(name: string): $CancellablePromise<void> {
-    return $Call.ByID(2947742357, name);
+    return $Call.ByID(1022366924, name);
 }
 
 export function Subscribe(callback: any): $CancellablePromise<void> {
-    return $Call.ByID(103217282, callback);
+    return $Call.ByID(1599264957, callback);
 }
 
 /**
  * ToggleTool enables or disables a specific tool for a client
  */
 export function ToggleTool(clientName: string, toolName: string, enabled: boolean): $CancellablePromise<void> {
-    return $Call.ByID(1308885728, clientName, toolName, enabled);
+    return $Call.ByID(280020369, clientName, toolName, enabled);
 }
 
 /**
@@ -127,21 +127,21 @@ export function ToggleTool(clientName: string, toolName: string, enabled: boolea
  * you may need to call this multiple times.
  */
 export function Unsubscribe(callback: any): $CancellablePromise<void> {
-    return $Call.ByID(3825233691, callback);
+    return $Call.ByID(1937566084, callback);
 }
 
 /**
  * UpdateMCPServer updates an MCP server configuration
  */
 export function UpdateMCPServer(name: string, config: settings$0.MCPServerConfig): $CancellablePromise<void> {
-    return $Call.ByID(2323123058, name, config);
+    return $Call.ByID(2752674265, name, config);
 }
 
 /**
  * UpdateSettings updates the settings
  */
 export function UpdateSettings(settings: settings$0.Settings | null): $CancellablePromise<void> {
-    return $Call.ByID(3316702090, settings);
+    return $Call.ByID(818812679, settings);
 }
 
 // Private type creation functions

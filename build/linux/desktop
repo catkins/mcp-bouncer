@@ -3,11 +3,11 @@ Version=1.0
 Name=MCP Bouncer
 Comment=Local gateway for MCP servers
 # The Exec line includes %u to pass the URL to the application
-Exec=/usr/local/bin/mcp-bouncer-poc %u
+Exec=/usr/local/bin/mcp-bouncer %u
 Terminal=false
 Type=Application
-Icon=mcp-bouncer-poc
+Icon=mcp-bouncer
 Categories=Utility;
-StartupWMClass=mcp-bouncer-poc
+StartupWMClass=mcp-bouncer
 
  

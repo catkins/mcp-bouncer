@@ -8,7 +8,7 @@
         AllowPromptForPassword="false">
     </Settings>
     <Installer
-        Path="mcp-bouncer-poc"
+        Path="mcp-bouncer"
         Arguments=""
         InstallLocation="C:\Program Files\My Company\My Product">
     </Installer>
@@ -25,10 +25,10 @@
         </Capabilities>
         <Applications>
             <Application
-                Id="com.wails.mcp-bouncer-poc"
+                Id="com.wails.mcp-bouncer"
                 Description="My Product Description"
                 DisplayName="My Product"
-                ExecutableName="mcp-bouncer-poc"
+                ExecutableName="mcp-bouncer"
                 EntryPoint="Windows.FullTrustApplication">
                 
             </Application>
@@ -47,7 +47,7 @@
             <Logo>Assets\AppIcon.png</Logo>
         </Properties>
     </PackageInformation>
-    <SaveLocation PackagePath="mcp-bouncer-poc.msix" />
+    <SaveLocation PackagePath="mcp-bouncer.msix" />
     <PackageIntegrity>
         <CertificatePath></CertificatePath>
     </PackageIntegrity>

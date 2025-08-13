@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/catkins/mcp-bouncer-poc/pkg/services/settings"
+	"github.com/catkins/mcp-bouncer/pkg/services/settings"
 	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/client/transport"
 	"github.com/mark3labs/mcp-go/mcp"

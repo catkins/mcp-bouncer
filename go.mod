@@ -1,4 +1,4 @@
-module github.com/catkins/mcp-bouncer-poc
+module github.com/catkins/mcp-bouncer
 
 go 1.24.0
 

@@ -6,7 +6,7 @@
         <key>CFBundleName</key>
             <string>MCP Bouncer</string>
         <key>CFBundleExecutable</key>
-            <string>mcp-bouncer-poc</string>
+            <string>mcp-bouncer</string>
         <key>CFBundleIdentifier</key>
             <string>com.catkins.mcpbouncer</string>
         <key>CFBundleVersion</key>

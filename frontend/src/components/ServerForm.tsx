@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { XMarkIcon, PlusIcon, TrashIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
-import { MCPServerConfig, TransportType } from '../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/settings/models'
+import { MCPServerConfig, TransportType } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models'
 import { LoadingButton } from './LoadingButton'
 import { ToggleSwitch } from './ToggleSwitch'
 

@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/catkins/mcp-bouncer-poc/pkg/services/settings"
+	"github.com/catkins/mcp-bouncer/pkg/services/settings"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 

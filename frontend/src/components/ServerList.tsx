@@ -3,8 +3,8 @@ import { PlusIcon } from '@heroicons/react/24/outline'
 import { ServerCard } from './ServerCard'
 import { ServerForm } from './ServerForm'
 import { ToolsModal } from './ToolsModal'
-import { MCPServerConfig } from '../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/settings/models'
-import { ClientStatus } from '../../bindings/github.com/catkins/mcp-bouncer-poc/pkg/services/mcp/models'
+import { MCPServerConfig } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models'
+import { ClientStatus } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/mcp/models'
 import { LoadingButton } from './LoadingButton'
 
 interface ServerListProps {

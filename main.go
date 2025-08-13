@@ -5,8 +5,8 @@ import (
 	_ "embed"
 	"log"
 
-	"github.com/catkins/mcp-bouncer-poc/pkg/services/mcp"
-	"github.com/catkins/mcp-bouncer-poc/pkg/services/settings"
+	"github.com/catkins/mcp-bouncer/pkg/services/mcp"
+	"github.com/catkins/mcp-bouncer/pkg/services/settings"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 

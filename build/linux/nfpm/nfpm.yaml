@@ -3,7 +3,7 @@
 #
 # The lines below are called `modelines`. See `:help modeline`
 
-name: "mcp-bouncer-poc"
+name: "mcp-bouncer"
 arch: ${GOARCH}
 platform: "linux"
 version: "0.0.1"
@@ -17,12 +17,12 @@ license: "MIT"
 release: "1"
 
 contents:
-  - src: "./bin/mcp-bouncer-poc"
-    dst: "/usr/local/bin/mcp-bouncer-poc"
+  - src: "./bin/mcp-bouncer"
+    dst: "/usr/local/bin/mcp-bouncer"
   - src: "./build/appicon.png"
-    dst: "/usr/share/icons/hicolor/128x128/apps/mcp-bouncer-poc.png"
-  - src: "./build/linux/mcp-bouncer-poc.desktop"
-    dst: "/usr/share/applications/mcp-bouncer-poc.desktop"
+    dst: "/usr/share/icons/hicolor/128x128/apps/mcp-bouncer.png"
+  - src: "./build/linux/mcp-bouncer.desktop"
+    dst: "/usr/share/applications/mcp-bouncer.desktop"
 
 # Default dependencies for Debian 12/Ubuntu 22.04+ with WebKit 4.1
 depends:
