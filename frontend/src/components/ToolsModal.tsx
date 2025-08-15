@@ -1,139 +1,135 @@
-import { useState, useEffect } from 'react'
-import { XMarkIcon, WrenchScrewdriverIcon, PowerIcon } from '@heroicons/react/24/outline'
-import { MCPService } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/mcp'
-import { ToggleSwitch } from './ToggleSwitch'
-import { LoadingButton } from './LoadingButton'
+import { useState, useEffect } from 'react';
+import { XMarkIcon, WrenchScrewdriverIcon, PowerIcon } from '@heroicons/react/24/outline';
+import { MCPService } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/mcp';
+import { ToggleSwitch } from './ToggleSwitch';
+import { LoadingButton } from './LoadingButton';
 
 interface Tool {
-  name: string
-  description: string
-  inputSchema?: any
+  name: string;
+  description: string;
+  inputSchema?: any;
 }
 
 interface ToolsModalProps {
-  serverName: string
-  isOpen: boolean
-  onClose: () => void
+  serverName: string;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
 export function ToolsModal({ serverName, isOpen, onClose }: ToolsModalProps) {
-  const [tools, setTools] = useState<Tool[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string>('')
-  const [toolStates, setToolStates] = useState<{ [key: string]: boolean }>({})
-  const [toggleLoading, setToggleLoading] = useState<{ [key: string]: boolean }>({})
-  const [bulkLoading, setBulkLoading] = useState(false)
+  const [tools, setTools] = useState<Tool[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string>('');
+  const [toolStates, setToolStates] = useState<{ [key: string]: boolean }>({});
+  const [toggleLoading, setToggleLoading] = useState<{ [key: string]: boolean }>({});
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen && serverName) {
-      loadTools()
+      loadTools();
     }
-  }, [isOpen, serverName])
+  }, [isOpen, serverName]);
 
   const loadTools = async () => {
     try {
-      setLoading(true)
-      setError('')
-      const toolsData = await MCPService.GetClientTools(serverName)
-      setTools(toolsData as Tool[])
-      
+      setLoading(true);
+      setError('');
+      const toolsData = await MCPService.GetClientTools(serverName);
+      setTools(toolsData as Tool[]);
+
       // Initialize all tools as enabled by default
-      const initialStates: { [key: string]: boolean } = {}
+      const initialStates: { [key: string]: boolean } = {};
       toolsData.forEach((tool: any) => {
-        initialStates[tool.name] = true
-      })
-      setToolStates(initialStates)
+        initialStates[tool.name] = true;
+      });
+      setToolStates(initialStates);
     } catch (err) {
-      console.error('Failed to load tools:', err)
-      setError(err instanceof Error ? err.message : 'Failed to load tools')
+      console.error('Failed to load tools:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load tools');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleToggleTool = async (toolName: string, enabled: boolean) => {
     try {
-      setToggleLoading(prev => ({ ...prev, [toolName]: true }))
-      await MCPService.ToggleTool(serverName, toolName, enabled)
-      setToolStates(prev => ({ ...prev, [toolName]: enabled }))
+      setToggleLoading(prev => ({ ...prev, [toolName]: true }));
+      await MCPService.ToggleTool(serverName, toolName, enabled);
+      setToolStates(prev => ({ ...prev, [toolName]: enabled }));
     } catch (err) {
-      console.error('Failed to toggle tool:', err)
+      console.error('Failed to toggle tool:', err);
       // Revert the toggle state on error
-      setToolStates(prev => ({ ...prev, [toolName]: !enabled }))
-      setError(err instanceof Error ? err.message : 'Failed to toggle tool')
+      setToolStates(prev => ({ ...prev, [toolName]: !enabled }));
+      setError(err instanceof Error ? err.message : 'Failed to toggle tool');
     } finally {
-      setToggleLoading(prev => ({ ...prev, [toolName]: false }))
+      setToggleLoading(prev => ({ ...prev, [toolName]: false }));
     }
-  }
+  };
 
   const handleBulkToggle = async () => {
-    const enabledCount = Object.values(toolStates).filter(Boolean).length
-    const totalCount = tools.length
-    const shouldEnable = enabledCount < totalCount / 2 // Enable if less than half are enabled
-    
+    const enabledCount = Object.values(toolStates).filter(Boolean).length;
+    const totalCount = tools.length;
+    const shouldEnable = enabledCount < totalCount / 2; // Enable if less than half are enabled
+
     try {
-      setBulkLoading(true)
-      setError('')
-      
+      setBulkLoading(true);
+      setError('');
+
       // Toggle all tools to the target state
-      const promises = tools.map(tool => 
-        MCPService.ToggleTool(serverName, tool.name, shouldEnable)
-      )
-      
-      await Promise.all(promises)
-      
+      const promises = tools.map(tool =>
+        MCPService.ToggleTool(serverName, tool.name, shouldEnable),
+      );
+
+      await Promise.all(promises);
+
       // Update all tool states
-      const newStates: { [key: string]: boolean } = {}
+      const newStates: { [key: string]: boolean } = {};
       tools.forEach(tool => {
-        newStates[tool.name] = shouldEnable
-      })
-      setToolStates(newStates)
-      
+        newStates[tool.name] = shouldEnable;
+      });
+      setToolStates(newStates);
     } catch (err) {
-      console.error('Failed to bulk toggle tools:', err)
-      setError(err instanceof Error ? err.message : 'Failed to bulk toggle tools')
+      console.error('Failed to bulk toggle tools:', err);
+      setError(err instanceof Error ? err.message : 'Failed to bulk toggle tools');
     } finally {
-      setBulkLoading(false)
+      setBulkLoading(false);
     }
-  }
+  };
 
   // Calculate bulk action state
-  const enabledCount = Object.values(toolStates).filter(Boolean).length
-  const totalCount = tools.length
-  const shouldEnable = enabledCount < totalCount / 2
-  const bulkActionText = shouldEnable ? 'Enable All' : 'Disable All'
-  const bulkActionDescription = shouldEnable 
-    ? `Enable all ${totalCount} tools` 
-    : `Disable all ${totalCount} tools`
+  const enabledCount = Object.values(toolStates).filter(Boolean).length;
+  const totalCount = tools.length;
+  const shouldEnable = enabledCount < totalCount / 2;
+  const bulkActionText = shouldEnable ? 'Enable All' : 'Disable All';
+  const bulkActionDescription = shouldEnable
+    ? `Enable all ${totalCount} tools`
+    : `Disable all ${totalCount} tools`;
 
   // Handle escape key to close modal
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose()
+        onClose();
       }
-    }
+    };
 
     if (isOpen) {
-      document.addEventListener('keydown', handleEscape)
+      document.addEventListener('keydown', handleEscape);
       return () => {
-        document.removeEventListener('keydown', handleEscape)
-      }
+        document.removeEventListener('keydown', handleEscape);
+      };
     }
-    
-    return undefined
-  }, [isOpen, onClose])
 
-  if (!isOpen) return null
+    return undefined;
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+
       {/* Modal */}
       <div className="relative w-full max-w-4xl mx-4 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-hidden">
         {/* Header */}
@@ -143,16 +139,9 @@ export function ToolsModal({ serverName, isOpen, onClose }: ToolsModalProps) {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               Tools - {serverName}
             </h2>
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              ({tools.length} tools)
-            </span>
+            <span className="text-sm text-gray-500 dark:text-gray-400">({tools.length} tools)</span>
           </div>
-          <LoadingButton
-            onClick={onClose}
-            variant="secondary"
-            size="sm"
-            className="p-1.5"
-          >
+          <LoadingButton onClick={onClose} variant="secondary" size="sm" className="p-1.5">
             <XMarkIcon className="h-4 w-4" />
           </LoadingButton>
         </div>
@@ -176,16 +165,17 @@ export function ToolsModal({ serverName, isOpen, onClose }: ToolsModalProps) {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Toggle individual tools on or off. Disabled tools will not be available to MCP clients.
+                  Toggle individual tools on or off. Disabled tools will not be available to MCP
+                  clients.
                 </p>
-                
+
                 {/* Bulk Action Button */}
                 <button
                   onClick={handleBulkToggle}
                   disabled={bulkLoading}
                   className={`inline-flex flex-row items-center justify-start gap-1.5 text-xs whitespace-nowrap px-3 py-1.5 font-medium rounded-md shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-sm transition-all duration-150 ${
-                    shouldEnable 
-                      ? 'bg-green-100 hover:bg-green-200 text-green-800 border border-green-300 hover:border-green-400' 
+                    shouldEnable
+                      ? 'bg-green-100 hover:bg-green-200 text-green-800 border border-green-300 hover:border-green-400'
                       : 'bg-orange-100 hover:bg-orange-200 text-orange-800 border border-orange-300 hover:border-orange-400'
                   }`}
                 >
@@ -197,7 +187,7 @@ export function ToolsModal({ serverName, isOpen, onClose }: ToolsModalProps) {
                   <span>{bulkActionText}</span>
                 </button>
               </div>
-              
+
               {/* Table */}
               <div className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
                 <table className="w-full">
@@ -216,7 +206,7 @@ export function ToolsModal({ serverName, isOpen, onClose }: ToolsModalProps) {
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
                     {tools.map((tool, index) => (
-                      <tr 
+                      <tr
                         key={tool.name}
                         className={`hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors duration-150 ${
                           toggleLoading[tool.name] ? 'opacity-75' : ''
@@ -236,7 +226,7 @@ export function ToolsModal({ serverName, isOpen, onClose }: ToolsModalProps) {
                           <div className="flex justify-center">
                             <ToggleSwitch
                               checked={toolStates[tool.name] ?? true}
-                              onChange={(enabled) => handleToggleTool(tool.name, enabled)}
+                              onChange={enabled => handleToggleTool(tool.name, enabled)}
                               disabled={toggleLoading[tool.name] || loading || bulkLoading}
                               size="sm"
                             />
@@ -265,15 +255,11 @@ export function ToolsModal({ serverName, isOpen, onClose }: ToolsModalProps) {
               </span>
             )}
           </div>
-          <LoadingButton
-            onClick={onClose}
-            variant="secondary"
-            size="sm"
-          >
+          <LoadingButton onClick={onClose} variant="secondary" size="sm">
             Close
           </LoadingButton>
         </div>
       </div>
     </div>
-  )
+  );
 }

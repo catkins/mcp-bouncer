@@ -32,3 +32,13 @@ tasks:
     cmds:
       - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
 
+  format:
+    summary: Formats frontend TypeScript with Prettier
+    cmds:
+      - npm --prefix frontend run format
+
+  format:check:
+    summary: Checks formatting in frontend via Prettier
+    cmds:
+      - npm --prefix frontend run format:check
+

@@ -1,0 +1,11 @@
+# Generated and build outputs
+node_modules
+build
+bin
+dist
+coverage
+bindings
+
+# Parent project build outputs (when run from repo root)
+../build
+../bin

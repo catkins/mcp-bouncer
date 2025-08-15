@@ -1,23 +1,38 @@
-import { ServerList, Header } from './components'
-import { useMCPService } from './hooks/useMCPService'
-import { useTheme } from './hooks/useTheme'
-import { ToastProvider } from './contexts/ToastContext'
-import { ToastContainer } from './components/Toast'
-import { useToast } from './contexts/ToastContext'
+import { ServerList, Header } from './components';
+import { useMCPService } from './hooks/useMCPService';
+import { useTheme } from './hooks/useTheme';
+import { ToastProvider } from './contexts/ToastContext';
+import { ToastContainer } from './components/Toast';
+import { useToast } from './contexts/ToastContext';
 
 function AppContent() {
-  const { servers, clientStatus, mcpUrl, isActive, loadingStates, errors, addServer, updateServer, removeServer, toggleServer, restartServer, authorizeServer, loadClientStatus, openConfigDirectory } = useMCPService()
-  const { theme, toggleTheme } = useTheme()
-  const { toasts, removeToast } = useToast()
+  const {
+    servers,
+    clientStatus,
+    mcpUrl,
+    isActive,
+    loadingStates,
+    errors,
+    addServer,
+    updateServer,
+    removeServer,
+    toggleServer,
+    restartServer,
+    authorizeServer,
+    loadClientStatus,
+    openConfigDirectory,
+  } = useMCPService();
+  const { theme, toggleTheme } = useTheme();
+  const { toasts, removeToast } = useToast();
 
   const handleRefreshStatus = async (serverName: string) => {
-    await loadClientStatus()
-  }
+    await loadClientStatus();
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-radial dark:from-gray-800 dark:via-gray-800 dark:to-gray-900">
-      <Header 
-        isActive={isActive} 
+      <Header
+        isActive={isActive}
         toggleTheme={toggleTheme}
         theme={theme}
         onOpenConfig={openConfigDirectory}
@@ -25,7 +40,7 @@ function AppContent() {
       />
       <ToastContainer toasts={toasts} onClose={removeToast} />
       <main className="pt-16 px-6 pb-6 max-w-5xl mx-auto">
-        <ServerList 
+        <ServerList
           servers={servers}
           clientStatus={clientStatus}
           onAddServer={addServer}
@@ -40,7 +55,7 @@ function AppContent() {
         />
       </main>
     </div>
-  )
+  );
 }
 
 export default function App() {
@@ -48,5 +63,5 @@ export default function App() {
     <ToastProvider>
       <AppContent />
     </ToastProvider>
-  )
+  );
 }

@@ -1,134 +1,136 @@
-import { useState, useEffect } from 'react'
-import { PlusIcon } from '@heroicons/react/24/outline'
-import { ServerCard } from './ServerCard'
-import { ServerForm } from './ServerForm'
-import { ToolsModal } from './ToolsModal'
-import { MCPServerConfig } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models'
-import { ClientStatus } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/mcp/models'
-import { LoadingButton } from './LoadingButton'
+import { useState, useEffect } from 'react';
+import { PlusIcon } from '@heroicons/react/24/outline';
+import { ServerCard } from './ServerCard';
+import { ServerForm } from './ServerForm';
+import { ToolsModal } from './ToolsModal';
+import { MCPServerConfig } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models';
+import { ClientStatus } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/mcp/models';
+import { LoadingButton } from './LoadingButton';
 
 interface ServerListProps {
-  servers: MCPServerConfig[]
-  clientStatus: { [key: string]: ClientStatus }
-  onAddServer: (server: MCPServerConfig) => Promise<void>
-  onUpdateServer: (name: string, server: MCPServerConfig) => Promise<void>
-  onRemoveServer: (name: string) => Promise<void>
-  onToggleServer: (name: string, enabled: boolean) => Promise<void>
-  onRestartServer: (name: string) => Promise<void>
-  onRefreshStatus?: (serverName: string) => Promise<void>
-  onAuthorizeServer?: (name: string) => Promise<void>
+  servers: MCPServerConfig[];
+  clientStatus: { [key: string]: ClientStatus };
+  onAddServer: (server: MCPServerConfig) => Promise<void>;
+  onUpdateServer: (name: string, server: MCPServerConfig) => Promise<void>;
+  onRemoveServer: (name: string) => Promise<void>;
+  onToggleServer: (name: string, enabled: boolean) => Promise<void>;
+  onRestartServer: (name: string) => Promise<void>;
+  onRefreshStatus?: (serverName: string) => Promise<void>;
+  onAuthorizeServer?: (name: string) => Promise<void>;
   loadingStates: {
-    addServer: boolean
-    updateServer: boolean
-    removeServer: boolean
-    general: boolean
-    toggleServer: { [key: string]: boolean }
-    restartServer: { [key: string]: boolean }
-  }
+    addServer: boolean;
+    updateServer: boolean;
+    removeServer: boolean;
+    general: boolean;
+    toggleServer: { [key: string]: boolean };
+    restartServer: { [key: string]: boolean };
+  };
   errors: {
-    addServer?: string
-    updateServer?: string
-    removeServer?: string
-    general?: string
-    toggleServer?: { [key: string]: string | undefined }
-  }
+    addServer?: string;
+    updateServer?: string;
+    removeServer?: string;
+    general?: string;
+    toggleServer?: { [key: string]: string | undefined };
+  };
 }
 
-export function ServerList({ 
-  servers, 
+export function ServerList({
+  servers,
   clientStatus,
-  onAddServer, 
-  onUpdateServer, 
+  onAddServer,
+  onUpdateServer,
   onRemoveServer,
   onToggleServer,
   onRestartServer,
   onAuthorizeServer,
   onRefreshStatus,
   loadingStates,
-  errors
+  errors,
 }: ServerListProps) {
-  const [showAddServer, setShowAddServer] = useState<boolean>(false)
-  const [editingServer, setEditingServer] = useState<MCPServerConfig | null>(null)
-  const [toolsModalServer, setToolsModalServer] = useState<string | null>(null)
+  const [showAddServer, setShowAddServer] = useState<boolean>(false);
+  const [editingServer, setEditingServer] = useState<MCPServerConfig | null>(null);
+  const [toolsModalServer, setToolsModalServer] = useState<string | null>(null);
 
   // Debug logging
   useEffect(() => {
-    console.log('ServerList state:', { showAddServer, editingServer: !!editingServer, toolsModalServer })
-  }, [showAddServer, editingServer, toolsModalServer])
+    console.log('ServerList state:', {
+      showAddServer,
+      editingServer: !!editingServer,
+      toolsModalServer,
+    });
+  }, [showAddServer, editingServer, toolsModalServer]);
 
   const handleSaveServer = async (serverConfig: MCPServerConfig) => {
     try {
       if (editingServer && editingServer.name) {
-        await onUpdateServer(editingServer.name, serverConfig)
+        await onUpdateServer(editingServer.name, serverConfig);
       } else {
-        await onAddServer(serverConfig)
+        await onAddServer(serverConfig);
       }
-      setShowAddServer(false)
-      setEditingServer(null)
+      setShowAddServer(false);
+      setEditingServer(null);
     } catch (error) {
-      console.error('Failed to save server:', error)
+      console.error('Failed to save server:', error);
       // Keep modal open on error
     }
-  }
+  };
 
   const handleCancelServer = () => {
-    console.log('Canceling server form')
-    setShowAddServer(false)
-    setEditingServer(null)
-  }
+    console.log('Canceling server form');
+    setShowAddServer(false);
+    setEditingServer(null);
+  };
 
   const handleEditServer = (server: MCPServerConfig) => {
-    console.log('Editing server:', server.name)
-    setEditingServer(server)
-  }
+    console.log('Editing server:', server.name);
+    setEditingServer(server);
+  };
 
   const handleRemoveServer = async (serverName: string) => {
     try {
-      await onRemoveServer(serverName)
+      await onRemoveServer(serverName);
     } catch (error) {
-      console.error('Failed to remove server:', error)
+      console.error('Failed to remove server:', error);
     }
-  }
+  };
 
   const handleAddServer = () => {
-    console.log('Opening add server form')
-    setShowAddServer(true)
-  }
+    console.log('Opening add server form');
+    setShowAddServer(true);
+  };
 
   const handleOpenTools = (serverName: string) => {
-    console.log('Opening tools modal for server:', serverName)
-    setToolsModalServer(serverName)
-  }
+    console.log('Opening tools modal for server:', serverName);
+    setToolsModalServer(serverName);
+  };
 
   const handleCloseTools = () => {
-    console.log('Closing tools modal')
-    setToolsModalServer(null)
-  }
+    console.log('Closing tools modal');
+    setToolsModalServer(null);
+  };
 
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Check for Cmd+A (macOS) or Ctrl+A (other platforms)
       if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
-        e.preventDefault() // Prevent default "select all" behavior
+        e.preventDefault(); // Prevent default "select all" behavior
         if (!showAddServer && !editingServer && !toolsModalServer) {
-          handleAddServer()
+          handleAddServer();
         }
       }
-    }
+    };
 
-    document.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [showAddServer, editingServer, toolsModalServer])
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showAddServer, editingServer, toolsModalServer]);
 
   return (
     <div className="mb-4">
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-          Servers
-        </h2>
+        <h2 className="text-base font-semibold text-gray-900 dark:text-white">Servers</h2>
         <LoadingButton
           onClick={handleAddServer}
           loading={loadingStates.addServer}
@@ -169,7 +171,7 @@ export function ServerList({
               className="animate-fadeIn"
               style={{
                 animationDelay: `${index * 100}ms`,
-                animationFillMode: 'both'
+                animationFillMode: 'both',
               }}
             >
               <ServerCard
@@ -178,12 +180,12 @@ export function ServerList({
                 onEdit={handleEditServer}
                 onRemove={handleRemoveServer}
                 onToggle={onToggleServer}
-            onRestart={() => onRestartServer(server.name)}
-            onAuthorize={onAuthorizeServer ? () => onAuthorizeServer(server.name) : undefined}
+                onRestart={() => onRestartServer(server.name)}
+                onAuthorize={onAuthorizeServer ? () => onAuthorizeServer(server.name) : undefined}
                 onOpenTools={handleOpenTools}
                 loading={loadingStates.updateServer || loadingStates.removeServer}
                 toggleLoading={loadingStates.toggleServer[server.name] || false}
-            restartLoading={loadingStates.restartServer[server.name] || false}
+                restartLoading={loadingStates.restartServer[server.name] || false}
                 toggleError={errors.toggleServer?.[server.name]}
                 onRefreshStatus={onRefreshStatus}
               />
@@ -210,5 +212,5 @@ export function ServerList({
         />
       )}
     </div>
-  )
+  );
 }

@@ -1,59 +1,85 @@
-import { useState, useEffect } from 'react'
-import { XMarkIcon, PlusIcon, TrashIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
-import { MCPServerConfig, TransportType } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models'
-import { LoadingButton } from './LoadingButton'
-import { ToggleSwitch } from './ToggleSwitch'
+import { useState, useEffect } from 'react';
+import {
+  XMarkIcon,
+  PlusIcon,
+  TrashIcon,
+  ExclamationTriangleIcon,
+} from '@heroicons/react/24/outline';
+import {
+  MCPServerConfig,
+  TransportType,
+} from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models';
+import { LoadingButton } from './LoadingButton';
+import { ToggleSwitch } from './ToggleSwitch';
 
 interface FormInputProps {
-  id: string
-  label: string
-  value: string
-  onChange: (value: string) => void
-  error?: string
-  required?: boolean
-  placeholder?: string
-  type?: string
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  error?: string;
+  required?: boolean;
+  placeholder?: string;
+  type?: string;
 }
 
-function FormInput({ id, label, value, onChange, error, required = false, placeholder, type = 'text' }: FormInputProps) {
+function FormInput({
+  id,
+  label,
+  value,
+  onChange,
+  error,
+  required = false,
+  placeholder,
+  type = 'text',
+}: FormInputProps) {
   const getInputClassName = () => {
-    const baseClasses = "w-full px-2 py-1.5 border rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:border-transparent text-sm"
-    const errorClasses = "border-red-500 focus:ring-red-500"
-    const normalClasses = "border-gray-300 dark:border-gray-700 focus:ring-purple-500 dark:focus:ring-purple-400"
-    
-    return `${baseClasses} ${error ? errorClasses : normalClasses}`
-  }
+    const baseClasses =
+      'w-full px-2 py-1.5 border rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:border-transparent text-sm';
+    const errorClasses = 'border-red-500 focus:ring-red-500';
+    const normalClasses =
+      'border-gray-300 dark:border-gray-700 focus:ring-purple-500 dark:focus:ring-purple-400';
+
+    return `${baseClasses} ${error ? errorClasses : normalClasses}`;
+  };
 
   return (
     <div>
-      <label htmlFor={id} className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+      <label
+        htmlFor={id}
+        className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1"
+      >
         {label} {required && '*'}
       </label>
       <input
         id={id}
         type={type}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={e => onChange(e.target.value)}
         className={getInputClassName()}
         required={required}
         placeholder={placeholder}
       />
-      {error && (
-        <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>
-      )}
+      {error && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
     </div>
-  )
+  );
 }
 
 interface ServerFormProps {
-  server?: MCPServerConfig | null
-  onSave: (server: MCPServerConfig) => Promise<void>
-  onCancel: () => void
-  loading?: boolean
-  existingServers?: MCPServerConfig[]
+  server?: MCPServerConfig | null;
+  onSave: (server: MCPServerConfig) => Promise<void>;
+  onCancel: () => void;
+  loading?: boolean;
+  existingServers?: MCPServerConfig[];
 }
 
-export function ServerForm({ server, onSave, onCancel, loading = false, existingServers = [] }: ServerFormProps) {
+export function ServerForm({
+  server,
+  onSave,
+  onCancel,
+  loading = false,
+  existingServers = [],
+}: ServerFormProps) {
   const [formData, setFormData] = useState<MCPServerConfig>({
     name: '',
     description: '',
@@ -63,167 +89,169 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
     env: {},
     endpoint: '',
     headers: {},
-    enabled: true
-  })
-  const [errors, setErrors] = useState<{ [key: string]: string }>({})
-  const [submitError, setSubmitError] = useState<string>('')
+    enabled: true,
+  });
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [submitError, setSubmitError] = useState<string>('');
 
   useEffect(() => {
     if (server) {
-      setFormData(server)
+      setFormData(server);
     }
-  }, [server])
+  }, [server]);
 
   // Auto-focus the name field when form opens
   useEffect(() => {
-    const nameInput = document.getElementById('server-name') as HTMLInputElement
+    const nameInput = document.getElementById('server-name') as HTMLInputElement;
     if (nameInput) {
-      nameInput.focus()
+      nameInput.focus();
     }
-  }, [])
+  }, []);
 
   // Handle escape key to dismiss modal
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onCancel()
+        onCancel();
       }
-    }
+    };
 
-    document.addEventListener('keydown', handleEscape)
+    document.addEventListener('keydown', handleEscape);
     return () => {
-      document.removeEventListener('keydown', handleEscape)
-    }
-  }, [onCancel])
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [onCancel]);
 
   const validateForm = (): boolean => {
-    const newErrors: { [key: string]: string } = {}
+    const newErrors: { [key: string]: string } = {};
 
     // Validate name
     if (!formData.name.trim()) {
-      newErrors.name = 'Server name is required'
+      newErrors.name = 'Server name is required';
     } else if (formData.name.trim().length < 2) {
-      newErrors.name = 'Server name must be at least 2 characters'
+      newErrors.name = 'Server name must be at least 2 characters';
     } else {
       // Check for duplicate names (excluding the current server being edited)
-      const isDuplicate = existingServers.some(s => 
-        s.name === formData.name.trim() && s.name !== server?.name
-      )
+      const isDuplicate = existingServers.some(
+        s => s.name === formData.name.trim() && s.name !== server?.name,
+      );
       if (isDuplicate) {
-        newErrors.name = 'A server with this name already exists'
+        newErrors.name = 'A server with this name already exists';
       }
     }
 
     // Validate command for stdio transport
     if (formData.transport === TransportType.TransportStdio && !formData.command.trim()) {
-      newErrors.command = 'Command is required for stdio transport'
+      newErrors.command = 'Command is required for stdio transport';
     }
 
     // Validate endpoint for HTTP transports
-    if ((formData.transport === TransportType.TransportSSE || formData.transport === TransportType.TransportStreamableHTTP) && !formData.endpoint?.trim()) {
-      newErrors.endpoint = 'Endpoint is required for HTTP transports'
+    if (
+      (formData.transport === TransportType.TransportSSE ||
+        formData.transport === TransportType.TransportStreamableHTTP) &&
+      !formData.endpoint?.trim()
+    ) {
+      newErrors.endpoint = 'Endpoint is required for HTTP transports';
     }
 
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSubmitError('')
-    
+    e.preventDefault();
+    setSubmitError('');
+
     if (!validateForm()) {
-      return
+      return;
     }
 
     try {
-      await onSave(formData)
+      await onSave(formData);
     } catch (error: any) {
-      console.error('Failed to save server:', error)
-      
+      console.error('Failed to save server:', error);
+
       // Handle specific backend errors
       if (error?.message?.includes('already exists')) {
-        setErrors({ name: 'A server with this name already exists' })
+        setErrors({ name: 'A server with this name already exists' });
       } else {
-        setSubmitError(error?.message || 'Failed to save server')
+        setSubmitError(error?.message || 'Failed to save server');
       }
     }
-  }
+  };
 
   const addArg = () => {
     setFormData(prev => ({
       ...prev,
-      args: [...(prev.args || []), '']
-    }))
-  }
+      args: [...(prev.args || []), ''],
+    }));
+  };
 
   const updateArg = (index: number, value: string) => {
     setFormData(prev => ({
       ...prev,
-      args: (prev.args || []).map((arg, i) => i === index ? value : arg)
-    }))
-  }
+      args: (prev.args || []).map((arg, i) => (i === index ? value : arg)),
+    }));
+  };
 
   const removeArg = (index: number) => {
     setFormData(prev => ({
       ...prev,
-      args: (prev.args || []).filter((_, i) => i !== index)
-    }))
-  }
+      args: (prev.args || []).filter((_, i) => i !== index),
+    }));
+  };
 
   const addEnvVar = () => {
     setFormData(prev => ({
       ...prev,
-      env: { ...prev.env, '': '' }
-    }))
-  }
+      env: { ...prev.env, '': '' },
+    }));
+  };
 
   const updateEnvVar = (oldKey: string, newKey: string, value: string) => {
     setFormData(prev => {
-      const newEnv = { ...prev.env }
-      delete newEnv[oldKey]
+      const newEnv = { ...prev.env };
+      delete newEnv[oldKey];
       if (newKey) {
-        newEnv[newKey] = value
+        newEnv[newKey] = value;
       }
-      return { ...prev, env: newEnv }
-    })
-  }
+      return { ...prev, env: newEnv };
+    });
+  };
 
   const removeEnvVar = (key: string) => {
     setFormData(prev => {
-      const newEnv = { ...prev.env }
-      delete newEnv[key]
-      return { ...prev, env: newEnv }
-    })
-  }
+      const newEnv = { ...prev.env };
+      delete newEnv[key];
+      return { ...prev, env: newEnv };
+    });
+  };
 
   const addHeader = () => {
     setFormData(prev => ({
       ...prev,
-      headers: { ...prev.headers, '': '' }
-    }))
-  }
+      headers: { ...prev.headers, '': '' },
+    }));
+  };
 
   const updateHeader = (oldKey: string, newKey: string, value: string) => {
     setFormData(prev => {
-      const newHeaders = { ...prev.headers }
-      delete newHeaders[oldKey]
+      const newHeaders = { ...prev.headers };
+      delete newHeaders[oldKey];
       if (newKey) {
-        newHeaders[newKey] = value
+        newHeaders[newKey] = value;
       }
-      return { ...prev, headers: newHeaders }
-    })
-  }
+      return { ...prev, headers: newHeaders };
+    });
+  };
 
   const removeHeader = (key: string) => {
     setFormData(prev => {
-      const newHeaders = { ...prev.headers }
-      delete newHeaders[key]
-      return { ...prev, headers: newHeaders }
-    })
-  }
-
-
+      const newHeaders = { ...prev.headers };
+      delete newHeaders[key];
+      return { ...prev, headers: newHeaders };
+    });
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -255,10 +283,10 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
             id="server-name"
             label="Name"
             value={formData.name}
-            onChange={(value) => {
-              setFormData(prev => ({ ...prev, name: value }))
+            onChange={value => {
+              setFormData(prev => ({ ...prev, name: value }));
               if (errors.name) {
-                setErrors(prev => ({ ...prev, name: '' }))
+                setErrors(prev => ({ ...prev, name: '' }));
               }
             }}
             error={errors.name}
@@ -269,7 +297,7 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
             id="server-description"
             label="Description"
             value={formData.description}
-            onChange={(value) => setFormData(prev => ({ ...prev, description: value }))}
+            onChange={value => setFormData(prev => ({ ...prev, description: value }))}
           />
 
           <div>
@@ -278,20 +306,20 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
             </label>
             <select
               value={formData.transport}
-              onChange={(e) => {
-                const newTransport = e.target.value as TransportType
-                setFormData(prev => ({ ...prev, transport: newTransport }))
+              onChange={e => {
+                const newTransport = e.target.value as TransportType;
+                setFormData(prev => ({ ...prev, transport: newTransport }));
                 // Clear validation errors when switching transport types
                 setErrors(prev => {
-                  const newErrors = { ...prev }
+                  const newErrors = { ...prev };
                   if (newTransport !== TransportType.TransportStdio) {
-                    delete newErrors.command
+                    delete newErrors.command;
                   }
                   if (newTransport === TransportType.TransportStdio) {
-                    delete newErrors.endpoint
+                    delete newErrors.endpoint;
                   }
-                  return newErrors
-                })
+                  return newErrors;
+                });
               }}
               className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
             >
@@ -301,15 +329,16 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
             </select>
           </div>
 
-          {(formData.transport === TransportType.TransportSSE || formData.transport === TransportType.TransportStreamableHTTP) && (
+          {(formData.transport === TransportType.TransportSSE ||
+            formData.transport === TransportType.TransportStreamableHTTP) && (
             <FormInput
               id="server-endpoint"
               label="Endpoint"
               value={formData.endpoint || ''}
-              onChange={(value) => {
-                setFormData(prev => ({ ...prev, endpoint: value }))
+              onChange={value => {
+                setFormData(prev => ({ ...prev, endpoint: value }));
                 if (errors.endpoint) {
-                  setErrors(prev => ({ ...prev, endpoint: '' }))
+                  setErrors(prev => ({ ...prev, endpoint: '' }));
                 }
               }}
               error={errors.endpoint}
@@ -318,15 +347,15 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
             />
           )}
 
-          {(formData.transport === TransportType.TransportStdio) && (
+          {formData.transport === TransportType.TransportStdio && (
             <FormInput
               id="server-command"
               label="Command"
               value={formData.command}
-              onChange={(value) => {
-                setFormData(prev => ({ ...prev, command: value }))
+              onChange={value => {
+                setFormData(prev => ({ ...prev, command: value }));
                 if (errors.command) {
-                  setErrors(prev => ({ ...prev, command: '' }))
+                  setErrors(prev => ({ ...prev, command: '' }));
                 }
               }}
               error={errors.command}
@@ -334,7 +363,7 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
             />
           )}
 
-          {(formData.transport === TransportType.TransportStdio) && (
+          {formData.transport === TransportType.TransportStdio && (
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
@@ -357,7 +386,7 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
                     <input
                       type="text"
                       value={arg}
-                      onChange={(e) => updateArg(index, e.target.value)}
+                      onChange={e => updateArg(index, e.target.value)}
                       className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
                       placeholder="Argument"
                       aria-label={`Argument ${index + 1}`}
@@ -378,7 +407,7 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
             </div>
           )}
 
-          {(formData.transport === TransportType.TransportStdio) && (
+          {formData.transport === TransportType.TransportStdio && (
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
@@ -401,7 +430,7 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
                     <input
                       type="text"
                       value={key}
-                      onChange={(e) => updateEnvVar(key, e.target.value, value)}
+                      onChange={e => updateEnvVar(key, e.target.value, value)}
                       className="w-1/3 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
                       placeholder="Variable name"
                       aria-label={`Environment variable name ${index + 1}`}
@@ -409,7 +438,7 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
                     <input
                       type="text"
                       value={value}
-                      onChange={(e) => updateEnvVar(key, key, e.target.value)}
+                      onChange={e => updateEnvVar(key, key, e.target.value)}
                       className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
                       placeholder="Value"
                       aria-label={`Environment variable value ${index + 1}`}
@@ -430,7 +459,8 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
             </div>
           )}
 
-          {(formData.transport === TransportType.TransportSSE || formData.transport === TransportType.TransportStreamableHTTP) && (
+          {(formData.transport === TransportType.TransportSSE ||
+            formData.transport === TransportType.TransportStreamableHTTP) && (
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
@@ -453,7 +483,7 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
                     <input
                       type="text"
                       value={key}
-                      onChange={(e) => updateHeader(key, e.target.value, value)}
+                      onChange={e => updateHeader(key, e.target.value, value)}
                       className="w-1/3 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
                       placeholder="Header name"
                       aria-label={`HTTP header name ${index + 1}`}
@@ -461,7 +491,7 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
                     <input
                       type="text"
                       value={value}
-                      onChange={(e) => updateHeader(key, key, e.target.value)}
+                      onChange={e => updateHeader(key, key, e.target.value)}
                       className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
                       placeholder="Value"
                       aria-label={`HTTP header value ${index + 1}`}
@@ -485,31 +515,22 @@ export function ServerForm({ server, onSave, onCancel, loading = false, existing
           <div className="pt-1">
             <ToggleSwitch
               checked={formData.enabled}
-              onChange={(checked) => setFormData(prev => ({ ...prev, enabled: checked }))}
+              onChange={checked => setFormData(prev => ({ ...prev, enabled: checked }))}
               label="Enable server"
               size="sm"
             />
           </div>
 
           <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-200 dark:border-gray-800">
-            <LoadingButton
-              type="button"
-              onClick={onCancel}
-              variant="secondary"
-              size="sm"
-            >
+            <LoadingButton type="button" onClick={onCancel} variant="secondary" size="sm">
               Cancel
             </LoadingButton>
-            <LoadingButton
-              type="submit"
-              loading={loading}
-              size="sm"
-            >
+            <LoadingButton type="submit" loading={loading} size="sm">
               {server ? 'Update Server' : 'Add Server'}
             </LoadingButton>
           </div>
         </form>
       </div>
     </div>
-  )
+  );
 }

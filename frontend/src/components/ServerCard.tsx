@@ -1,86 +1,103 @@
-import { PencilIcon, TrashIcon, WrenchScrewdriverIcon, CheckCircleIcon, XCircleIcon, NoSymbolIcon, CommandLineIcon, SignalIcon, GlobeAltIcon, ArrowPathIcon, KeyIcon } from '@heroicons/react/24/outline'
-import { MCPServerConfig } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models'
-import { ClientStatus } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/mcp/models'
-import { LoadingButton } from './LoadingButton'
-import { ToggleSwitch } from './ToggleSwitch'
+import {
+  PencilIcon,
+  TrashIcon,
+  WrenchScrewdriverIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  NoSymbolIcon,
+  CommandLineIcon,
+  SignalIcon,
+  GlobeAltIcon,
+  ArrowPathIcon,
+  KeyIcon,
+} from '@heroicons/react/24/outline';
+import { MCPServerConfig } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models';
+import { ClientStatus } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/mcp/models';
+import { LoadingButton } from './LoadingButton';
+import { ToggleSwitch } from './ToggleSwitch';
 
 interface ServerCardProps {
-  server: MCPServerConfig
-  clientStatus?: ClientStatus
-  onEdit: (server: MCPServerConfig) => void
-  onRemove: (serverName: string) => Promise<void>
-  onToggle: (serverName: string, enabled: boolean) => Promise<void>
-  onRestart?: () => Promise<void>
-  onRefreshStatus?: (serverName: string) => Promise<void>
-  onOpenTools?: (serverName: string) => void
-  onAuthorize?: (serverName: string) => Promise<void>
-  loading?: boolean
-  toggleLoading?: boolean
-  restartLoading?: boolean
-  toggleError?: string
+  server: MCPServerConfig;
+  clientStatus?: ClientStatus;
+  onEdit: (server: MCPServerConfig) => void;
+  onRemove: (serverName: string) => Promise<void>;
+  onToggle: (serverName: string, enabled: boolean) => Promise<void>;
+  onRestart?: () => Promise<void>;
+  onRefreshStatus?: (serverName: string) => Promise<void>;
+  onOpenTools?: (serverName: string) => void;
+  onAuthorize?: (serverName: string) => Promise<void>;
+  loading?: boolean;
+  toggleLoading?: boolean;
+  restartLoading?: boolean;
+  toggleError?: string;
 }
 
-export function ServerCard({ 
-  server, 
-  clientStatus, 
-  onEdit, 
-  onRemove, 
-  onToggle, 
-  onRefreshStatus, 
+export function ServerCard({
+  server,
+  clientStatus,
+  onEdit,
+  onRemove,
+  onToggle,
+  onRefreshStatus,
   onRestart,
   onOpenTools,
   onAuthorize,
   loading = false,
   toggleLoading = false,
   restartLoading = false,
-  toggleError
+  toggleError,
 }: ServerCardProps) {
-
   const handleToolsClick = () => {
     if (clientStatus?.connected && clientStatus.tools > 0 && onOpenTools) {
-      onOpenTools(server.name)
+      onOpenTools(server.name);
     }
-  }
+  };
 
   const getTransportIcon = () => {
     switch (server.transport) {
       case 'stdio':
-        return <CommandLineIcon className="w-3 h-3" />
+        return <CommandLineIcon className="w-3 h-3" />;
       case 'sse':
-        return <SignalIcon className="w-3 h-3" />
+        return <SignalIcon className="w-3 h-3" />;
       case 'streamable_http':
-        return <GlobeAltIcon className="w-3 h-3" />
+        return <GlobeAltIcon className="w-3 h-3" />;
       default:
-        return <CommandLineIcon className="w-3 h-3" />
+        return <CommandLineIcon className="w-3 h-3" />;
     }
-  }
+  };
 
   return (
-    <div className={`
+    <div
+      className={`
       relative p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm 
       hover:shadow-md transition-all duration-300 ease-in-out
       ${toggleLoading ? 'animate-pulse' : ''}
       ${loading ? 'opacity-75' : 'opacity-100'}
-    `}>
+    `}
+    >
       {/* Shimmer effect overlay when loading */}
       {toggleLoading && (
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full animate-shimmer pointer-events-none rounded-lg" />
       )}
-      
+
       <div className="flex items-start justify-between mb-1.5 relative">
         <div className="flex items-center gap-2">
-          <h3 className={`text-base font-semibold text-gray-900 dark:text-white transition-colors duration-200 ${
-            toggleLoading ? 'text-gray-400 dark:text-gray-500' : ''
-          }`}>
+          <h3
+            className={`text-base font-semibold text-gray-900 dark:text-white transition-colors duration-200 ${
+              toggleLoading ? 'text-gray-400 dark:text-gray-500' : ''
+            }`}
+          >
             {server.name}
           </h3>
           {clientStatus && (
             <div className="flex items-center gap-2">
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full transition-all duration-200 ${
-                clientStatus.connected
-                  ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-400'
-                  : 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-400'
-              } ${toggleLoading ? 'animate-pulse' : ''}`}>
+              <span
+                className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full transition-all duration-200 ${
+                  clientStatus.connected
+                    ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-400'
+                    : 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-400'
+                } ${toggleLoading ? 'animate-pulse' : ''}`}
+              >
                 {clientStatus.connected ? (
                   <CheckCircleIcon className="w-3 h-3" />
                 ) : (
@@ -135,7 +152,7 @@ export function ServerCard({
           <div className={`transition-all duration-200 ${toggleLoading ? 'animate-pulse' : ''}`}>
             <ToggleSwitch
               checked={server.enabled}
-              onChange={(enabled) => onToggle(server.name, enabled)}
+              onChange={enabled => onToggle(server.name, enabled)}
               disabled={loading || toggleLoading}
               size="sm"
               className="mr-2"
@@ -161,15 +178,17 @@ export function ServerCard({
           </LoadingButton>
         </div>
       </div>
-      
+
       {server.description && (
-        <p className={`text-sm text-gray-600 dark:text-gray-400 mb-2 transition-colors duration-200 ${
-          toggleLoading ? 'text-gray-400 dark:text-gray-500' : ''
-        }`}>
+        <p
+          className={`text-sm text-gray-600 dark:text-gray-400 mb-2 transition-colors duration-200 ${
+            toggleLoading ? 'text-gray-400 dark:text-gray-500' : ''
+          }`}
+        >
           {server.description}
         </p>
       )}
-      
+
       {/* Show toggle error if present */}
       {toggleError && (
         <div className="mb-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md animate-fadeIn">
@@ -179,7 +198,7 @@ export function ServerCard({
           </div>
         </div>
       )}
-      
+
       {/* Show client error if present */}
       {server.enabled && clientStatus && clientStatus.last_error && !toggleError && (
         <div className="mb-2 p-2 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-md animate-fadeIn">
@@ -189,8 +208,10 @@ export function ServerCard({
           </div>
         </div>
       )}
-      
-      <div className={`space-y-1.5 transition-all duration-200 ${toggleLoading ? 'opacity-75' : ''}`}>
+
+      <div
+        className={`space-y-1.5 transition-all duration-200 ${toggleLoading ? 'opacity-75' : ''}`}
+      >
         {/* stdio transport fields */}
         {(server.transport === 'stdio' || !server.transport) && (
           <>
@@ -200,23 +221,30 @@ export function ServerCard({
                 {server.command}
               </code>
             </div>
-            
+
             {server.args && server.args.length > 0 && (
               <div>
-                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Arguments:</span>
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                  Arguments:
+                </span>
                 <div className="mt-1 flex flex-wrap gap-1">
                   {server.args.map((arg, index) => (
-                    <code key={index} className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
+                    <code
+                      key={index}
+                      className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono"
+                    >
                       {arg}
                     </code>
                   ))}
                 </div>
               </div>
             )}
-            
+
             {server.env && Object.keys(server.env).length > 0 && (
               <div>
-                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Environment:</span>
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                  Environment:
+                </span>
                 <div className="mt-1 space-y-1">
                   {Object.entries(server.env).map(([key, value]) => (
                     <div key={key} className="flex items-center gap-2">
@@ -236,16 +264,20 @@ export function ServerCard({
           <>
             {server.endpoint && (
               <div>
-                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Endpoint:</span>
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                  Endpoint:
+                </span>
                 <code className="ml-2 px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
                   {server.endpoint}
                 </code>
               </div>
             )}
-            
+
             {server.headers && Object.keys(server.headers).length > 0 && (
               <div>
-                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Headers:</span>
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                  Headers:
+                </span>
                 <div className="mt-1 space-y-1">
                   {Object.entries(server.headers).map(([key, value]) => (
                     <div key={key} className="flex items-center gap-2">
@@ -261,5 +293,5 @@ export function ServerCard({
         )}
       </div>
     </div>
-  )
+  );
 }
