@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-    "strings"
+	"net/http"
+	"os"
+	"os/exec"
+	"runtime"
+	"strings"
 	"sync"
 	"time"
-    "net/http"
-    "os/exec"
-    "runtime"
-    "os"
 
 	"github.com/catkins/mcp-bouncer/pkg/services/settings"
 	"github.com/mark3labs/mcp-go/client"
@@ -20,32 +20,32 @@ import (
 
 // ClientManager manages MCP client connections
 type ClientManager struct {
-    clients map[string]*ManagedClient
-    mutex   sync.RWMutex
-    server  *Server
+	clients map[string]*ManagedClient
+	mutex   sync.RWMutex
+	server  *Server
 }
 
 // (Token persistence to disk can be added later if supported by mcp-go TokenStore interface)
 
 // ManagedClient represents a managed MCP client connection
 type ManagedClient struct {
-	Config      settings.MCPServerConfig
-	Client      *client.Client
-	Transport   transport.Interface
-	Tools       []mcp.Tool
-	Connected   bool
-    LastError   string
-    AuthorizationRequired bool
-	StopChan    chan struct{}
-	RestartChan chan struct{}
+	Config                settings.MCPServerConfig
+	Client                *client.Client
+	Transport             transport.Interface
+	Tools                 []mcp.Tool
+	Connected             bool
+	LastError             string
+	AuthorizationRequired bool
+	StopChan              chan struct{}
+	RestartChan           chan struct{}
 }
 
 // NewClientManager creates a new client manager
 func NewClientManager(server *Server) *ClientManager {
-    return &ClientManager{
-        clients: make(map[string]*ManagedClient),
-        server:  server,
-    }
+	return &ClientManager{
+		clients: make(map[string]*ManagedClient),
+		server:  server,
+	}
 }
 
 // StartClient starts an MCP client based on configuration
@@ -75,11 +75,11 @@ func (cm *ClientManager) StartClient(ctx context.Context, config settings.MCPSer
 		return fmt.Errorf("failed to start client process: %w", err)
 	}
 
-    // Create client unless already provided by startClientProcess
-    if mc.Client == nil {
-        mcpClient := client.NewClient(mc.Transport)
-        mc.Client = mcpClient
-    }
+	// Create client unless already provided by startClientProcess
+	if mc.Client == nil {
+		mcpClient := client.NewClient(mc.Transport)
+		mc.Client = mcpClient
+	}
 
 	// Start the client
 	if err := mc.Client.Start(ctx); err != nil {
@@ -87,23 +87,23 @@ func (cm *ClientManager) StartClient(ctx context.Context, config settings.MCPSer
 		return fmt.Errorf("failed to start client: %w", err)
 	}
 
-    // Initialize the client
-    if err := cm.initializeClient(ctx, mc); err != nil {
-        // If initialization failed due to authorization, retain client entry and mark status
-        if client.IsOAuthAuthorizationRequiredError(err) || strings.Contains(strings.ToLower(err.Error()), "authorization required") || strings.Contains(strings.ToLower(err.Error()), "authentication required") || strings.Contains(err.Error(), "401") || strings.Contains(strings.ToLower(err.Error()), "authoriz") {
-            mc.AuthorizationRequired = true
-            mc.LastError = err.Error()
-            cm.clients[config.Name] = mc
-            slog.Warn("Client requires authorization", "name", config.Name, "error", err)
-            cm.server.EmitEvent("mcp:client_status_changed", map[string]any{
-                "server_name": config.Name,
-                "status":      "authorization_required",
-            })
-            return nil
-        }
-        cm.stopClientInternal(config.Name)
-        return fmt.Errorf("failed to initialize client: %w", err)
-    }
+	// Initialize the client
+	if err := cm.initializeClient(ctx, mc); err != nil {
+		// If initialization failed due to authorization, retain client entry and mark status
+		if client.IsOAuthAuthorizationRequiredError(err) || strings.Contains(strings.ToLower(err.Error()), "authorization required") || strings.Contains(strings.ToLower(err.Error()), "authentication required") || strings.Contains(err.Error(), "401") || strings.Contains(strings.ToLower(err.Error()), "authoriz") {
+			mc.AuthorizationRequired = true
+			mc.LastError = err.Error()
+			cm.clients[config.Name] = mc
+			slog.Warn("Client requires authorization", "name", config.Name, "error", err)
+			cm.server.EmitEvent("mcp:client_status_changed", map[string]any{
+				"server_name": config.Name,
+				"status":      "authorization_required",
+			})
+			return nil
+		}
+		cm.stopClientInternal(config.Name)
+		return fmt.Errorf("failed to initialize client: %w", err)
+	}
 
 	// Register tools with the main server
 	if err := cm.registerClientTools(ctx, mc); err != nil {
@@ -118,11 +118,11 @@ func (cm *ClientManager) StartClient(ctx context.Context, config settings.MCPSer
 	go cm.monitorClient(ctx, mc)
 
 	slog.Info("Started MCP client", "name", config.Name, "tools", len(mc.Tools))
-    // Emit per-client started event for immediate UI update
-    cm.server.EmitEvent("mcp:client_status_changed", map[string]any{
-        "server_name": config.Name,
-        "status":      "started",
-    })
+	// Emit per-client started event for immediate UI update
+	cm.server.EmitEvent("mcp:client_status_changed", map[string]any{
+		"server_name": config.Name,
+		"status":      "started",
+	})
 	return nil
 }
 
@@ -168,12 +168,12 @@ func (cm *ClientManager) stopClientInternal(name string) error {
 	// Remove from clients map
 	delete(cm.clients, name)
 
-    slog.Info("Stopped MCP client", "name", name)
-    // Emit per-client stopped event for immediate UI update
-    cm.server.EmitEvent("mcp:client_status_changed", map[string]any{
-        "server_name": name,
-        "status":      "stopped",
-    })
+	slog.Info("Stopped MCP client", "name", name)
+	// Emit per-client stopped event for immediate UI update
+	cm.server.EmitEvent("mcp:client_status_changed", map[string]any{
+		"server_name": name,
+		"status":      "stopped",
+	})
 	return nil
 }
 
@@ -182,13 +182,13 @@ func (cm *ClientManager) RestartClient(ctx context.Context, name string) error {
 	cm.mutex.Lock()
 	mc, exists := cm.clients[name]
 	if !exists {
-        // If not found, try to find config in settings via server and start afresh
-        cm.mutex.Unlock()
-        if cm.server != nil && cm.server.clientManager != nil {
-            // Access settings indirectly is not available here; return a clear error
-            return fmt.Errorf("client '%s' not found", name)
-        }
-        return fmt.Errorf("client '%s' not found", name)
+		// If not found, try to find config in settings via server and start afresh
+		cm.mutex.Unlock()
+		if cm.server != nil && cm.server.clientManager != nil {
+			// Access settings indirectly is not available here; return a clear error
+			return fmt.Errorf("client '%s' not found", name)
+		}
+		return fmt.Errorf("client '%s' not found", name)
 	}
 	config := mc.Config
 	cm.mutex.Unlock()
@@ -207,115 +207,115 @@ func (cm *ClientManager) RestartClient(ctx context.Context, name string) error {
 
 // AuthorizeClient runs an interactive OAuth flow for the given client if required
 func (cm *ClientManager) AuthorizeClient(ctx context.Context, name string) error {
-    cm.mutex.RLock()
-    mc, exists := cm.clients[name]
-    cm.mutex.RUnlock()
-    if !exists {
-        return fmt.Errorf("client '%s' not found", name)
-    }
+	cm.mutex.RLock()
+	mc, exists := cm.clients[name]
+	cm.mutex.RUnlock()
+	if !exists {
+		return fmt.Errorf("client '%s' not found", name)
+	}
 
-    // Try an initialize call to retrieve the OAuth handler from the error
-    _, err := mc.Client.Initialize(ctx, mcp.InitializeRequest{})
-    if err == nil {
-        return nil
-    }
+	// Try an initialize call to retrieve the OAuth handler from the error
+	_, err := mc.Client.Initialize(ctx, mcp.InitializeRequest{})
+	if err == nil {
+		return nil
+	}
 
-    if !client.IsOAuthAuthorizationRequiredError(err) {
-        return fmt.Errorf("authorization not required or unexpected error: %w", err)
-    }
+	if !client.IsOAuthAuthorizationRequiredError(err) {
+		return fmt.Errorf("authorization not required or unexpected error: %w", err)
+	}
 
-    oauthHandler := client.GetOAuthHandler(err)
-    if oauthHandler == nil {
-        return fmt.Errorf("failed to obtain OAuth handler")
-    }
+	oauthHandler := client.GetOAuthHandler(err)
+	if oauthHandler == nil {
+		return fmt.Errorf("failed to obtain OAuth handler")
+	}
 
-    // Start callback server
-    callbackChan := make(chan map[string]string)
-    srv := startOAuthCallbackServer(callbackChan)
-    defer srv.Close()
+	// Start callback server
+	callbackChan := make(chan map[string]string)
+	srv := startOAuthCallbackServer(callbackChan)
+	defer srv.Close()
 
-    // PKCE and state
-    codeVerifier, err := client.GenerateCodeVerifier()
-    if err != nil {
-        return fmt.Errorf("failed to generate code verifier: %w", err)
-    }
-    codeChallenge := client.GenerateCodeChallenge(codeVerifier)
-    state, err := client.GenerateState()
-    if err != nil {
-        return fmt.Errorf("failed to generate state: %w", err)
-    }
+	// PKCE and state
+	codeVerifier, err := client.GenerateCodeVerifier()
+	if err != nil {
+		return fmt.Errorf("failed to generate code verifier: %w", err)
+	}
+	codeChallenge := client.GenerateCodeChallenge(codeVerifier)
+	state, err := client.GenerateState()
+	if err != nil {
+		return fmt.Errorf("failed to generate state: %w", err)
+	}
 
-    if err := oauthHandler.RegisterClient(ctx, "mcp-bouncer"); err != nil {
-        return fmt.Errorf("failed to register client: %w", err)
-    }
+	if err := oauthHandler.RegisterClient(ctx, "mcp-bouncer"); err != nil {
+		return fmt.Errorf("failed to register client: %w", err)
+	}
 
-    authURL, err := oauthHandler.GetAuthorizationURL(ctx, state, codeChallenge)
-    if err != nil {
-        return fmt.Errorf("failed to get authorization URL: %w", err)
-    }
+	authURL, err := oauthHandler.GetAuthorizationURL(ctx, state, codeChallenge)
+	if err != nil {
+		return fmt.Errorf("failed to get authorization URL: %w", err)
+	}
 
-    if err := openDefaultBrowser(authURL); err != nil {
-        slog.Warn("Failed to open browser automatically", "error", err, "url", authURL)
-    }
+	if err := openDefaultBrowser(authURL); err != nil {
+		slog.Warn("Failed to open browser automatically", "error", err, "url", authURL)
+	}
 
-    // Wait for callback
-    params := <-callbackChan
-    if params["state"] != state {
-        return fmt.Errorf("state mismatch: expected %s, got %s", state, params["state"])
-    }
-    code := params["code"]
-    if code == "" {
-        return fmt.Errorf("no authorization code received")
-    }
+	// Wait for callback
+	params := <-callbackChan
+	if params["state"] != state {
+		return fmt.Errorf("state mismatch: expected %s, got %s", state, params["state"])
+	}
+	code := params["code"]
+	if code == "" {
+		return fmt.Errorf("no authorization code received")
+	}
 
-    if err := oauthHandler.ProcessAuthorizationResponse(ctx, code, state, codeVerifier); err != nil {
-        return fmt.Errorf("failed to process authorization response: %w", err)
-    }
+	if err := oauthHandler.ProcessAuthorizationResponse(ctx, code, state, codeVerifier); err != nil {
+		return fmt.Errorf("failed to process authorization response: %w", err)
+	}
 
-    // Authorization succeeded; clear flag and attempt initialize on existing client
-    cm.mutex.Lock()
-    mc.AuthorizationRequired = false
-    mc.LastError = ""
-    cm.mutex.Unlock()
+	// Authorization succeeded; clear flag and attempt initialize on existing client
+	cm.mutex.Lock()
+	mc.AuthorizationRequired = false
+	mc.LastError = ""
+	cm.mutex.Unlock()
 
-    // Give token a moment to be recognized
-    time.Sleep(200 * time.Millisecond)
+	// Give token a moment to be recognized
+	time.Sleep(200 * time.Millisecond)
 
-    // Initialize and register tools without restarting the process
-    if err := cm.initializeClient(ctx, mc); err != nil {
-        mc.LastError = err.Error()
-        return fmt.Errorf("failed to initialize client after authorization: %w", err)
-    }
-    if err := cm.registerClientTools(ctx, mc); err != nil {
-        mc.LastError = err.Error()
-        return fmt.Errorf("failed to register tools after authorization: %w", err)
-    }
-    cm.mutex.Lock()
-    mc.Connected = true
-    cm.mutex.Unlock()
+	// Initialize and register tools without restarting the process
+	if err := cm.initializeClient(ctx, mc); err != nil {
+		mc.LastError = err.Error()
+		return fmt.Errorf("failed to initialize client after authorization: %w", err)
+	}
+	if err := cm.registerClientTools(ctx, mc); err != nil {
+		mc.LastError = err.Error()
+		return fmt.Errorf("failed to register tools after authorization: %w", err)
+	}
+	cm.mutex.Lock()
+	mc.Connected = true
+	cm.mutex.Unlock()
 
-    // Notify UI
-    cm.server.EmitEvent("mcp:client_status_changed", map[string]any{
-        "server_name": name,
-        "status":      "started",
-    })
-    return nil
+	// Notify UI
+	cm.server.EmitEvent("mcp:client_status_changed", map[string]any{
+		"server_name": name,
+		"status":      "started",
+	})
+	return nil
 }
 
 // startOAuthCallbackServer starts a local HTTP server for OAuth redirect handling
 func startOAuthCallbackServer(callbackChan chan<- map[string]string) *http.Server {
-    server := &http.Server{Addr: ":8085"}
-    mux := http.NewServeMux()
-    mux.HandleFunc("/oauth/callback", func(w http.ResponseWriter, r *http.Request) {
-        params := make(map[string]string)
-        for key, values := range r.URL.Query() {
-            if len(values) > 0 {
-                params[key] = values[0]
-            }
-        }
-        callbackChan <- params
-        w.Header().Set("Content-Type", "text/html")
-        _, _ = w.Write([]byte(`
+	server := &http.Server{Addr: ":8085"}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/oauth/callback", func(w http.ResponseWriter, r *http.Request) {
+		params := make(map[string]string)
+		for key, values := range r.URL.Query() {
+			if len(values) > 0 {
+				params[key] = values[0]
+			}
+		}
+		callbackChan <- params
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(`
       <html>
         <body>
           <h1>Authorization Successful</h1>
@@ -324,30 +324,30 @@ func startOAuthCallbackServer(callbackChan chan<- map[string]string) *http.Serve
         </body>
       </html>
     `))
-    })
-    server.Handler = mux
+	})
+	server.Handler = mux
 
-    go func() {
-        if err := server.ListenAndServe(); err != nil && err.Error() != "http: Server closed" {
-            slog.Error("OAuth callback server error", "error", err)
-        }
-    }()
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err.Error() != "http: Server closed" {
+			slog.Error("OAuth callback server error", "error", err)
+		}
+	}()
 
-    return server
+	return server
 }
 
 // openDefaultBrowser opens the system browser to a URL
 func openDefaultBrowser(url string) error {
-    var cmd *exec.Cmd
-    switch runtime.GOOS {
-    case "darwin":
-        cmd = exec.Command("open", url)
-    case "windows":
-        cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
-    default:
-        cmd = exec.Command("xdg-open", url)
-    }
-    return cmd.Start()
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", url)
+	case "windows":
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+	default:
+		cmd = exec.Command("xdg-open", url)
+	}
+	return cmd.Start()
 }
 
 // GetClientStatus returns the status of all clients
@@ -358,11 +358,11 @@ func (cm *ClientManager) GetClientStatus() map[string]ClientStatus {
 	status := make(map[string]ClientStatus)
 	for name, mc := range cm.clients {
 		status[name] = ClientStatus{
-			Name:      name,
-			Connected: mc.Connected,
-			Tools:     len(mc.Tools),
-            LastError: mc.LastError,
-            AuthorizationRequired: mc.AuthorizationRequired,
+			Name:                  name,
+			Connected:             mc.Connected,
+			Tools:                 len(mc.Tools),
+			LastError:             mc.LastError,
+			AuthorizationRequired: mc.AuthorizationRequired,
 		}
 	}
 	return status
@@ -370,16 +370,16 @@ func (cm *ClientManager) GetClientStatus() map[string]ClientStatus {
 
 // ClientStatus represents the status of a client
 type ClientStatus struct {
-	Name      string `json:"name"`
-	Connected bool   `json:"connected"`
-	Tools     int    `json:"tools"`
-    LastError string `json:"last_error,omitempty"`
-    AuthorizationRequired bool `json:"authorization_required"`
+	Name                  string `json:"name"`
+	Connected             bool   `json:"connected"`
+	Tools                 int    `json:"tools"`
+	LastError             string `json:"last_error,omitempty"`
+	AuthorizationRequired bool   `json:"authorization_required"`
 }
 
 // startClientProcess starts the client process
 func (cm *ClientManager) startClientProcess(mc *ManagedClient) error {
-    switch mc.Config.Transport {
+	switch mc.Config.Transport {
 	case settings.TransportStdio:
 		// Create stdio transport
 		mc.Transport = transport.NewStdio(mc.Config.Command, []string{}, mc.Config.Args...)
@@ -401,27 +401,27 @@ func (cm *ClientManager) startClientProcess(mc *ManagedClient) error {
 		}
 		mc.Transport = sseTransport
 
-    case settings.TransportStreamableHTTP:
-        // Create OAuth-enabled streamable HTTP client
-        if mc.Config.Endpoint == "" {
-            return fmt.Errorf("endpoint is required for streamable HTTP transport")
-        }
-        // Use in-memory token store for this session
-        tokenStore := client.NewMemoryTokenStore()
-        oauthConfig := client.OAuthConfig{
-            ClientID:     os.Getenv("MCP_CLIENT_ID"),
-            ClientSecret: os.Getenv("MCP_CLIENT_SECRET"),
-            RedirectURI:  "http://localhost:8085/oauth/callback",
-            Scopes:       []string{"mcp.read", "mcp.write"},
-            TokenStore:   tokenStore,
-            PKCEEnabled:  true,
-        }
-        oauthClient, err := client.NewOAuthStreamableHttpClient(mc.Config.Endpoint, oauthConfig)
-        if err != nil {
-            return fmt.Errorf("failed to create OAuth HTTP client: %w", err)
-        }
-        mc.Client = oauthClient
-        return nil
+	case settings.TransportStreamableHTTP:
+		// Create OAuth-enabled streamable HTTP client
+		if mc.Config.Endpoint == "" {
+			return fmt.Errorf("endpoint is required for streamable HTTP transport")
+		}
+		// Use in-memory token store for this session
+		tokenStore := client.NewMemoryTokenStore()
+		oauthConfig := client.OAuthConfig{
+			ClientID:     os.Getenv("MCP_CLIENT_ID"),
+			ClientSecret: os.Getenv("MCP_CLIENT_SECRET"),
+			RedirectURI:  "http://localhost:8085/oauth/callback",
+			Scopes:       []string{"mcp.read", "mcp.write"},
+			TokenStore:   tokenStore,
+			PKCEEnabled:  true,
+		}
+		oauthClient, err := client.NewOAuthStreamableHttpClient(mc.Config.Endpoint, oauthConfig)
+		if err != nil {
+			return fmt.Errorf("failed to create OAuth HTTP client: %w", err)
+		}
+		mc.Client = oauthClient
+		return nil
 
 	default:
 		return fmt.Errorf("unsupported transport type: %s", mc.Config.Transport)

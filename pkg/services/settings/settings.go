@@ -19,9 +19,9 @@ import (
 type TransportType string
 
 const (
-	TransportStdio           TransportType = "stdio"
-	TransportSSE             TransportType = "sse"
-	TransportStreamableHTTP  TransportType = "streamable_http"
+	TransportStdio          TransportType = "stdio"
+	TransportSSE            TransportType = "sse"
+	TransportStreamableHTTP TransportType = "streamable_http"
 )
 
 // MCPServerConfig represents configuration for a single MCP server
