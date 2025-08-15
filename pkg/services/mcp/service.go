@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
+    "strings"
 	"sync"
 	"time"
 
@@ -361,10 +362,27 @@ func (s *MCPService) StopClient(name string) error {
 
 // RestartClient restarts an MCP client
 func (s *MCPService) RestartClient(name string) error {
-	if s.server != nil {
-		return s.server.GetClientManager().RestartClient(context.Background(), name)
-	}
-	return fmt.Errorf("server not available")
+    if s.server == nil {
+        return fmt.Errorf("server not available")
+    }
+    if err := s.server.GetClientManager().RestartClient(context.Background(), name); err != nil {
+        // If client not found, try to start it from settings
+        if strings.Contains(err.Error(), "not found") {
+            if s.settings != nil {
+                for _, cfg := range s.settings.GetMCPServers() {
+                    if cfg.Name == name {
+                        if !cfg.Enabled {
+                            return fmt.Errorf("server '%s' is disabled", name)
+                        }
+                        slog.Info("Client not found on restart; starting from settings", "name", name)
+                        return s.server.GetClientManager().StartClient(context.Background(), cfg)
+                    }
+                }
+            }
+        }
+        return err
+    }
+    return nil
 }
 
 // AuthorizeClient triggers OAuth authorization flow for a specific client
@@ -403,10 +421,31 @@ func (s *MCPService) ReloadClients() error {
 // GetClientTools returns the tools for a specific client
 func (s *MCPService) GetClientTools(clientName string) ([]map[string]interface{}, error) {
 	if s.server != nil {
-		tools, err := s.server.GetClientManager().GetClientTools(clientName)
-		if err != nil {
-			return nil, err
-		}
+        tools, err := s.server.GetClientManager().GetClientTools(clientName)
+        if err != nil {
+            // Auto-start missing client if enabled, then retry once
+            if strings.Contains(err.Error(), "not found") && s.settings != nil {
+                for _, cfg := range s.settings.GetMCPServers() {
+                    if cfg.Name == clientName {
+                        if !cfg.Enabled {
+                            return nil, fmt.Errorf("server '%s' is disabled", clientName)
+                        }
+                        if startErr := s.server.GetClientManager().StartClient(context.Background(), cfg); startErr != nil {
+                            return nil, fmt.Errorf("failed to start client '%s': %w", clientName, startErr)
+                        }
+                        // Retry
+                        var retryErr error
+                        tools, retryErr = s.server.GetClientManager().GetClientTools(clientName)
+                        if retryErr != nil {
+                            return nil, retryErr
+                        }
+                        break
+                    }
+                }
+            } else {
+                return nil, err
+            }
+        }
 
 		// Convert tools to map format for JSON serialization
 		toolMaps := make([]map[string]interface{}, len(tools))
@@ -426,7 +465,24 @@ func (s *MCPService) GetClientTools(clientName string) ([]map[string]interface{}
 // ToggleTool enables or disables a specific tool for a client
 func (s *MCPService) ToggleTool(clientName string, toolName string, enabled bool) error {
 	if s.server != nil {
-		return s.server.GetClientManager().ToggleTool(clientName, toolName, enabled)
+        if err := s.server.GetClientManager().ToggleTool(clientName, toolName, enabled); err != nil {
+            if strings.Contains(err.Error(), "not found") && s.settings != nil {
+                for _, cfg := range s.settings.GetMCPServers() {
+                    if cfg.Name == clientName {
+                        if !cfg.Enabled {
+                            return fmt.Errorf("server '%s' is disabled", clientName)
+                        }
+                        if startErr := s.server.GetClientManager().StartClient(context.Background(), cfg); startErr != nil {
+                            return fmt.Errorf("failed to start client '%s': %w", clientName, startErr)
+                        }
+                        // Retry once
+                        return s.server.GetClientManager().ToggleTool(clientName, toolName, enabled)
+                    }
+                }
+            }
+            return err
+        }
+        return nil
 	}
 	return fmt.Errorf("server not available")
 }

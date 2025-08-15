@@ -10,6 +10,7 @@ import (
     "net/http"
     "os/exec"
     "runtime"
+    "os"
 
 	"github.com/catkins/mcp-bouncer/pkg/services/settings"
 	"github.com/mark3labs/mcp-go/client"
@@ -19,10 +20,12 @@ import (
 
 // ClientManager manages MCP client connections
 type ClientManager struct {
-	clients map[string]*ManagedClient
-	mutex   sync.RWMutex
-	server  *Server
+    clients map[string]*ManagedClient
+    mutex   sync.RWMutex
+    server  *Server
 }
+
+// (Token persistence to disk can be added later if supported by mcp-go TokenStore interface)
 
 // ManagedClient represents a managed MCP client connection
 type ManagedClient struct {
@@ -31,7 +34,7 @@ type ManagedClient struct {
 	Transport   transport.Interface
 	Tools       []mcp.Tool
 	Connected   bool
-	LastError   error
+    LastError   string
     AuthorizationRequired bool
 	StopChan    chan struct{}
 	RestartChan chan struct{}
@@ -39,10 +42,10 @@ type ManagedClient struct {
 
 // NewClientManager creates a new client manager
 func NewClientManager(server *Server) *ClientManager {
-	return &ClientManager{
-		clients: make(map[string]*ManagedClient),
-		server:  server,
-	}
+    return &ClientManager{
+        clients: make(map[string]*ManagedClient),
+        server:  server,
+    }
 }
 
 // StartClient starts an MCP client based on configuration
@@ -72,9 +75,11 @@ func (cm *ClientManager) StartClient(ctx context.Context, config settings.MCPSer
 		return fmt.Errorf("failed to start client process: %w", err)
 	}
 
-	// Create client
-	mcpClient := client.NewClient(mc.Transport)
-	mc.Client = mcpClient
+    // Create client unless already provided by startClientProcess
+    if mc.Client == nil {
+        mcpClient := client.NewClient(mc.Transport)
+        mc.Client = mcpClient
+    }
 
 	// Start the client
 	if err := mc.Client.Start(ctx); err != nil {
@@ -82,12 +87,12 @@ func (cm *ClientManager) StartClient(ctx context.Context, config settings.MCPSer
 		return fmt.Errorf("failed to start client: %w", err)
 	}
 
-	// Initialize the client
+    // Initialize the client
     if err := cm.initializeClient(ctx, mc); err != nil {
         // If initialization failed due to authorization, retain client entry and mark status
-        if strings.Contains(strings.ToLower(err.Error()), "authoriz") {
+        if client.IsOAuthAuthorizationRequiredError(err) || strings.Contains(strings.ToLower(err.Error()), "authorization required") || strings.Contains(strings.ToLower(err.Error()), "authentication required") || strings.Contains(err.Error(), "401") || strings.Contains(strings.ToLower(err.Error()), "authoriz") {
             mc.AuthorizationRequired = true
-            mc.LastError = err
+            mc.LastError = err.Error()
             cm.clients[config.Name] = mc
             slog.Warn("Client requires authorization", "name", config.Name, "error", err)
             cm.server.EmitEvent("mcp:client_status_changed", map[string]any{
@@ -163,7 +168,7 @@ func (cm *ClientManager) stopClientInternal(name string) error {
 	// Remove from clients map
 	delete(cm.clients, name)
 
-	slog.Info("Stopped MCP client", "name", name)
+    slog.Info("Stopped MCP client", "name", name)
     // Emit per-client stopped event for immediate UI update
     cm.server.EmitEvent("mcp:client_status_changed", map[string]any{
         "server_name": name,
@@ -177,8 +182,13 @@ func (cm *ClientManager) RestartClient(ctx context.Context, name string) error {
 	cm.mutex.Lock()
 	mc, exists := cm.clients[name]
 	if !exists {
-		cm.mutex.Unlock()
-		return fmt.Errorf("client '%s' not found", name)
+        // If not found, try to find config in settings via server and start afresh
+        cm.mutex.Unlock()
+        if cm.server != nil && cm.server.clientManager != nil {
+            // Access settings indirectly is not available here; return a clear error
+            return fmt.Errorf("client '%s' not found", name)
+        }
+        return fmt.Errorf("client '%s' not found", name)
 	}
 	config := mc.Config
 	cm.mutex.Unlock()
@@ -262,14 +272,34 @@ func (cm *ClientManager) AuthorizeClient(ctx context.Context, name string) error
         return fmt.Errorf("failed to process authorization response: %w", err)
     }
 
-    // Authorization succeeded; clear flag and restart client to apply tokens
+    // Authorization succeeded; clear flag and attempt initialize on existing client
     cm.mutex.Lock()
     mc.AuthorizationRequired = false
+    mc.LastError = ""
     cm.mutex.Unlock()
 
-    // Brief pause then restart
-    time.Sleep(300 * time.Millisecond)
-    return cm.RestartClient(ctx, name)
+    // Give token a moment to be recognized
+    time.Sleep(200 * time.Millisecond)
+
+    // Initialize and register tools without restarting the process
+    if err := cm.initializeClient(ctx, mc); err != nil {
+        mc.LastError = err.Error()
+        return fmt.Errorf("failed to initialize client after authorization: %w", err)
+    }
+    if err := cm.registerClientTools(ctx, mc); err != nil {
+        mc.LastError = err.Error()
+        return fmt.Errorf("failed to register tools after authorization: %w", err)
+    }
+    cm.mutex.Lock()
+    mc.Connected = true
+    cm.mutex.Unlock()
+
+    // Notify UI
+    cm.server.EmitEvent("mcp:client_status_changed", map[string]any{
+        "server_name": name,
+        "status":      "started",
+    })
+    return nil
 }
 
 // startOAuthCallbackServer starts a local HTTP server for OAuth redirect handling
@@ -343,13 +373,13 @@ type ClientStatus struct {
 	Name      string `json:"name"`
 	Connected bool   `json:"connected"`
 	Tools     int    `json:"tools"`
-	LastError error  `json:"last_error,omitempty"`
+    LastError string `json:"last_error,omitempty"`
     AuthorizationRequired bool `json:"authorization_required"`
 }
 
 // startClientProcess starts the client process
 func (cm *ClientManager) startClientProcess(mc *ManagedClient) error {
-	switch mc.Config.Transport {
+    switch mc.Config.Transport {
 	case settings.TransportStdio:
 		// Create stdio transport
 		mc.Transport = transport.NewStdio(mc.Config.Command, []string{}, mc.Config.Args...)
@@ -371,22 +401,27 @@ func (cm *ClientManager) startClientProcess(mc *ManagedClient) error {
 		}
 		mc.Transport = sseTransport
 
-	case settings.TransportStreamableHTTP:
-		// Create streamable HTTP transport
-		if mc.Config.Endpoint == "" {
-			return fmt.Errorf("endpoint is required for streamable HTTP transport")
-		}
-
-		var options []transport.StreamableHTTPCOption
-		if mc.Config.Headers != nil {
-			options = append(options, transport.WithHTTPHeaders(mc.Config.Headers))
-		}
-
-		httpTransport, err := transport.NewStreamableHTTP(mc.Config.Endpoint, options...)
-		if err != nil {
-			return fmt.Errorf("failed to create streamable HTTP transport: %w", err)
-		}
-		mc.Transport = httpTransport
+    case settings.TransportStreamableHTTP:
+        // Create OAuth-enabled streamable HTTP client
+        if mc.Config.Endpoint == "" {
+            return fmt.Errorf("endpoint is required for streamable HTTP transport")
+        }
+        // Use in-memory token store for this session
+        tokenStore := client.NewMemoryTokenStore()
+        oauthConfig := client.OAuthConfig{
+            ClientID:     os.Getenv("MCP_CLIENT_ID"),
+            ClientSecret: os.Getenv("MCP_CLIENT_SECRET"),
+            RedirectURI:  "http://localhost:8085/oauth/callback",
+            Scopes:       []string{"mcp.read", "mcp.write"},
+            TokenStore:   tokenStore,
+            PKCEEnabled:  true,
+        }
+        oauthClient, err := client.NewOAuthStreamableHttpClient(mc.Config.Endpoint, oauthConfig)
+        if err != nil {
+            return fmt.Errorf("failed to create OAuth HTTP client: %w", err)
+        }
+        mc.Client = oauthClient
+        return nil
 
 	default:
 		return fmt.Errorf("unsupported transport type: %s", mc.Config.Transport)

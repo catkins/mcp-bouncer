@@ -12,7 +12,7 @@ export class ClientStatus {
     "name": string;
     "connected": boolean;
     "tools": number;
-    "last_error"?: any;
+    "last_error"?: string;
     "authorization_required": boolean;
 
     /** Creates a new ClientStatus instance. */
