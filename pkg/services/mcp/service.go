@@ -367,6 +367,14 @@ func (s *MCPService) RestartClient(name string) error {
 	return fmt.Errorf("server not available")
 }
 
+// AuthorizeClient triggers OAuth authorization flow for a specific client
+func (s *MCPService) AuthorizeClient(name string) error {
+    if s.server != nil {
+        return s.server.GetClientManager().AuthorizeClient(context.Background(), name)
+    }
+    return fmt.Errorf("server not available")
+}
+
 // GetClientStatus returns the status of all clients
 func (s *MCPService) GetClientStatus() map[string]ClientStatus {
 	if s.server != nil {

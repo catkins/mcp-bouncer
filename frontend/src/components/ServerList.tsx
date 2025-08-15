@@ -16,6 +16,7 @@ interface ServerListProps {
   onToggleServer: (name: string, enabled: boolean) => Promise<void>
   onRestartServer: (name: string) => Promise<void>
   onRefreshStatus?: (serverName: string) => Promise<void>
+  onAuthorizeServer?: (name: string) => Promise<void>
   loadingStates: {
     addServer: boolean
     updateServer: boolean
@@ -41,6 +42,7 @@ export function ServerList({
   onRemoveServer,
   onToggleServer,
   onRestartServer,
+  onAuthorizeServer,
   onRefreshStatus,
   loadingStates,
   errors
@@ -177,6 +179,7 @@ export function ServerList({
                 onRemove={handleRemoveServer}
                 onToggle={onToggleServer}
             onRestart={() => onRestartServer(server.name)}
+            onAuthorize={onAuthorizeServer ? () => onAuthorizeServer(server.name) : undefined}
                 onOpenTools={handleOpenTools}
                 loading={loadingStates.updateServer || loadingStates.removeServer}
                 toggleLoading={loadingStates.toggleServer[server.name] || false}

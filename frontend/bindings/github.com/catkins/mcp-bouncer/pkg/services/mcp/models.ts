@@ -13,6 +13,7 @@ export class ClientStatus {
     "connected": boolean;
     "tools": number;
     "last_error"?: any;
+    "authorization_required": boolean;
 
     /** Creates a new ClientStatus instance. */
     constructor($$source: Partial<ClientStatus> = {}) {
@@ -24,6 +25,9 @@ export class ClientStatus {
         }
         if (!("tools" in $$source)) {
             this["tools"] = 0;
+        }
+        if (!("authorization_required" in $$source)) {
+            this["authorization_required"] = false;
         }
 
         Object.assign(this, $$source);

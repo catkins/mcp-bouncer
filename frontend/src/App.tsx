@@ -6,7 +6,7 @@ import { ToastContainer } from './components/Toast'
 import { useToast } from './contexts/ToastContext'
 
 function AppContent() {
-  const { servers, clientStatus, mcpUrl, isActive, loadingStates, errors, addServer, updateServer, removeServer, toggleServer, restartServer, loadClientStatus, openConfigDirectory } = useMCPService()
+  const { servers, clientStatus, mcpUrl, isActive, loadingStates, errors, addServer, updateServer, removeServer, toggleServer, restartServer, authorizeServer, loadClientStatus, openConfigDirectory } = useMCPService()
   const { theme, toggleTheme } = useTheme()
   const { toasts, removeToast } = useToast()
 
@@ -33,6 +33,7 @@ function AppContent() {
           onRemoveServer={removeServer}
           onToggleServer={toggleServer}
           onRestartServer={restartServer}
+          onAuthorizeServer={authorizeServer}
           onRefreshStatus={handleRefreshStatus}
           loadingStates={loadingStates}
           errors={errors}

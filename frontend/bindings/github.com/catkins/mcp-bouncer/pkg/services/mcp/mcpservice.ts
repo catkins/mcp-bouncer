@@ -21,6 +21,13 @@ export function AddMCPServer(config: settings$0.MCPServerConfig): $CancellablePr
 }
 
 /**
+ * AuthorizeClient triggers OAuth authorization flow for a specific client
+ */
+export function AuthorizeClient(name: string): $CancellablePromise<void> {
+    return $Call.ByID(3537454797, name);
+}
+
+/**
  * ClearCallbacks removes all callbacks
  */
 export function ClearCallbacks(): $CancellablePromise<void> {

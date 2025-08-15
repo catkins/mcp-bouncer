@@ -222,6 +222,17 @@ export function useMCPService() {
     }
   }
 
+  const authorizeServer = async (serverName: string) => {
+    try {
+      await MCPService.AuthorizeClient(serverName)
+      await loadClientStatus()
+    } catch (error) {
+      console.error('Failed to authorize server:', error)
+      setError('general', `Failed to authorize ${serverName}`)
+      throw error
+    }
+  }
+
   const openConfigDirectory = async () => {
     try {
       await SettingsService.OpenConfigDirectory()
@@ -297,6 +308,7 @@ export function useMCPService() {
     removeServer,
     toggleServer,
     restartServer,
+    authorizeServer,
     openConfigDirectory,
     loadServers,
     loadSettings,

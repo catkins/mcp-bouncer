@@ -1,4 +1,4 @@
-import { PencilIcon, TrashIcon, WrenchScrewdriverIcon, CheckCircleIcon, XCircleIcon, NoSymbolIcon, CommandLineIcon, SignalIcon, GlobeAltIcon, ArrowPathIcon } from '@heroicons/react/24/outline'
+import { PencilIcon, TrashIcon, WrenchScrewdriverIcon, CheckCircleIcon, XCircleIcon, NoSymbolIcon, CommandLineIcon, SignalIcon, GlobeAltIcon, ArrowPathIcon, KeyIcon } from '@heroicons/react/24/outline'
 import { MCPServerConfig } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models'
 import { ClientStatus } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/mcp/models'
 import { LoadingButton } from './LoadingButton'
@@ -13,6 +13,7 @@ interface ServerCardProps {
   onRestart?: () => Promise<void>
   onRefreshStatus?: (serverName: string) => Promise<void>
   onOpenTools?: (serverName: string) => void
+  onAuthorize?: (serverName: string) => Promise<void>
   loading?: boolean
   toggleLoading?: boolean
   restartLoading?: boolean
@@ -28,6 +29,7 @@ export function ServerCard({
   onRefreshStatus, 
   onRestart,
   onOpenTools,
+  onAuthorize,
   loading = false,
   toggleLoading = false,
   restartLoading = false,
@@ -100,6 +102,18 @@ export function ServerCard({
                 >
                   <WrenchScrewdriverIcon className="w-3 h-3" />
                   {clientStatus.tools}
+                </button>
+              )}
+              {!clientStatus.connected && clientStatus.authorization_required && (
+                <button
+                  onClick={() => onAuthorize && onAuthorize(server.name)}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-400 rounded-full text-xs font-medium transition-all duration-200 hover:bg-amber-200 dark:hover:bg-amber-800/70 hover:scale-105 active:scale-95 cursor-pointer ${
+                    toggleLoading ? 'animate-pulse' : ''
+                  }`}
+                  title="Authorization required"
+                >
+                  <KeyIcon className="w-3 h-3" />
+                  Authorize
                 </button>
               )}
             </div>
