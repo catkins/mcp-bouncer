@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Important Instructions for Claude
+
+**Git Commits**: Only create git commits when explicitly asked by the user. Do not automatically commit changes unless the user specifically requests it.
+
 ## Development Commands
 
 ### Primary Development
