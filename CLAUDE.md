@@ -13,6 +13,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Frontend build (dev)**: `cd frontend && npm run build:dev` - TypeScript compilation with dev settings
 - **Frontend build (prod)**: `cd frontend && npm run build` - Optimized production build
 - **Frontend dev server**: `cd frontend && npm run dev` - Standalone Vite dev server
+- **Format code**: `task format` - Formats all TypeScript code with Prettier
+- **Check formatting**: `task format:check` - Checks if code is properly formatted
 
 ### Task Runner
 The project uses Taskfile (Task) as the build system. Use `task --list` to see all available tasks.
@@ -52,6 +54,7 @@ The core functionality revolves around an **MCP (Model Context Protocol) service
 - `build/config.yml`: Wails project configuration including app metadata and dev mode settings
 - `Taskfile.yml`: Build task definitions with OS-specific includes
 - Frontend config in `frontend/package.json` and `frontend/tsconfig.json`
+- `frontend/.prettierrc.json`: Prettier formatting configuration for consistent code style
 
 ## Development Notes
 
