@@ -14,6 +14,7 @@ interface ServerListProps {
   onUpdateServer: (name: string, server: MCPServerConfig) => Promise<void>
   onRemoveServer: (name: string) => Promise<void>
   onToggleServer: (name: string, enabled: boolean) => Promise<void>
+  onRestartServer: (name: string) => Promise<void>
   onRefreshStatus?: (serverName: string) => Promise<void>
   loadingStates: {
     addServer: boolean
@@ -21,6 +22,7 @@ interface ServerListProps {
     removeServer: boolean
     general: boolean
     toggleServer: { [key: string]: boolean }
+    restartServer: { [key: string]: boolean }
   }
   errors: {
     addServer?: string
@@ -38,6 +40,7 @@ export function ServerList({
   onUpdateServer, 
   onRemoveServer,
   onToggleServer,
+  onRestartServer,
   onRefreshStatus,
   loadingStates,
   errors
@@ -173,9 +176,11 @@ export function ServerList({
                 onEdit={handleEditServer}
                 onRemove={handleRemoveServer}
                 onToggle={onToggleServer}
+            onRestart={() => onRestartServer(server.name)}
                 onOpenTools={handleOpenTools}
                 loading={loadingStates.updateServer || loadingStates.removeServer}
                 toggleLoading={loadingStates.toggleServer[server.name] || false}
+            restartLoading={loadingStates.restartServer[server.name] || false}
                 toggleError={errors.toggleServer?.[server.name]}
                 onRefreshStatus={onRefreshStatus}
               />

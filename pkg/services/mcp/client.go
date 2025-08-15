@@ -96,6 +96,11 @@ func (cm *ClientManager) StartClient(ctx context.Context, config settings.MCPSer
 	go cm.monitorClient(ctx, mc)
 
 	slog.Info("Started MCP client", "name", config.Name, "tools", len(mc.Tools))
+    // Emit per-client started event for immediate UI update
+    cm.server.EmitEvent("mcp:client_status_changed", map[string]any{
+        "server_name": config.Name,
+        "status":      "started",
+    })
 	return nil
 }
 
@@ -142,6 +147,11 @@ func (cm *ClientManager) stopClientInternal(name string) error {
 	delete(cm.clients, name)
 
 	slog.Info("Stopped MCP client", "name", name)
+    // Emit per-client stopped event for immediate UI update
+    cm.server.EmitEvent("mcp:client_status_changed", map[string]any{
+        "server_name": name,
+        "status":      "stopped",
+    })
 	return nil
 }
 

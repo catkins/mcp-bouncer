@@ -38,6 +38,7 @@ type Server struct {
 	httpServer    *http.Server
 	active        bool
 	clientManager *ClientManager
+    eventEmitter  func(name string, data any)
 }
 
 func (s *Server) Start(ctx context.Context) error {
@@ -60,4 +61,16 @@ func (s *Server) Start(ctx context.Context) error {
 // GetClientManager returns the client manager
 func (s *Server) GetClientManager() *ClientManager {
 	return s.clientManager
+}
+
+// SetEventEmitter sets a callback to emit events to the application layer
+func (s *Server) SetEventEmitter(emitter func(name string, data any)) {
+    s.eventEmitter = emitter
+}
+
+// EmitEvent emits an event if an emitter is configured
+func (s *Server) EmitEvent(name string, data any) {
+    if s.eventEmitter != nil {
+        s.eventEmitter(name, data)
+    }
 }

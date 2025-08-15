@@ -25,7 +25,7 @@ const defaultListenAddr = "localhost:8091"
 func NewMCPService(settingsService *settings.SettingsService) *MCPService {
 	return &MCPService{
 		listenAddr: defaultListenAddr,
-		server:     NewServer(defaultListenAddr),
+        server:     NewServer(defaultListenAddr),
 		settings:   settingsService,
 	}
 }
@@ -33,8 +33,12 @@ func NewMCPService(settingsService *settings.SettingsService) *MCPService {
 func (s *MCPService) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
 	// Use settings if available
 	if s.settings != nil {
-		s.listenAddr = s.settings.GetListenAddr()
-		s.server = NewServer(s.listenAddr)
+        s.listenAddr = s.settings.GetListenAddr()
+        s.server = NewServer(s.listenAddr)
+        // Bridge server-emitted events to the app event bus
+        s.server.SetEventEmitter(func(name string, data any) {
+            s.emitEvent(name, data)
+        })
 
 		// Subscribe to settings updates - only reload clients if listen address changes
 		s.settings.Subscribe(func(event *application.CustomEvent) {
@@ -43,8 +47,11 @@ func (s *MCPService) ServiceStartup(ctx context.Context, options application.Ser
 				newAddr := s.settings.GetListenAddr()
 				if newAddr != s.listenAddr {
 					slog.Info("Listen address changed, reloading all clients", "old", s.listenAddr, "new", newAddr)
-					s.listenAddr = newAddr
-					s.server = NewServer(s.listenAddr)
+                    s.listenAddr = newAddr
+                    s.server = NewServer(s.listenAddr)
+                    s.server.SetEventEmitter(func(name string, data any) {
+                        s.emitEvent(name, data)
+                    })
 					if err := s.ReloadClients(); err != nil {
 						slog.Error("Failed to reload clients", "error", err)
 					}

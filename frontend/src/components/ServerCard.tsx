@@ -1,4 +1,4 @@
-import { PencilIcon, TrashIcon, WrenchScrewdriverIcon, CheckCircleIcon, XCircleIcon, NoSymbolIcon, CommandLineIcon, SignalIcon, GlobeAltIcon } from '@heroicons/react/24/outline'
+import { PencilIcon, TrashIcon, WrenchScrewdriverIcon, CheckCircleIcon, XCircleIcon, NoSymbolIcon, CommandLineIcon, SignalIcon, GlobeAltIcon, ArrowPathIcon } from '@heroicons/react/24/outline'
 import { MCPServerConfig } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models'
 import { ClientStatus } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/mcp/models'
 import { LoadingButton } from './LoadingButton'
@@ -10,10 +10,12 @@ interface ServerCardProps {
   onEdit: (server: MCPServerConfig) => void
   onRemove: (serverName: string) => Promise<void>
   onToggle: (serverName: string, enabled: boolean) => Promise<void>
+  onRestart?: () => Promise<void>
   onRefreshStatus?: (serverName: string) => Promise<void>
   onOpenTools?: (serverName: string) => void
   loading?: boolean
   toggleLoading?: boolean
+  restartLoading?: boolean
   toggleError?: string
 }
 
@@ -24,9 +26,11 @@ export function ServerCard({
   onRemove, 
   onToggle, 
   onRefreshStatus, 
+  onRestart,
   onOpenTools,
   loading = false,
   toggleLoading = false,
+  restartLoading = false,
   toggleError
 }: ServerCardProps) {
 
@@ -102,6 +106,18 @@ export function ServerCard({
           )}
         </div>
         <div className="flex items-center gap-3">
+          {server.enabled && (
+            <LoadingButton
+              onClick={onRestart}
+              disabled={loading || toggleLoading}
+              loading={restartLoading}
+              variant="secondary"
+              size="sm"
+              className={`p-1.5 transition-all duration-200 ${toggleLoading ? 'opacity-50' : ''}`}
+            >
+              <ArrowPathIcon className="h-3.5 w-3.5" />
+            </LoadingButton>
+          )}
           <div className={`transition-all duration-200 ${toggleLoading ? 'animate-pulse' : ''}`}>
             <ToggleSwitch
               checked={server.enabled}

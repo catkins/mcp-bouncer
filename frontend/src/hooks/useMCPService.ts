@@ -17,12 +17,14 @@ export function useMCPService() {
     updateServer: boolean
     removeServer: boolean
     general: boolean
+    restartServer: { [key: string]: boolean }
     toggleServer: { [key: string]: boolean }
   }>({
     addServer: false,
     updateServer: false,
     removeServer: false,
     general: false,
+    restartServer: {},
     toggleServer: {}
   })
   const [errors, setErrors] = useState<{
@@ -41,6 +43,13 @@ export function useMCPService() {
     setLoadingStates(prev => ({
       ...prev,
       toggleServer: { ...prev.toggleServer, [serverName]: value }
+    }))
+  }
+
+  const setRestartLoading = (serverName: string, value: boolean) => {
+    setLoadingStates(prev => ({
+      ...prev,
+      restartServer: { ...prev.restartServer, [serverName]: value }
     }))
   }
 
@@ -199,6 +208,20 @@ export function useMCPService() {
     }
   }
 
+  const restartServer = async (serverName: string) => {
+    setRestartLoading(serverName, true)
+    try {
+      await MCPService.RestartClient(serverName)
+      await loadClientStatus()
+    } catch (error) {
+      console.error('Failed to restart server:', error)
+      setError('general', `Failed to restart ${serverName}`)
+      throw error
+    } finally {
+      setRestartLoading(serverName, false)
+    }
+  }
+
   const openConfigDirectory = async () => {
     try {
       await SettingsService.OpenConfigDirectory()
@@ -273,6 +296,7 @@ export function useMCPService() {
     updateServer,
     removeServer,
     toggleServer,
+    restartServer,
     openConfigDirectory,
     loadServers,
     loadSettings,
