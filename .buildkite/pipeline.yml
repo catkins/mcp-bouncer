@@ -1,7 +1,8 @@
 steps:
   - label: "Build"
+    command: wails3 build
     plugins:
       - docker-compose#v5.10.0:
           run: app
-          command: wails3 build
           config: .buildkite/docker-compose.yml
+          progress: plain
