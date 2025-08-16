@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   XMarkIcon,
+  ExclamationTriangleIcon,
   PlusIcon,
   TrashIcon,
-  ExclamationTriangleIcon,
+  ChevronDownIcon,
 } from '@heroicons/react/24/outline';
 import {
-  MCPServerConfig,
   TransportType,
+  MCPServerConfig,
 } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models';
 import { LoadingButton } from './LoadingButton';
 import { ToggleSwitch } from './ToggleSwitch';
@@ -89,6 +90,7 @@ export function ServerForm({
     env: {},
     endpoint: '',
     headers: {},
+    requires_auth: false,
     enabled: true,
   });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -304,46 +306,59 @@ export function ServerForm({
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
               Transport Type *
             </label>
-            <select
-              value={formData.transport}
-              onChange={e => {
-                const newTransport = e.target.value as TransportType;
-                setFormData(prev => ({ ...prev, transport: newTransport }));
-                // Clear validation errors when switching transport types
-                setErrors(prev => {
-                  const newErrors = { ...prev };
-                  if (newTransport !== TransportType.TransportStdio) {
-                    delete newErrors.command;
-                  }
-                  if (newTransport === TransportType.TransportStdio) {
-                    delete newErrors.endpoint;
-                  }
-                  return newErrors;
-                });
-              }}
-              className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
-            >
-              <option value={TransportType.TransportStdio}>stdio</option>
-              <option value={TransportType.TransportSSE}>sse</option>
-              <option value={TransportType.TransportStreamableHTTP}>streamable http</option>
-            </select>
+            <div className="relative">
+              <select
+                value={formData.transport}
+                onChange={e => {
+                  const newTransport = e.target.value as TransportType;
+                  setFormData(prev => ({ ...prev, transport: newTransport }));
+                  // Clear validation errors when switching transport types
+                  setErrors(prev => {
+                    const newErrors = { ...prev };
+                    if (newTransport !== TransportType.TransportStdio) {
+                      delete newErrors.command;
+                    }
+                    if (newTransport === TransportType.TransportStdio) {
+                      delete newErrors.endpoint;
+                    }
+                    return newErrors;
+                  });
+                }}
+                className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-purple-500 dark:focus:border-purple-400 text-sm appearance-none cursor-pointer transition-all duration-200 hover:border-gray-400 dark:hover:border-gray-600"
+              >
+                <option value={TransportType.TransportStdio}>stdio</option>
+                <option value={TransportType.TransportSSE}>sse</option>
+                <option value={TransportType.TransportStreamableHTTP}>streamable http</option>
+              </select>
+              <ChevronDownIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
+            </div>
           </div>
 
           {(formData.transport === TransportType.TransportSSE ||
             formData.transport === TransportType.TransportStreamableHTTP) && (
-            <FormInput
-              id="server-endpoint"
-              label="Endpoint"
-              value={formData.endpoint || ''}
-              onChange={value => {
-                setFormData(prev => ({ ...prev, endpoint: value }));
-                if (errors.endpoint) {
-                  setErrors(prev => ({ ...prev, endpoint: '' }));
-                }
-              }}
-              error={errors.endpoint}
-              required
-              placeholder="https://example.com/mcp"
+              <FormInput
+                id="server-endpoint"
+                label="Endpoint"
+                value={formData.endpoint || ''}
+                onChange={value => {
+                  setFormData(prev => ({ ...prev, endpoint: value }));
+                  if (errors.endpoint) {
+                    setErrors(prev => ({ ...prev, endpoint: '' }));
+                  }
+                }}
+                error={errors.endpoint}
+                required
+                placeholder="https://example.com/mcp"
+              />
+            )}
+
+          {formData.transport === TransportType.TransportStreamableHTTP && (
+            <ToggleSwitch
+              checked={formData.requires_auth || false}
+              onChange={checked => setFormData(prev => ({ ...prev, requires_auth: checked }))}
+              size="sm"
+              label="Requires Authorization (OAuth)"
+              description="Enable this if the server requires OAuth authentication"
             />
           )}
 
@@ -461,56 +476,56 @@ export function ServerForm({
 
           {(formData.transport === TransportType.TransportSSE ||
             formData.transport === TransportType.TransportStreamableHTTP) && (
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
-                  HTTP Headers
-                </label>
-                <LoadingButton
-                  type="button"
-                  onClick={addHeader}
-                  variant="secondary"
-                  size="sm"
-                  className="text-xs px-1.5 py-0.5 h-5 text-xs"
-                >
-                  <PlusIcon className="h-2.5 w-2.5 inline-block" />
-                  Add
-                </LoadingButton>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                    HTTP Headers
+                  </label>
+                  <LoadingButton
+                    type="button"
+                    onClick={addHeader}
+                    variant="secondary"
+                    size="sm"
+                    className="text-xs px-1.5 py-0.5 h-5 text-xs"
+                  >
+                    <PlusIcon className="h-2.5 w-2.5 inline-block" />
+                    Add
+                  </LoadingButton>
+                </div>
+                <div className="space-y-1.5">
+                  {Object.entries(formData.headers || {}).map(([key, value], index) => (
+                    <div key={key} className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        value={key}
+                        onChange={e => updateHeader(key, e.target.value, value)}
+                        className="w-1/3 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
+                        placeholder="Header name"
+                        aria-label={`HTTP header name ${index + 1}`}
+                      />
+                      <input
+                        type="text"
+                        value={value}
+                        onChange={e => updateHeader(key, key, e.target.value)}
+                        className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
+                        placeholder="Value"
+                        aria-label={`HTTP header value ${index + 1}`}
+                      />
+                      <LoadingButton
+                        type="button"
+                        onClick={() => removeHeader(key)}
+                        variant="danger"
+                        size="sm"
+                        className="p-1.5"
+                        aria-label={`Remove HTTP header ${key}`}
+                      >
+                        <TrashIcon className="h-3 w-3" />
+                      </LoadingButton>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="space-y-1.5">
-                {Object.entries(formData.headers || {}).map(([key, value], index) => (
-                  <div key={key} className="flex items-center gap-1.5">
-                    <input
-                      type="text"
-                      value={key}
-                      onChange={e => updateHeader(key, e.target.value, value)}
-                      className="w-1/3 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
-                      placeholder="Header name"
-                      aria-label={`HTTP header name ${index + 1}`}
-                    />
-                    <input
-                      type="text"
-                      value={value}
-                      onChange={e => updateHeader(key, key, e.target.value)}
-                      className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
-                      placeholder="Value"
-                      aria-label={`HTTP header value ${index + 1}`}
-                    />
-                    <LoadingButton
-                      type="button"
-                      onClick={() => removeHeader(key)}
-                      variant="danger"
-                      size="sm"
-                      className="p-1.5"
-                      aria-label={`Remove HTTP header ${key}`}
-                    >
-                      <TrashIcon className="h-3 w-3" />
-                    </LoadingButton>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+            )}
 
           <div className="pt-1">
             <ToggleSwitch

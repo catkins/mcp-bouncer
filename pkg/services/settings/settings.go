@@ -26,15 +26,16 @@ const (
 
 // MCPServerConfig represents configuration for a single MCP server
 type MCPServerConfig struct {
-	Name        string            `json:"name"`
-	Description string            `json:"description"`
-	Transport   TransportType     `json:"transport"`
-	Command     string            `json:"command"`
-	Args        []string          `json:"args,omitempty"`
-	Env         map[string]string `json:"env,omitempty"`
-	Endpoint    string            `json:"endpoint,omitempty"`
-	Headers     map[string]string `json:"headers,omitempty"`
-	Enabled     bool              `json:"enabled"`
+	Name         string            `json:"name"`
+	Description  string            `json:"description"`
+	Transport    TransportType     `json:"transport"`
+	Command      string            `json:"command"`
+	Args         []string          `json:"args,omitempty"`
+	Env          map[string]string `json:"env,omitempty"`
+	Endpoint     string            `json:"endpoint,omitempty"`
+	Headers      map[string]string `json:"headers,omitempty"`
+	RequiresAuth bool              `json:"requires_auth,omitempty"`
+	Enabled      bool              `json:"enabled"`
 }
 
 // Settings represents the application settings

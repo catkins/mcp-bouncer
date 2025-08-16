@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync"
 	"time"
 
@@ -139,6 +138,7 @@ type ManagedClient struct {
 	Connected             bool
 	LastError             string
 	AuthorizationRequired bool
+	OAuthAuthenticated    bool
 	StopChan              chan struct{}
 	RestartChan           chan struct{}
 }
@@ -193,9 +193,10 @@ func (cm *ClientManager) StartClient(ctx context.Context, config settings.MCPSer
 	// Initialize the client
 	if err := cm.initializeClient(ctx, mc); err != nil {
 		// If initialization failed due to authorization, retain client entry and mark status
-		if client.IsOAuthAuthorizationRequiredError(err) || strings.Contains(strings.ToLower(err.Error()), "authorization required") || strings.Contains(strings.ToLower(err.Error()), "authentication required") || strings.Contains(err.Error(), "401") || strings.Contains(strings.ToLower(err.Error()), "authoriz") {
+		if client.IsOAuthAuthorizationRequiredError(err) {
 			mc.AuthorizationRequired = true
-			mc.LastError = err.Error()
+			mc.OAuthAuthenticated = false
+			mc.LastError = fmt.Sprintf("cm.initializeClient: %s", err.Error())
 			cm.clients[config.Name] = mc
 			slog.Warn("Client requires authorization", "name", config.Name, "error", err)
 			cm.server.EmitEvent("mcp:client_status_changed", map[string]any{
@@ -317,6 +318,11 @@ func (cm *ClientManager) AuthorizeClient(ctx context.Context, name string) error
 		return fmt.Errorf("client '%s' not found", name)
 	}
 
+	// Check if the server is configured to require authorization
+	if !mc.Config.RequiresAuth {
+		return fmt.Errorf("server '%s' is not configured to require authorization", name)
+	}
+
 	// Try an initialize call to retrieve the OAuth handler from the error
 	_, err := mc.Client.Initialize(ctx, mcp.InitializeRequest{})
 	if err == nil {
@@ -378,6 +384,10 @@ func (cm *ClientManager) AuthorizeClient(ctx context.Context, name string) error
 	// Authorization succeeded; clear flag and attempt initialize on existing client
 	cm.mutex.Lock()
 	mc.AuthorizationRequired = false
+	// Only mark as OAuth authenticated for streamable_http transport that requires auth
+	if mc.Config.Transport == settings.TransportStreamableHTTP && mc.Config.RequiresAuth {
+		mc.OAuthAuthenticated = true
+	}
 	mc.LastError = ""
 	cm.mutex.Unlock()
 
@@ -386,11 +396,11 @@ func (cm *ClientManager) AuthorizeClient(ctx context.Context, name string) error
 
 	// Initialize and register tools without restarting the process
 	if err := cm.initializeClient(ctx, mc); err != nil {
-		mc.LastError = err.Error()
+		mc.LastError = fmt.Sprintf("initializeClient: %s", err.Error())
 		return fmt.Errorf("failed to initialize client after authorization: %w", err)
 	}
 	if err := cm.registerClientTools(ctx, mc); err != nil {
-		mc.LastError = err.Error()
+		mc.LastError = fmt.Sprintf("registerClientTools: %s", err.Error())
 		return fmt.Errorf("failed to register tools after authorization: %w", err)
 	}
 	cm.mutex.Lock()
@@ -466,6 +476,7 @@ func (cm *ClientManager) GetClientStatus() map[string]ClientStatus {
 			Tools:                 len(mc.Tools),
 			LastError:             mc.LastError,
 			AuthorizationRequired: mc.AuthorizationRequired,
+			OAuthAuthenticated:    mc.OAuthAuthenticated,
 		}
 	}
 	return status
@@ -478,6 +489,7 @@ type ClientStatus struct {
 	Tools                 int    `json:"tools"`
 	LastError             string `json:"last_error,omitempty"`
 	AuthorizationRequired bool   `json:"authorization_required"`
+	OAuthAuthenticated    bool   `json:"oauth_authenticated"`
 }
 
 // startClientProcess starts the client process
@@ -505,24 +517,36 @@ func (cm *ClientManager) startClientProcess(mc *ManagedClient) error {
 		mc.Transport = sseTransport
 
 	case settings.TransportStreamableHTTP:
-		// Create OAuth-enabled streamable HTTP client
+		// Create streamable HTTP client (OAuth or non-OAuth based on configuration)
 		if mc.Config.Endpoint == "" {
 			return fmt.Errorf("endpoint is required for streamable HTTP transport")
 		}
-		// Use file-based token store for persistent OAuth tokens
-		fileStore := NewFileTokenStore(mc.Config.Name)
-		slog.Debug("Creating OAuth client", "server_name", mc.Config.Name, "endpoint", mc.Config.Endpoint)
-		oauthConfig := client.OAuthConfig{
-			RedirectURI: "http://localhost:8085/oauth/callback",
-			Scopes:      []string{"mcp.read", "mcp.write"},
-			TokenStore:  fileStore,
-			PKCEEnabled: true,
+
+		if mc.Config.RequiresAuth {
+			// Use file-based token store for persistent OAuth tokens
+			// tokenStore := NewFileTokenStore(mc.Config.Name)
+			tokenStore := client.NewMemoryTokenStore()
+			slog.Debug("Creating OAuth client", "server_name", mc.Config.Name, "endpoint", mc.Config.Endpoint)
+			oauthConfig := client.OAuthConfig{
+				RedirectURI: "http://localhost:8085/oauth/callback",
+				Scopes:      []string{"mcp.read", "mcp.write"},
+				TokenStore:  tokenStore,
+				PKCEEnabled: true,
+			}
+			oauthClient, err := client.NewOAuthStreamableHttpClient(mc.Config.Endpoint, oauthConfig)
+			if err != nil {
+				return fmt.Errorf("failed to create OAuth HTTP client: %w", err)
+			}
+			mc.Client = oauthClient
+		} else {
+			// Create non-OAuth streamable HTTP client
+			slog.Debug("Creating non-OAuth streamable HTTP client", "server_name", mc.Config.Name, "endpoint", mc.Config.Endpoint)
+			httpClient, err := client.NewStreamableHttpClient(mc.Config.Endpoint)
+			if err != nil {
+				return fmt.Errorf("failed to create HTTP client: %w", err)
+			}
+			mc.Client = httpClient
 		}
-		oauthClient, err := client.NewOAuthStreamableHttpClient(mc.Config.Endpoint, oauthConfig)
-		if err != nil {
-			return fmt.Errorf("failed to create OAuth HTTP client: %w", err)
-		}
-		mc.Client = oauthClient
 		return nil
 
 	default:

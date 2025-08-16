@@ -17,6 +17,7 @@ export class MCPServerConfig {
     "env"?: { [_: string]: string };
     "endpoint"?: string;
     "headers"?: { [_: string]: string };
+    "requires_auth"?: boolean;
     "enabled": boolean;
 
     /** Creates a new MCPServerConfig instance. */

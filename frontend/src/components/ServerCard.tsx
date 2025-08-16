@@ -10,6 +10,7 @@ import {
   GlobeAltIcon,
   ArrowPathIcon,
   KeyIcon,
+  ShieldCheckIcon,
 } from '@heroicons/react/24/outline';
 import { MCPServerConfig } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models';
 import { ClientStatus } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/mcp/models';
@@ -132,6 +133,11 @@ export function ServerCard({
                   <KeyIcon className="w-3 h-3" />
                   Authorize
                 </button>
+              )}
+              {clientStatus?.oauth_authenticated && (
+                <span className="inline-flex items-center p-1 bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-400 rounded-full" title="OAuth Authenticated">
+                  <ShieldCheckIcon className="w-3 h-3" />
+                </span>
               )}
             </div>
           )}
