@@ -12,6 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Primary Development
 - **Development mode**: `wails3 dev` or `task dev` - Runs with hot reload for both frontend and backend
+  - **Note**: `wails3 dev` must be run in a background process (eg. in a tmux session)
 - **Build production**: `wails3 build` or `task build` - Creates production executable in `build/` directory
 - **Run built app**: `task run` - Runs the built application
 
@@ -47,7 +48,7 @@ The core functionality revolves around an **MCP (Model Context Protocol) service
 - Currently generates mock server data but designed to proxy real MCP servers
 
 **Frontend (`frontend/src/main.ts`):**
-- Imports auto-generated Go service bindings from `bindings/` directory  
+- Imports auto-generated Go service bindings from `bindings/` directory
 - Listens for `mcp:servers_updated` events to refresh server list dynamically
 - Simple DOM manipulation to display server information
 
