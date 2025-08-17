@@ -229,11 +229,11 @@ export function ServerCard({
             </div>
 
             {server.args && server.args.length > 0 && (
-              <div>
-                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+              <div className="flex items-start gap-2">
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">
                   Arguments:
                 </span>
-                <div className="mt-1 flex flex-wrap gap-1">
+                <div className="flex flex-wrap gap-1">
                   {server.args.map((arg, index) => (
                     <code
                       key={index}
