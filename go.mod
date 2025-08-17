@@ -7,7 +7,7 @@ toolchain go1.24.6
 require (
 	github.com/adrg/xdg v0.5.3
 	github.com/mark3labs/mcp-go v0.37.0
-	github.com/wailsapp/wails/v3 v3.0.0-alpha.20
+	github.com/wailsapp/wails/v3 v3.0.0-alpha.25
 )
 
 require (
