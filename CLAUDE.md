@@ -1,25 +1,21 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## Important Instructions for Claude
-
-**Git Commits**: Only create git commits when explicitly asked by the user. Do not automatically commit changes unless the user specifically requests it.
-
-**Go Type Documentation**: Use `go doc <package or type>` to understand Go types and APIs when debugging or working with unfamiliar code.
+This file provides guidance to coding agents when working with code in this repository.
 
 ## Development Commands
 
-### Primary Development
-- **Development mode**: `wails3 dev` or `task dev` - Runs with hot reload for both frontend and backend
+### Go backend development Development
+- **Development mode**: `wails3 dev` or `task dev` - Runs with hot reload for both frontend and backend, and starts storybook on. This is blocking.
   - **Note**: `wails3 dev` must be run in a background process (eg. in a tmux session)
 - **Build production**: `wails3 build` or `task build` - Creates production executable in `build/` directory
-- **Run built app**: `task run` - Runs the built application
+- **Run built app**: `task run` - Runs the built application. This is blocking.
+- **Go Type Documentation**: Use `go doc <package or type>` to understand Go types and APIs when debugging or working with unfamiliar code.
+
+IMPORTANT: Blocking commands MUST be run in a background agent, or in a tmux pane.
 
 ### Frontend Development
-- **Frontend build (dev)**: `cd frontend && npm run build:dev` - TypeScript compilation with dev settings
-- **Frontend build (prod)**: `cd frontend && npm run build` - Optimized production build
-- **Frontend dev server**: `cd frontend && npm run dev` - Standalone Vite dev server
+- **Frontend build (dev)**: `npm run --prefix frontend build:dev` - TypeScript compilation with dev settings
+- **Frontend build (prod)**: `npm run --prefix frontend build` - Optimized production build
 - **Format code**: `task format` - Formats all TypeScript code with Prettier
 - **Check formatting**: `task format:check` - Checks if code is properly formatted
 
@@ -29,28 +25,24 @@ The project uses Taskfile (Task) as the build system. Use `task --list` to see a
 ## Architecture Overview
 
 ### Application Structure
-This is a **Wails 3 application** that creates a desktop app combining Go backend services with a TypeScript/HTML frontend.
+This is a **[Wails 3](https://github.com/wailsapp/wails/tree/v3-alpha) application** that creates a desktop app combining Go backend services with a TypeScript/HTML frontend.
 
 **Main Components:**
+
 - `main.go`: Application entry point that initializes Wails app and MCP service
-- `pkg/services/mcp/`: Go service layer containing MCP server functionality
+- `pkg/services/mcp/`: Go service layer containing MCP server/client functionality
+- `pkg/services/settings/`: Go service layer managing settings
 - `frontend/`: Web-based UI built with TypeScript and vanilla HTML/CSS
+- After making changes in `pkg/services` regenerate bindings with `wails3 generate bindings` which will update generated code in `frontend/bindings`
 
-After making changes in `pkg/services` regenerate bindings with `wails3 generate bindings`
+**Frontend:**
 
-### MCP Service Architecture
-The core functionality revolves around an **MCP (Model Context Protocol) service**:
-
-**Backend (`pkg/services/mcp/server.go`):**
-- `MCPService`: Main service struct that manages MCP server connections
-- Runs as a background goroutine emitting periodic events
-- Exposes methods `List()` and `ListenAddr()` to frontend via Wails bindings
-- Currently generates mock server data but designed to proxy real MCP servers
-
-**Frontend (`frontend/src/main.ts`):**
 - Imports auto-generated Go service bindings from `bindings/` directory
-- Listens for `mcp:servers_updated` events to refresh server list dynamically
-- Simple DOM manipulation to display server information
+- React frontend using Vite for builds
+- Tailwind CSS 4 is used for styling
+- Storybook for component development and testing
+  - When `wails3 dev` is running, Storybook is automatically started and accessible at `http://localhost:6006`
+  - Use the playwright MCP browser tools to interact with components in the Storybook UI
 
 ### Key Integration Points
 1. **Service Binding**: Go services are automatically bound to frontend via Wails
@@ -66,12 +58,16 @@ The core functionality revolves around an **MCP (Model Context Protocol) service
 ## Development Notes
 
 ### Project Purpose
-This appears to be a **proof-of-concept for an MCP bouncer/proxy** - a local gateway that can manage and route requests to multiple MCP servers. The current implementation shows the foundation with mock data.
+- This is MCP Bouncer, a local gateway that can manage and route requests to multiple MCP servers.
+- It exposes a Streamable HTTP MCP Server at http://localhost:8091/mcp, and proxies requests to configured MCP Servers
+- It is configured in the UI, but configuration is saved in `$XDG_CONFIG_HOME/mcp-bouncer/settings.json`
+- It supports STDIO, SSE and Streamable HTTP (including OAuth) MCP Servers
 
 ### File Structure Patterns
 - Go services follow `pkg/services/{service-name}/` pattern
 - Wails auto-generates TypeScript bindings in `frontend/bindings/`
 - Build artifacts go to `build/` and `bin/` directories
 
-### No Testing Framework
-The project currently has no test files or testing framework configured.
+### Other guidelines
+
+**Git Commits**: Only create git commits when explicitly asked by the user. Do not automatically commit changes unless the user specifically requests it.
