@@ -1,5 +1,5 @@
 services:
   app:
     build:
-      dockerfile: .buildkite/Dockerfile.ci
+      dockerfile: .buildkite/Dockerfile
       context: ..

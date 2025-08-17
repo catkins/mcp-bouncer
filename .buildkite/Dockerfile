@@ -1,4 +1,3 @@
-
 FROM golang:1.24-bookworm
 
 # base utilities needed for installs
