@@ -36,6 +36,8 @@ dev_mode:
       type: once
     - cmd: wails3 task common:dev:frontend
       type: background
+    - cmd: wails3 task common:dev:storybook
+      type: background
     - cmd: go mod tidy
       type: blocking
     - cmd: wails3 task build
