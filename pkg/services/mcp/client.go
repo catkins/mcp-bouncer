@@ -524,8 +524,7 @@ func (cm *ClientManager) startClientProcess(mc *ManagedClient) error {
 
 		if mc.Config.RequiresAuth {
 			// Use file-based token store for persistent OAuth tokens
-			// tokenStore := NewFileTokenStore(mc.Config.Name)
-			tokenStore := client.NewMemoryTokenStore()
+			tokenStore := NewFileTokenStore(mc.Config.Name)
 			slog.Debug("Creating OAuth client", "server_name", mc.Config.Name, "endpoint", mc.Config.Endpoint)
 			oauthConfig := client.OAuthConfig{
 				RedirectURI: "http://localhost:8085/oauth/callback",
