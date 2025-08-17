@@ -389,7 +389,7 @@ export function ServerForm({
                   onClick={addArg}
                   variant="secondary"
                   size="sm"
-                  className="text-xs px-1.5 py-0.5 h-5 text-xs"
+                  className="text-xs px-1.5 py-0.5 h-5"
                 >
                   <PlusIcon className="h-2.5 w-2.5 inline-block" />
                   Add
@@ -433,7 +433,7 @@ export function ServerForm({
                   onClick={addEnvVar}
                   variant="secondary"
                   size="sm"
-                  className="text-xs px-1.5 py-0.5 h-5 text-xs"
+                  className="text-xs px-1.5 py-0.5 h-5"
                 >
                   <PlusIcon className="h-2.5 w-2.5 inline-block" />
                   Add
@@ -486,7 +486,7 @@ export function ServerForm({
                     onClick={addHeader}
                     variant="secondary"
                     size="sm"
-                    className="text-xs px-1.5 py-0.5 h-5 text-xs"
+                    className="text-xs px-1.5 py-0.5 h-5"
                   >
                     <PlusIcon className="h-2.5 w-2.5 inline-block" />
                     Add

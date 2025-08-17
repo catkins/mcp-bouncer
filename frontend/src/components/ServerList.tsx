@@ -21,7 +21,6 @@ interface ServerListProps {
     addServer: boolean;
     updateServer: boolean;
     removeServer: boolean;
-    general: boolean;
     toggleServer: { [key: string]: boolean };
     restartServer: { [key: string]: boolean };
   };
