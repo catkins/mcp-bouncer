@@ -60,6 +60,7 @@ This is a **[Wails 3](https://github.com/wailsapp/wails/tree/v3-alpha) applicati
 ### Project Purpose
 - This is MCP Bouncer, a local gateway that can manage and route requests to multiple MCP servers.
 - It exposes a Streamable HTTP MCP Server at http://localhost:8091/mcp, and proxies requests to configured MCP Servers
+- Also tracks incoming MCP client sessions and surfaces them in the UI (Clients tab)
 - It is configured in the UI, but configuration is saved in `$XDG_CONFIG_HOME/mcp-bouncer/settings.json`
 - It supports STDIO, SSE and Streamable HTTP (including OAuth) MCP Servers
 
