@@ -7,3 +7,5 @@ export { ToggleSwitch } from './ToggleSwitch';
 export { ToolsModal } from './ToolsModal';
 export { LoadingButton } from './LoadingButton';
 export { Toast, ToastContainer, type ToastType } from './Toast';
+export { ClientList } from './ClientList';
+export { TabSwitcher, type TabKey } from './TabSwitcher';

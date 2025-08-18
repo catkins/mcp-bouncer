@@ -1,9 +1,10 @@
-import { ServerList, Header } from './components';
+import { ServerList, Header, ClientList, TabSwitcher } from './components';
 import { useMCPService } from './hooks/useMCPService';
 import { useTheme } from './hooks/useTheme';
 import { ToastProvider } from './contexts/ToastContext';
 import { ToastContainer } from './components/Toast';
 import { useToast } from './contexts/ToastContext';
+import { useState } from 'react';
 
 function AppContent() {
   const {
@@ -24,6 +25,7 @@ function AppContent() {
   } = useMCPService();
   const { theme, toggleTheme } = useTheme();
   const { toasts, removeToast } = useToast();
+  const [tab, setTab] = useState<'servers' | 'clients'>('servers');
 
   const handleRefreshStatus = async (serverName: string) => {
     await loadClientStatus();
@@ -40,19 +42,25 @@ function AppContent() {
       />
       <ToastContainer toasts={toasts} onClose={removeToast} />
       <main className="pt-16 px-6 pb-6 max-w-5xl mx-auto">
-        <ServerList
-          servers={servers}
-          clientStatus={clientStatus}
-          onAddServer={addServer}
-          onUpdateServer={updateServer}
-          onRemoveServer={removeServer}
-          onToggleServer={toggleServer}
-          onRestartServer={restartServer}
-          onAuthorizeServer={authorizeServer}
-          onRefreshStatus={handleRefreshStatus}
-          loadingStates={loadingStates}
-          errors={errors}
-        />
+        <TabSwitcher value={tab} onChange={setTab} />
+
+        {tab === 'servers' ? (
+          <ServerList
+            servers={servers}
+            clientStatus={clientStatus}
+            onAddServer={addServer}
+            onUpdateServer={updateServer}
+            onRemoveServer={removeServer}
+            onToggleServer={toggleServer}
+            onRestartServer={restartServer}
+            onAuthorizeServer={authorizeServer}
+            onRefreshStatus={handleRefreshStatus}
+            loadingStates={loadingStates}
+            errors={errors}
+          />
+        ) : (
+          <ClientList />
+        )}
       </main>
     </div>
   );
