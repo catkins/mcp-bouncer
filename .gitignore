@@ -8,3 +8,4 @@ build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
 storybook-static
 
 .crush/
+.env
