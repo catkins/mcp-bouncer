@@ -33,7 +33,7 @@ This is a **[Wails 3](https://github.com/wailsapp/wails/tree/v3-alpha) applicati
 - `pkg/services/mcp/`: Go service layer containing MCP server/client functionality
 - `pkg/services/settings/`: Go service layer managing settings
 - `frontend/`: Web-based UI built with TypeScript and vanilla HTML/CSS
-- After making changes in `pkg/services` regenerate bindings with `wails3 generate bindings` which will update generated code in `frontend/bindings`
+- After making changes in `pkg/services` regenerate bindings with `wails3 generate bindings -ts` which will update generated code in `frontend/bindings`
 
 **Frontend:**
 
