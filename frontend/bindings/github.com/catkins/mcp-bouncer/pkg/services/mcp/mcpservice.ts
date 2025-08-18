@@ -60,11 +60,20 @@ export function GetClientTools(clientName: string): $CancellablePromise<{ [_: st
 }
 
 /**
+ * GetIncomingClients returns the list of active incoming clients connected to the streamable HTTP endpoint
+ */
+export function GetIncomingClients(): $CancellablePromise<$models.IncomingClient[]> {
+    return $Call.ByID(2713822155).then(($result: any) => {
+        return $$createType5($result);
+    });
+}
+
+/**
  * GetSettings returns the current settings
  */
 export function GetSettings(): $CancellablePromise<settings$0.Settings | null> {
     return $Call.ByID(2186197872).then(($result: any) => {
-        return $$createType5($result);
+        return $$createType7($result);
     });
 }
 
@@ -74,7 +83,7 @@ export function IsActive(): $CancellablePromise<boolean> {
 
 export function List(): $CancellablePromise<settings$0.MCPServerConfig[]> {
     return $Call.ByID(391634795).then(($result: any) => {
-        return $$createType7($result);
+        return $$createType9($result);
     });
 }
 
@@ -156,7 +165,9 @@ const $$createType0 = $models.ClientStatus.createFrom;
 const $$createType1 = $Create.Map($Create.Any, $$createType0);
 const $$createType2 = $Create.Map($Create.Any, $Create.Any);
 const $$createType3 = $Create.Array($$createType2);
-const $$createType4 = settings$0.Settings.createFrom;
-const $$createType5 = $Create.Nullable($$createType4);
-const $$createType6 = settings$0.MCPServerConfig.createFrom;
-const $$createType7 = $Create.Array($$createType6);
+const $$createType4 = $models.IncomingClient.createFrom;
+const $$createType5 = $Create.Array($$createType4);
+const $$createType6 = settings$0.Settings.createFrom;
+const $$createType7 = $Create.Nullable($$createType6);
+const $$createType8 = settings$0.MCPServerConfig.createFrom;
+const $$createType9 = $Create.Array($$createType8);

@@ -5,6 +5,10 @@
 // @ts-ignore: Unused imports
 import { Create as $Create } from "@wailsio/runtime";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as time$0 from "../../../../../../time/models.js";
+
 /**
  * ClientStatus represents the status of a client
  */
@@ -43,5 +47,39 @@ export class ClientStatus {
     static createFrom($$source: any = {}): ClientStatus {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new ClientStatus($$parsedSource as Partial<ClientStatus>);
+    }
+}
+
+export class IncomingClient {
+    "id": string;
+    "name": string;
+    "version": string;
+    "title"?: string;
+    "connected_at": time$0.Time;
+
+    /** Creates a new IncomingClient instance. */
+    constructor($$source: Partial<IncomingClient> = {}) {
+        if (!("id" in $$source)) {
+            this["id"] = "";
+        }
+        if (!("name" in $$source)) {
+            this["name"] = "";
+        }
+        if (!("version" in $$source)) {
+            this["version"] = "";
+        }
+        if (!("connected_at" in $$source)) {
+            this["connected_at"] = null;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new IncomingClient instance from a string or object.
+     */
+    static createFrom($$source: any = {}): IncomingClient {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new IncomingClient($$parsedSource as Partial<IncomingClient>);
     }
 }

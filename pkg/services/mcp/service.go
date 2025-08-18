@@ -21,6 +21,14 @@ type MCPService struct {
 	settings       *settings.SettingsService
 }
 
+// GetIncomingClients returns the list of active incoming clients connected to the streamable HTTP endpoint
+func (s *MCPService) GetIncomingClients() []IncomingClient {
+	if s.server == nil {
+		return []IncomingClient{}
+	}
+	return s.server.GetIncomingClients()
+}
+
 const defaultListenAddr = "localhost:8091"
 
 func NewMCPService(settingsService *settings.SettingsService) *MCPService {

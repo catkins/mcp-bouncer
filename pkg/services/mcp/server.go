@@ -2,15 +2,20 @@ package mcp
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"time"
 
+	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 func NewServer(listenAddr string) *Server {
+	hooks := &server.Hooks{}
+
 	mcpServer := server.NewMCPServer("mcp-bouncer", "0.0.1",
-		server.WithToolCapabilities(true))
+		server.WithToolCapabilities(true),
+		server.WithHooks(hooks))
 	streamableHttp := server.NewStreamableHTTPServer(mcpServer)
 	mux := http.NewServeMux()
 	mux.Handle("/mcp", streamableHttp)
@@ -20,25 +25,54 @@ func NewServer(listenAddr string) *Server {
 		Handler: mux,
 	}
 
-	server := &Server{
+	srv := &Server{
 		listenAddr: listenAddr,
 		mcp:        mcpServer,
 		httpServer: httpServer,
 	}
 
-	// Create client manager
-	server.clientManager = NewClientManager(server)
+	srv.incomingClients = NewIncomingClientRegistry(srv)
 
-	return server
+	hooks.AddAfterInitialize(func(ctx context.Context, id any, req *mcp.InitializeRequest, _ *mcp.InitializeResult) {
+		session := server.ClientSessionFromContext(ctx)
+		if session == nil {
+			return
+		}
+		srv.incomingClients.AddOrUpdate(session.SessionID(), req.Params.ClientInfo.Name, req.Params.ClientInfo.Version, "")
+		srv.EmitEvent("mcp:incoming_client_connected", map[string]any{
+			"id":           session.SessionID(),
+			"name":         req.Params.ClientInfo.Name,
+			"version":      req.Params.ClientInfo.Version,
+			"title":        "",
+			"connected_at": time.Now(),
+		})
+		srv.EmitEvent("mcp:incoming_clients_updated", srv.incomingClients.List())
+	})
+	hooks.AddOnUnregisterSession(func(ctx context.Context, session server.ClientSession) {
+		id := session.SessionID()
+		if srv.incomingClients.Remove(id) {
+			srv.EmitEvent("mcp:incoming_client_disconnected", map[string]any{
+				"id": id,
+			})
+			srv.EmitEvent("mcp:incoming_clients_updated", srv.incomingClients.List())
+		} else {
+			slog.Debug("UnregisterSession for unknown incoming client", "session_id", id)
+		}
+	})
+
+	srv.clientManager = NewClientManager(srv)
+
+	return srv
 }
 
 type Server struct {
-	listenAddr    string
-	mcp           *server.MCPServer
-	httpServer    *http.Server
-	active        bool
-	clientManager *ClientManager
-	eventEmitter  func(name string, data any)
+	listenAddr      string
+	mcp             *server.MCPServer
+	httpServer      *http.Server
+	active          bool
+	clientManager   *ClientManager
+	eventEmitter    func(name string, data any)
+	incomingClients *IncomingClientRegistry
 }
 
 func (s *Server) Start(ctx context.Context) error {
@@ -61,6 +95,13 @@ func (s *Server) Start(ctx context.Context) error {
 // GetClientManager returns the client manager
 func (s *Server) GetClientManager() *ClientManager {
 	return s.clientManager
+}
+
+func (s *Server) GetIncomingClients() []IncomingClient {
+	if s.incomingClients == nil {
+		return []IncomingClient{}
+	}
+	return s.incomingClients.List()
 }
 
 // SetEventEmitter sets a callback to emit events to the application layer
