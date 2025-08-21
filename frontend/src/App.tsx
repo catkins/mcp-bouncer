@@ -1,10 +1,11 @@
 import { ServerList, Header, ClientList, TabSwitcher } from './components';
 import { useMCPService } from './hooks/useMCPService';
-import { useTheme } from './hooks/useTheme';
 import { ToastProvider } from './contexts/ToastContext';
 import { ToastContainer } from './components/Toast';
 import { useToast } from './contexts/ToastContext';
 import { useState } from 'react';
+import { Toaster } from 'sonner';
+import { ThemeProvider } from './components/ThemeProvider';
 
 function AppContent() {
   const {
@@ -23,7 +24,6 @@ function AppContent() {
     loadClientStatus,
     openConfigDirectory,
   } = useMCPService();
-  const { theme, toggleTheme } = useTheme();
   const { toasts, removeToast } = useToast();
   const [tab, setTab] = useState<'servers' | 'clients'>('servers');
 
@@ -35,12 +35,11 @@ function AppContent() {
     <div className="min-h-screen bg-gray-100 dark:bg-radial dark:from-gray-800 dark:via-gray-800 dark:to-gray-900">
       <Header
         isActive={isActive}
-        toggleTheme={toggleTheme}
-        theme={theme}
         onOpenConfig={openConfigDirectory}
         mcpUrl={mcpUrl}
       />
       <ToastContainer toasts={toasts} onClose={removeToast} />
+      <Toaster />
       <main className="pt-16 px-6 pb-6 max-w-5xl mx-auto">
         <TabSwitcher value={tab} onChange={setTab} />
 
@@ -68,8 +67,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <ToastProvider>
-      <AppContent />
-    </ToastProvider>
+    <ThemeProvider>
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
+    </ThemeProvider>
   );
 }

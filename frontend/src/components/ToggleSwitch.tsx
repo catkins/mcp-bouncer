@@ -1,3 +1,5 @@
+import { Switch } from '@/components/ui/switch';
+
 interface ToggleSwitchProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
@@ -17,68 +19,24 @@ export function ToggleSwitch({
   label,
   description,
 }: ToggleSwitchProps) {
-  const sizeClasses = {
-    sm: 'w-8 h-4',
-    md: 'w-10 h-5',
-    lg: 'w-12 h-6',
-  };
-
-  const thumbSizeClasses = {
-    sm: 'w-3 h-3',
-    md: 'w-4 h-4',
-    lg: 'w-5 h-5',
-  };
-
-  const handleToggle = () => {
-    if (!disabled) {
-      onChange(!checked);
-    }
-  };
-
   return (
     <div className={`flex items-center gap-3 ${className}`}>
-      <button
-        type="button"
-        onClick={handleToggle}
+      <Switch
+        checked={checked}
+        onCheckedChange={onChange}
         disabled={disabled}
-        className={`
-          relative inline-flex items-center rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
-          ${sizeClasses[size]}
-          ${
-            checked
-              ? 'bg-gradient-to-r from-blue-400 via-blue-500 to-purple-500 shadow-lg'
-              : 'bg-gray-300 dark:bg-gray-600'
-          }
-          ${
-            disabled
-              ? 'opacity-50 cursor-not-allowed'
-              : 'cursor-pointer hover:shadow-md transform hover:scale-105 active:scale-95'
-          }
-          ${disabled && checked ? 'animate-pulse' : ''}
-        `}
+        size={size}
         aria-label={label || 'Toggle switch'}
-      >
-        <span
-          className={`
-            inline-block rounded-full bg-white shadow transform transition-all duration-300 ease-in-out
-            ${thumbSizeClasses[size]}
-            ${checked ? 'translate-x-4' : 'translate-x-0.5'}
-            ${disabled ? 'opacity-75' : ''}
-          `}
-        />
-        {/* Loading indicator when disabled */}
-        {disabled && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-2 h-2 bg-white/20 rounded-full animate-pulse" />
-          </div>
-        )}
-      </button>
+        className={`${
+          disabled && checked ? 'animate-pulse opacity-75' : ''
+        }`}
+      />
       {(label || description) && (
         <div className="flex flex-col">
           {label && (
             <span
               className={`font-medium ${size === 'sm' ? 'text-xs' : size === 'md' ? 'text-sm' : 'text-base'} text-gray-900 dark:text-white transition-colors duration-200 ${
-                disabled ? 'text-gray-400 dark:text-gray-500' : ''
+                disabled ? 'opacity-60' : ''
               }`}
             >
               {label}
@@ -87,7 +45,7 @@ export function ToggleSwitch({
           {description && (
             <span
               className={`${size === 'sm' ? 'text-xs' : 'text-sm'} text-gray-500 dark:text-gray-400 transition-colors duration-200 ${
-                disabled ? 'text-gray-300 dark:text-gray-600' : ''
+                disabled ? 'opacity-60' : ''
               }`}
             >
               {description}

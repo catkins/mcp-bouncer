@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
-import { WailsEvent } from '@wailsio/runtime/types/events';
 import { MCPService } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/mcp';
+
+// Define WailsEvent type locally
+type WailsEvent = {
+  name: string;
+  data: any;
+};
 import { SettingsService } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings';
 import {
   MCPServerConfig,

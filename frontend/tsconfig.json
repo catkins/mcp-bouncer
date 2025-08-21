@@ -20,7 +20,11 @@
     "noImplicitAny": false,
     "noImplicitReturns": true,
     "skipLibCheck": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "include": [
     "src"

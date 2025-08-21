@@ -17,7 +17,6 @@ const meta: Meta<typeof Header> = {
   tags: ['autodocs'],
   args: {
     isActive: true,
-    theme: 'light',
     mcpUrl: 'localhost:3000',
   },
   argTypes: {
@@ -26,11 +25,6 @@ const meta: Meta<typeof Header> = {
       options: [true, false, null],
       description: 'Server connection status',
     },
-    theme: {
-      control: { type: 'select' },
-      options: ['light', 'dark'],
-    },
-    toggleTheme: { action: 'toggleTheme' },
     onOpenConfig: { action: 'openConfig' },
   },
 };
@@ -42,14 +36,12 @@ export const Default: Story = {};
 
 export const LightTheme: Story = {
   args: {
-    theme: 'light',
     isActive: true,
   },
 };
 
 export const DarkTheme: Story = {
   args: {
-    theme: 'dark',
     isActive: true,
   },
   parameters: {
@@ -98,7 +90,6 @@ export const HttpsUrl: Story = {
 
 export const DarkThemeInactive: Story = {
   args: {
-    theme: 'dark',
     isActive: false,
   },
   parameters: {
@@ -108,7 +99,6 @@ export const DarkThemeInactive: Story = {
 
 export const DarkThemeChecking: Story = {
   args: {
-    theme: 'dark',
     isActive: null,
   },
   parameters: {

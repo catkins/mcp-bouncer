@@ -1,20 +1,17 @@
 import {
-  SunIcon,
-  MoonIcon,
   Cog6ToothIcon,
   GlobeAltIcon,
   ClipboardDocumentIcon,
 } from '@heroicons/react/24/outline';
+import { ModeToggle } from './ModeToggle';
 
 interface HeaderProps {
   isActive: boolean | null;
-  toggleTheme: () => void;
-  theme: 'light' | 'dark';
   onOpenConfig: () => void;
   mcpUrl: string;
 }
 
-export function Header({ isActive, toggleTheme, theme, onOpenConfig, mcpUrl }: HeaderProps) {
+export function Header({ isActive, onOpenConfig, mcpUrl }: HeaderProps) {
   const handleCopyUrl = async () => {
     try {
       await navigator.clipboard.writeText(mcpUrl);
@@ -51,13 +48,7 @@ export function Header({ isActive, toggleTheme, theme, onOpenConfig, mcpUrl }: H
           >
             <Cog6ToothIcon className="h-4 w-4" />
           </button>
-          <button
-            onClick={toggleTheme}
-            className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg transition-colors"
-            aria-label="Toggle theme"
-          >
-            {theme === 'light' ? <SunIcon className="h-4 w-4" /> : <MoonIcon className="h-4 w-4" />}
-          </button>
+          <ModeToggle />
         </div>
       </div>
     </header>

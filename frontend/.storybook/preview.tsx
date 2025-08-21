@@ -1,6 +1,7 @@
 import type { Preview } from '@storybook/react-vite';
 import { DocsContainer } from '@storybook/addon-docs/blocks';
 import '../src/style.css';
+import { ThemeProvider } from '../src/components/ThemeProvider';
 
 import { withThemeByClassName } from "@storybook/addon-themes";
 
@@ -26,13 +27,20 @@ const preview: Preview = {
     }
   },
 
-  decorators: [withThemeByClassName({
-    themes: {
-      light: lightClasses,
-      dark: darkClasses,
-    },
-    defaultTheme: 'light',
-  })]
+  decorators: [
+    (Story) => (
+      <ThemeProvider>
+        <Story />
+      </ThemeProvider>
+    ),
+    withThemeByClassName({
+      themes: {
+        light: lightClasses,
+        dark: darkClasses,
+      },
+      defaultTheme: 'light',
+    })
+  ]
 };
 
 export default preview;
