@@ -40,7 +40,6 @@ func NewMCPService(settingsService *settings.SettingsService) *MCPService {
 }
 
 func (s *MCPService) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
-	// Use settings if available
 	if s.settings != nil {
 		s.listenAddr = s.settings.GetListenAddr()
 		s.server = NewServer(s.listenAddr)
@@ -49,7 +48,6 @@ func (s *MCPService) ServiceStartup(ctx context.Context, options application.Ser
 			s.emitEvent(name, data)
 		})
 
-		// Subscribe to settings updates - only reload clients if listen address changes
 		s.settings.Subscribe(func(event *application.CustomEvent) {
 			if event.Name == "settings:updated" {
 				// Check if listen address changed
@@ -418,7 +416,6 @@ func (s *MCPService) ReloadClients() error {
 			if err != nil {
 				return err
 			}
-			// Emit event to notify frontend that servers have been updated
 			s.emitEvent("mcp:servers_updated", map[string]any{})
 			return nil
 		}
@@ -456,9 +453,9 @@ func (s *MCPService) GetClientTools(clientName string) ([]map[string]interface{}
 		}
 
 		// Convert tools to map format for JSON serialization
-		toolMaps := make([]map[string]interface{}, len(tools))
+		toolMaps := make([]map[string]any, len(tools))
 		for i, tool := range tools {
-			toolMaps[i] = map[string]interface{}{
+			toolMaps[i] = map[string]any{
 				"name":        tool.Name,
 				"description": tool.Description,
 				"inputSchema": tool.InputSchema,

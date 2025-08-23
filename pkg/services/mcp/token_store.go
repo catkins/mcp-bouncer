@@ -23,7 +23,6 @@ type FileTokenStore struct {
 
 // NewFileTokenStore creates a new file-based token store using the default location
 func NewFileTokenStore(serverName string) *FileTokenStore {
-	// Create a unique filename based on server name
 	filename := fmt.Sprintf("mcp-tokens-%s.json", serverName)
 	filePath := filepath.Join(xdg.ConfigHome, "mcp-bouncer", filename)
 
@@ -32,7 +31,6 @@ func NewFileTokenStore(serverName string) *FileTokenStore {
 
 // NewFileTokenStoreWithPath creates a new file-based token store with a custom file path
 func NewFileTokenStoreWithPath(filePath string) *FileTokenStore {
-	// Ensure the directory exists
 	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
 		slog.Warn("Failed to create token storage directory", "error", err, "path", filepath.Dir(filePath))
 	}
@@ -49,21 +47,18 @@ func (f *FileTokenStore) GetToken() (*transport.Token, error) {
 
 	slog.Debug("FileTokenStore: GetToken called", "path", f.filePath)
 
-	// Check if file exists
 	if _, err := os.Stat(f.filePath); os.IsNotExist(err) {
 		// Follow MemoryTokenStore pattern: return error when no token available
 		slog.Debug("FileTokenStore: no token file found", "path", f.filePath)
 		return nil, fmt.Errorf("no token available")
 	}
 
-	// Read the file
 	data, err := os.ReadFile(f.filePath)
 	if err != nil {
 		slog.Error("FileTokenStore: failed to read token file", "path", f.filePath, "error", err)
 		return nil, fmt.Errorf("failed to read token file: %w", err)
 	}
 
-	// Parse JSON
 	var token transport.Token
 	if err := json.Unmarshal(data, &token); err != nil {
 		slog.Error("FileTokenStore: failed to parse token file", "path", f.filePath, "error", err)
@@ -79,13 +74,11 @@ func (f *FileTokenStore) SaveToken(token *transport.Token) error {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
-	// Marshal token to JSON
 	data, err := json.MarshalIndent(token, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal token: %w", err)
 	}
 
-	// Write to file with proper permissions
 	if err := os.WriteFile(f.filePath, data, 0600); err != nil {
 		return fmt.Errorf("failed to write token file: %w", err)
 	}

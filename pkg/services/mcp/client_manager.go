@@ -97,20 +97,23 @@ func (cm *ClientManager) StartClient(ctx context.Context, config settings.MCPSer
 		if client.IsOAuthAuthorizationRequiredError(err) {
 			mc.AuthorizationRequired = true
 			mc.OAuthAuthenticated = false
-			mc.LastError = fmt.Sprintf("cm.initializeClient: %s", err.Error())
+			mc.LastError = fmt.Sprintf("** cm.initializeClient: %s", err.Error())
 			cm.clients[config.Name] = mc
+
 			slog.Warn("Client requires authorization", "name", config.Name, "error", err)
+
 			cm.server.EmitEvent("mcp:client_status_changed", map[string]any{
 				"server_name": config.Name,
 				"status":      "authorization_required",
 			})
+
 			return nil
 		}
+
 		cm.stopClientInternal(config.Name)
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
 
-	// Register tools with the main server
 	if err := cm.registerClientTools(ctx, mc); err != nil {
 		cm.stopClientInternal(config.Name)
 		return fmt.Errorf("failed to register client tools: %w", err)
@@ -119,11 +122,10 @@ func (cm *ClientManager) StartClient(ctx context.Context, config settings.MCPSer
 	mc.Connected = true
 	cm.clients[config.Name] = mc
 
-	// Start monitoring goroutine
 	go cm.monitorClient(ctx, mc)
 
 	slog.Info("Started MCP client", "name", config.Name, "tools", len(mc.Tools))
-	// Emit per-client started event for immediate UI update
+
 	cm.server.EmitEvent("mcp:client_status_changed", map[string]any{
 		"server_name": config.Name,
 		"status":      "started",
@@ -147,13 +149,10 @@ func (cm *ClientManager) stopClientInternal(name string) error {
 		return nil
 	}
 
-	// Signal stop
 	close(mc.StopChan)
 
-	// Remove tools from main server
 	cm.removeClientTools(mc)
 
-	// Close transport with timeout to prevent hanging
 	if mc.Transport != nil {
 		done := make(chan struct{})
 		go func() {
@@ -170,11 +169,10 @@ func (cm *ClientManager) stopClientInternal(name string) error {
 		}
 	}
 
-	// Remove from clients map
 	delete(cm.clients, name)
 
 	slog.Info("Stopped MCP client", "name", name)
-	// Emit per-client stopped event for immediate UI update
+
 	cm.server.EmitEvent("mcp:client_status_changed", map[string]any{
 		"server_name": name,
 		"status":      "stopped",
@@ -198,15 +196,13 @@ func (cm *ClientManager) RestartClient(ctx context.Context, name string) error {
 	config := mc.Config
 	cm.mutex.Unlock()
 
-	// Stop the client
 	if err := cm.StopClient(name); err != nil {
 		return fmt.Errorf("failed to stop client: %w", err)
 	}
 
-	// Wait a bit before restarting
+	// wait a bit before restarting
 	time.Sleep(1 * time.Second)
 
-	// Start the client again
 	return cm.StartClient(ctx, config)
 }
 
@@ -219,8 +215,13 @@ func (cm *ClientManager) AuthorizeClient(ctx context.Context, name string) error
 		return fmt.Errorf("client '%s' not found", name)
 	}
 
+	defer func() {
+		cm.server.EmitEvent("mcp:client_status_changed", map[string]any{})
+	}()
+
 	// Check if the server is configured to require authorization
 	if !mc.Config.RequiresAuth {
+		mc.LastError = fmt.Sprintf("server '%s' is not configured to require authorization", name)
 		return fmt.Errorf("server '%s' is not configured to require authorization", name)
 	}
 
@@ -231,11 +232,13 @@ func (cm *ClientManager) AuthorizeClient(ctx context.Context, name string) error
 	}
 
 	if !client.IsOAuthAuthorizationRequiredError(err) {
+		mc.LastError = fmt.Sprintf("authorization not required or unexpected error: %w", err)
 		return fmt.Errorf("authorization not required or unexpected error: %w", err)
 	}
 
 	oauthHandler := client.GetOAuthHandler(err)
 	if oauthHandler == nil {
+		mc.LastError = "failed to obtain OAuth handler"
 		return fmt.Errorf("failed to obtain OAuth handler")
 	}
 
@@ -247,24 +250,29 @@ func (cm *ClientManager) AuthorizeClient(ctx context.Context, name string) error
 	// PKCE and state
 	codeVerifier, err := client.GenerateCodeVerifier()
 	if err != nil {
+		mc.LastError = fmt.Sprintf("failed to generate code verifier: %s", err)
 		return fmt.Errorf("failed to generate code verifier: %w", err)
 	}
 	codeChallenge := client.GenerateCodeChallenge(codeVerifier)
 	state, err := client.GenerateState()
 	if err != nil {
+		mc.LastError = fmt.Sprintf("failed to generate state: %s", err)
 		return fmt.Errorf("failed to generate state: %w", err)
 	}
 
 	if err := oauthHandler.RegisterClient(ctx, "mcp-bouncer"); err != nil {
+		mc.LastError = fmt.Sprintf("failed to register client: %s", err)
 		return fmt.Errorf("failed to register client: %w", err)
 	}
 
 	authURL, err := oauthHandler.GetAuthorizationURL(ctx, state, codeChallenge)
 	if err != nil {
+		mc.LastError = fmt.Sprintf("failed to get authorization URL: %s", err)
 		return fmt.Errorf("failed to get authorization URL: %w", err)
 	}
 
 	if err := openDefaultBrowser(authURL); err != nil {
+		mc.LastError = fmt.Sprintf("failed to open browser automatically: %s", err)
 		slog.Warn("Failed to open browser automatically", "error", err, "url", authURL)
 	}
 
@@ -279,6 +287,7 @@ func (cm *ClientManager) AuthorizeClient(ctx context.Context, name string) error
 	}
 
 	if err := oauthHandler.ProcessAuthorizationResponse(ctx, code, state, codeVerifier); err != nil {
+		mc.LastError = fmt.Sprintf("failed to process authorization response: %s", err)
 		return fmt.Errorf("failed to process authorization response: %w", err)
 	}
 
@@ -434,7 +443,6 @@ func (cm *ClientManager) registerClientTools(ctx context.Context, mc *ManagedCli
 				"prefixed_tool", request.Params.Name,
 				"request", request)
 
-			// Call the client with the original tool name
 			return mc.Client.CallTool(ctx, request)
 		}
 
