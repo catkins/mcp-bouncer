@@ -1,20 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { IncomingClient } from '../hooks/useIncomingClients';
 import { ClockIcon } from '@heroicons/react/24/outline';
 
+import { formatDistance } from 'date-fns';
+
+
 function timeAgo(input: string | Date | null): string {
-  if (!input) return '-';
-  const ts = new Date(input).getTime();
-  if (isNaN(ts)) return '-';
-  const now = Date.now();
-  const diff = Math.max(0, Math.floor((now - ts) / 1000));
-  if (diff < 60) return `${diff}s ago`;
-  const m = Math.floor(diff / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
+  if (!input) return '';
+  return formatDistance(input, new Date(), {
+    addSuffix: true
+  });
 }
 
 export function ClientCard({ client }: { client: IncomingClient }) {
