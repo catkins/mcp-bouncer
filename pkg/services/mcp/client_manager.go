@@ -2,123 +2,16 @@ package mcp
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net/http"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"runtime"
 	"sync"
 	"time"
 
-	"github.com/adrg/xdg"
 	"github.com/catkins/mcp-bouncer/pkg/services/settings"
 	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/client/transport"
 	"github.com/mark3labs/mcp-go/mcp"
 )
-
-// FileTokenStore implements transport.TokenStore by persisting tokens to disk.
-// It stores OAuth tokens in JSON format with secure file permissions (0600).
-// Tokens are stored per-server using unique filenames in the user's config directory.
-// Thread-safe operations are provided through mutex protection.
-type FileTokenStore struct {
-	filePath string
-	mutex    sync.RWMutex
-}
-
-// NewFileTokenStore creates a new file-based token store using the default location
-func NewFileTokenStore(serverName string) *FileTokenStore {
-	// Create a unique filename based on server name
-	filename := fmt.Sprintf("mcp-tokens-%s.json", serverName)
-	filePath := filepath.Join(xdg.ConfigHome, "mcp-bouncer", filename)
-
-	return NewFileTokenStoreWithPath(filePath)
-}
-
-// NewFileTokenStoreWithPath creates a new file-based token store with a custom file path
-func NewFileTokenStoreWithPath(filePath string) *FileTokenStore {
-	// Ensure the directory exists
-	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
-		slog.Warn("Failed to create token storage directory", "error", err, "path", filepath.Dir(filePath))
-	}
-
-	return &FileTokenStore{
-		filePath: filePath,
-	}
-}
-
-// GetToken retrieves a token from the file
-func (f *FileTokenStore) GetToken() (*transport.Token, error) {
-	f.mutex.RLock()
-	defer f.mutex.RUnlock()
-
-	slog.Debug("FileTokenStore: GetToken called", "path", f.filePath)
-
-	// Check if file exists
-	if _, err := os.Stat(f.filePath); os.IsNotExist(err) {
-		// Follow MemoryTokenStore pattern: return error when no token available
-		slog.Debug("FileTokenStore: no token file found", "path", f.filePath)
-		return nil, fmt.Errorf("no token available")
-	}
-
-	// Read the file
-	data, err := os.ReadFile(f.filePath)
-	if err != nil {
-		slog.Error("FileTokenStore: failed to read token file", "path", f.filePath, "error", err)
-		return nil, fmt.Errorf("failed to read token file: %w", err)
-	}
-
-	// Parse JSON
-	var token transport.Token
-	if err := json.Unmarshal(data, &token); err != nil {
-		slog.Error("FileTokenStore: failed to parse token file", "path", f.filePath, "error", err)
-		return nil, fmt.Errorf("failed to parse token file: %w", err)
-	}
-
-	slog.Debug("FileTokenStore: successfully loaded token", "path", f.filePath, "expires_at", token.ExpiresAt)
-	return &token, nil
-}
-
-// SaveToken saves a token to the file
-func (f *FileTokenStore) SaveToken(token *transport.Token) error {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
-
-	// Marshal token to JSON
-	data, err := json.MarshalIndent(token, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal token: %w", err)
-	}
-
-	// Write to file with proper permissions
-	if err := os.WriteFile(f.filePath, data, 0600); err != nil {
-		return fmt.Errorf("failed to write token file: %w", err)
-	}
-
-	slog.Debug("Token saved to file", "path", f.filePath)
-	return nil
-}
-
-// ClearToken removes the stored token file
-func (f *FileTokenStore) ClearToken() error {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
-
-	if err := os.Remove(f.filePath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to remove token file: %w", err)
-	}
-
-	slog.Debug("Token file cleared", "path", f.filePath)
-	return nil
-}
-
-// GetTokenFilePath returns the path to the token file (for debugging/info purposes)
-func (f *FileTokenStore) GetTokenFilePath() string {
-	return f.filePath
-}
 
 // ClientManager manages MCP client connections
 type ClientManager struct {
@@ -126,8 +19,6 @@ type ClientManager struct {
 	mutex   sync.RWMutex
 	server  *Server
 }
-
-// OAuth tokens are persisted to disk using FileTokenStore for session recovery
 
 // ManagedClient represents a managed MCP client connection
 type ManagedClient struct {
@@ -141,6 +32,16 @@ type ManagedClient struct {
 	OAuthAuthenticated    bool
 	StopChan              chan struct{}
 	RestartChan           chan struct{}
+}
+
+// ClientStatus represents the status of a client
+type ClientStatus struct {
+	Name                  string `json:"name"`
+	Connected             bool   `json:"connected"`
+	Tools                 int    `json:"tools"`
+	LastError             string `json:"last_error,omitempty"`
+	AuthorizationRequired bool   `json:"authorization_required"`
+	OAuthAuthenticated    bool   `json:"oauth_authenticated"`
 }
 
 // NewClientManager creates a new client manager
@@ -415,54 +316,6 @@ func (cm *ClientManager) AuthorizeClient(ctx context.Context, name string) error
 	return nil
 }
 
-// startOAuthCallbackServer starts a local HTTP server for OAuth redirect handling
-func startOAuthCallbackServer(callbackChan chan<- map[string]string) *http.Server {
-	server := &http.Server{Addr: ":8085"}
-	mux := http.NewServeMux()
-	mux.HandleFunc("/oauth/callback", func(w http.ResponseWriter, r *http.Request) {
-		params := make(map[string]string)
-		for key, values := range r.URL.Query() {
-			if len(values) > 0 {
-				params[key] = values[0]
-			}
-		}
-		callbackChan <- params
-		w.Header().Set("Content-Type", "text/html")
-		_, _ = w.Write([]byte(`
-      <html>
-        <body>
-          <h1>Authorization Successful</h1>
-          <p>You can now close this window and return to the application.</p>
-          <script>window.close();</script>
-        </body>
-      </html>
-    `))
-	})
-	server.Handler = mux
-
-	go func() {
-		if err := server.ListenAndServe(); err != nil && err.Error() != "http: Server closed" {
-			slog.Error("OAuth callback server error", "error", err)
-		}
-	}()
-
-	return server
-}
-
-// openDefaultBrowser opens the system browser to a URL
-func openDefaultBrowser(url string) error {
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "darwin":
-		cmd = exec.Command("open", url)
-	case "windows":
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
-	default:
-		cmd = exec.Command("xdg-open", url)
-	}
-	return cmd.Start()
-}
-
 // GetClientStatus returns the status of all clients
 func (cm *ClientManager) GetClientStatus() map[string]ClientStatus {
 	cm.mutex.RLock()
@@ -480,16 +333,6 @@ func (cm *ClientManager) GetClientStatus() map[string]ClientStatus {
 		}
 	}
 	return status
-}
-
-// ClientStatus represents the status of a client
-type ClientStatus struct {
-	Name                  string `json:"name"`
-	Connected             bool   `json:"connected"`
-	Tools                 int    `json:"tools"`
-	LastError             string `json:"last_error,omitempty"`
-	AuthorizationRequired bool   `json:"authorization_required"`
-	OAuthAuthenticated    bool   `json:"oauth_authenticated"`
 }
 
 // startClientProcess starts the client process
