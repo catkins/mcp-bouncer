@@ -2,9 +2,9 @@ FROM golang:1.25-bookworm
 
 # base utilities needed for installs
 RUN apt-get update && apt-get install -y \
-    curl \
-    ca-certificates \
-    gnupg \
+  curl \
+  ca-certificates \
+  gnupg \
   && rm -rf /var/lib/apt/lists/*
 
 # install nodejs 22 LTS
@@ -12,14 +12,14 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install
 
 # Webkit & GTK deps
 RUN apt-get update && apt-get install -y \
-    gcc \
-    libc6-dev \
-    pkg-config \
-    libgtk-3-dev \
-    libwebkit2gtk-4.1-dev \
-    libayatana-appindicator3-dev \
-    librsvg2-dev \
-    patchelf \
+  gcc \
+  libc6-dev \
+  pkg-config \
+  libgtk-3-dev \
+  libwebkit2gtk-4.1-dev \
+  libayatana-appindicator3-dev \
+  librsvg2-dev \
+  patchelf \
   && rm -rf /var/lib/apt/lists/*
 
 # install taskfile.dev
