@@ -99,24 +99,24 @@ func (s *Server) handleAfterInitialize(ctx context.Context, id any, req *mcp.Ini
 		return
 	}
 	s.incomingClients.AddOrUpdate(session.SessionID(), req.Params.ClientInfo.Name, req.Params.ClientInfo.Version, "")
-	s.EmitEvent("mcp:incoming_client_connected", map[string]any{
+	s.EmitEvent(EventIncomingClientConnected, map[string]any{
 		"id":           session.SessionID(),
 		"name":         req.Params.ClientInfo.Name,
 		"version":      req.Params.ClientInfo.Version,
 		"title":        "",
 		"connected_at": time.Now(),
 	})
-	s.EmitEvent("mcp:incoming_clients_updated", s.incomingClients.List())
+	s.EmitEvent(EventIncomingClientsUpdated, s.incomingClients.List())
 }
 
 // handleUnregisterSession handles the unregister session hook
 func (s *Server) handleUnregisterSession(ctx context.Context, session server.ClientSession) {
 	id := session.SessionID()
 	if s.incomingClients.Remove(id) {
-		s.EmitEvent("mcp:incoming_client_disconnected", map[string]any{
+		s.EmitEvent(EventIncomingClientDisconnected, map[string]any{
 			"id": id,
 		})
-		s.EmitEvent("mcp:incoming_clients_updated", s.incomingClients.List())
+		s.EmitEvent(EventIncomingClientsUpdated, s.incomingClients.List())
 	} else {
 		slog.Debug("UnregisterSession for unknown incoming client", "session_id", id)
 	}

@@ -102,7 +102,7 @@ func (cm *ClientManager) StartClient(ctx context.Context, config settings.MCPSer
 
 			slog.Warn("Client requires authorization", "name", config.Name, "error", err)
 
-			cm.server.EmitEvent("mcp:client_status_changed", map[string]any{
+			cm.server.EmitEvent(EventClientStatusChanged, map[string]any{
 				"server_name": config.Name,
 				"status":      "authorization_required",
 			})
@@ -126,7 +126,7 @@ func (cm *ClientManager) StartClient(ctx context.Context, config settings.MCPSer
 
 	slog.Info("Started MCP client", "name", config.Name, "tools", len(mc.Tools))
 
-	cm.server.EmitEvent("mcp:client_status_changed", map[string]any{
+	cm.server.EmitEvent(EventClientStatusChanged, map[string]any{
 		"server_name": config.Name,
 		"status":      "started",
 	})
@@ -173,7 +173,7 @@ func (cm *ClientManager) stopClientInternal(name string) error {
 
 	slog.Info("Stopped MCP client", "name", name)
 
-	cm.server.EmitEvent("mcp:client_status_changed", map[string]any{
+	cm.server.EmitEvent(EventClientStatusChanged, map[string]any{
 		"server_name": name,
 		"status":      "stopped",
 	})
@@ -216,7 +216,7 @@ func (cm *ClientManager) AuthorizeClient(ctx context.Context, name string) error
 	}
 
 	defer func() {
-		cm.server.EmitEvent("mcp:client_status_changed", map[string]any{})
+		cm.server.EmitEvent(EventClientStatusChanged, map[string]any{})
 	}()
 
 	// Check if the server is configured to require authorization
@@ -318,7 +318,7 @@ func (cm *ClientManager) AuthorizeClient(ctx context.Context, name string) error
 	cm.mutex.Unlock()
 
 	// Notify UI
-	cm.server.EmitEvent("mcp:client_status_changed", map[string]any{
+	cm.server.EmitEvent(EventClientStatusChanged, map[string]any{
 		"server_name": name,
 		"status":      "started",
 	})

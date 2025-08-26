@@ -165,13 +165,13 @@ func (s *MCPService) AddMCPServer(config settings.MCPServerConfig) error {
 			go func() {
 				if err := s.server.GetClientManager().StartClient(context.Background(), config); err != nil {
 					slog.Error("Failed to start client after adding", "name", config.Name, "error", err)
-					s.emitEvent("mcp:client_error", map[string]any{
+					s.emitEvent(EventClientError, map[string]any{
 						"server_name": config.Name,
 						"error":       err.Error(),
 						"action":      "start",
 					})
 				} else {
-					s.emitEvent("mcp:client_status_changed", map[string]any{
+					s.emitEvent(EventClientStatusChanged, map[string]any{
 						"server_name": config.Name,
 						"status":      "started",
 					})
@@ -180,7 +180,7 @@ func (s *MCPService) AddMCPServer(config settings.MCPServerConfig) error {
 		}
 
 		// Emit event to notify frontend that servers have been updated
-		s.emitEvent("mcp:servers_updated", map[string]any{
+		s.emitEvent(EventServersUpdated, map[string]any{
 			"added_server": config.Name,
 			"action":       "added",
 		})
@@ -199,7 +199,7 @@ func (s *MCPService) RemoveMCPServer(name string) error {
 					slog.Error("Failed to stop client before removal", "name", name, "error", err)
 					// Continue with removal even if stop fails
 				} else {
-					s.emitEvent("mcp:client_status_changed", map[string]any{
+					s.emitEvent(EventClientStatusChanged, map[string]any{
 						"server_name": name,
 						"status":      "stopped",
 					})
@@ -213,7 +213,7 @@ func (s *MCPService) RemoveMCPServer(name string) error {
 		}
 
 		// Emit event to notify frontend that servers have been updated
-		s.emitEvent("mcp:servers_updated", map[string]any{
+		s.emitEvent(EventServersUpdated, map[string]any{
 			"removed_server": name,
 			"action":         "removed",
 		})
@@ -251,7 +251,7 @@ func (s *MCPService) UpdateMCPServer(name string, config settings.MCPServerConfi
 		}
 
 		// Emit event to notify frontend that servers have been updated
-		s.emitEvent("mcp:servers_updated", map[string]any{
+		s.emitEvent(EventServersUpdated, map[string]any{
 			"updated_server": name,
 			"action":         "updated",
 		})
@@ -267,14 +267,14 @@ func (s *MCPService) UpdateMCPServer(name string, config settings.MCPServerConfi
 						if err := s.server.GetClientManager().StartClient(context.Background(), config); err != nil {
 							slog.Error("Failed to start client after enabling", "name", name, "error", err)
 							// Emit error event for the frontend
-							s.emitEvent("mcp:client_error", map[string]any{
+							s.emitEvent(EventClientError, map[string]any{
 								"server_name": name,
 								"error":       err.Error(),
 								"action":      "start",
 							})
 						} else {
 							// Emit success event
-							s.emitEvent("mcp:client_status_changed", map[string]any{
+							s.emitEvent(EventClientStatusChanged, map[string]any{
 								"server_name": name,
 								"status":      "started",
 							})
@@ -290,7 +290,7 @@ func (s *MCPService) UpdateMCPServer(name string, config settings.MCPServerConfi
 						if err := s.server.GetClientManager().StopClient(name); err != nil {
 							slog.Error("Failed to stop client after disabling", "name", name, "error", err, "duration", time.Since(startTime))
 							// Emit error event for the frontend
-							s.emitEvent("mcp:client_error", map[string]any{
+							s.emitEvent(EventClientError, map[string]any{
 								"server_name": name,
 								"error":       err.Error(),
 								"action":      "stop",
@@ -298,7 +298,7 @@ func (s *MCPService) UpdateMCPServer(name string, config settings.MCPServerConfi
 						} else {
 							slog.Info("Successfully stopped client after disabling", "name", name, "duration", time.Since(startTime))
 							// Emit success event
-							s.emitEvent("mcp:client_status_changed", map[string]any{
+							s.emitEvent(EventClientStatusChanged, map[string]any{
 								"server_name": name,
 								"status":      "stopped",
 							})
@@ -313,13 +313,13 @@ func (s *MCPService) UpdateMCPServer(name string, config settings.MCPServerConfi
 					go func() {
 						if err := s.server.GetClientManager().RestartClient(context.Background(), name); err != nil {
 							slog.Error("Failed to restart client after config change", "name", name, "error", err)
-							s.emitEvent("mcp:client_error", map[string]any{
+							s.emitEvent(EventClientError, map[string]any{
 								"server_name": name,
 								"error":       err.Error(),
 								"action":      "restart",
 							})
 						} else {
-							s.emitEvent("mcp:client_status_changed", map[string]any{
+							s.emitEvent(EventClientStatusChanged, map[string]any{
 								"server_name": name,
 								"status":      "restarted",
 							})
@@ -416,7 +416,7 @@ func (s *MCPService) ReloadClients() error {
 			if err != nil {
 				return err
 			}
-			s.emitEvent("mcp:servers_updated", map[string]any{})
+			s.emitEvent(EventServersUpdated, map[string]any{})
 			return nil
 		}
 	}
