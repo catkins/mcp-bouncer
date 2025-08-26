@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"sort"
 	"sync"
 	"time"
 )
@@ -55,5 +56,15 @@ func (r *IncomingClientRegistry) List() []IncomingClient {
 	for _, v := range r.items {
 		out = append(out, v)
 	}
+	// Deterministic ordering: by Name, then ConnectedAt, then ID
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Name != out[j].Name {
+			return out[i].Name < out[j].Name
+		}
+		if !out[i].ConnectedAt.Equal(out[j].ConnectedAt) {
+			return out[i].ConnectedAt.Before(out[j].ConnectedAt)
+		}
+		return out[i].ID < out[j].ID
+	})
 	return out
 }
