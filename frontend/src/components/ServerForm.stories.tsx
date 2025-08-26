@@ -1,6 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { ServerForm } from './ServerForm';
-import { MCPServerConfig, TransportType } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models';
+import {
+  MCPServerConfig,
+  TransportType,
+} from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models';
 
 // Mock existing servers for validation testing
 const mockExistingServers = [
@@ -100,7 +103,7 @@ export const EditHttpServer: Story = {
       enabled: true,
       command: '',
       headers: {
-        'Authorization': 'Bearer token123',
+        Authorization: 'Bearer token123',
         'Content-Type': 'application/json',
       },
     }),

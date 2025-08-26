@@ -1,6 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { ServerCard } from './ServerCard';
-import { MCPServerConfig, TransportType } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models';
+import {
+  MCPServerConfig,
+  TransportType,
+} from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models';
 import { ClientStatus } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/mcp/models';
 
 // Mock server configs using class constructors
@@ -13,8 +16,8 @@ const mockServerConfig = new MCPServerConfig({
   enabled: true,
   env: {
     API_KEY: 'your-api-key',
-    DEBUG: 'true'
-  }
+    DEBUG: 'true',
+  },
 });
 
 const mockConnectedStatus = new ClientStatus({
@@ -140,9 +143,9 @@ export const HttpServer: Story = {
       enabled: true,
       command: '',
       headers: {
-        'Authorization': 'Bearer token123',
-        'Content-Type': 'application/json'
-      }
+        Authorization: 'Bearer token123',
+        'Content-Type': 'application/json',
+      },
     }),
     clientStatus: new ClientStatus({
       name: 'buildkite',

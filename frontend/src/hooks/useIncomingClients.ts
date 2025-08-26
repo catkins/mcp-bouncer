@@ -24,8 +24,8 @@ export function useIncomingClients() {
             typeof item.connected_at === 'string' || item.connected_at instanceof Date
               ? item.connected_at
               : item.connected_at && item.connected_at.Time
-              ? item.connected_at.Time
-              : item.connected_at,
+                ? item.connected_at.Time
+                : item.connected_at,
         })),
       );
     } catch (e) {
@@ -47,7 +47,10 @@ export function useIncomingClients() {
             name: data.name,
             version: data.version,
             title: data.title,
-            connected_at: typeof data.connected_at === 'string' ? data.connected_at : new Date(data.connected_at).toISOString(),
+            connected_at:
+              typeof data.connected_at === 'string'
+                ? data.connected_at
+                : new Date(data.connected_at).toISOString(),
           },
         ];
       });

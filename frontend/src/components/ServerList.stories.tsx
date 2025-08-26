@@ -1,6 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { ServerList } from './ServerList';
-import { MCPServerConfig, TransportType } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models';
+import {
+  MCPServerConfig,
+  TransportType,
+} from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models';
 import { ClientStatus } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/mcp/models';
 
 // Mock server configurations
@@ -24,7 +27,7 @@ const mockServers = [
     enabled: true,
     command: '',
     headers: {
-      'Authorization': 'Bearer token123',
+      Authorization: 'Bearer token123',
     },
   }),
   new MCPServerConfig({

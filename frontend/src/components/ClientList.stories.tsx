@@ -31,7 +31,13 @@ export const Multiple: Story = {
     clients: [
       { id: '1', name: 'Build Agent', version: '2.3.1', connected_at: nowIso },
       { id: '2', name: 'Browser MCP', version: '0.7.0', title: 'Chromium', connected_at: nowIso },
-      { id: '3', name: 'Docs Helper', version: '2025.08.18', title: 'Internal', connected_at: nowIso },
+      {
+        id: '3',
+        name: 'Docs Helper',
+        version: '2025.08.18',
+        title: 'Internal',
+        connected_at: nowIso,
+      },
     ],
   },
 };

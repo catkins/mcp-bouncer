@@ -74,7 +74,8 @@ export const LongMessage: Story = {
   args: {
     type: 'error',
     title: 'Connection Failed',
-    message: 'Unable to establish connection to the MCP server at localhost:3000. This could be due to network issues, server downtime, or incorrect configuration. Please verify your settings and try again.',
+    message:
+      'Unable to establish connection to the MCP server at localhost:3000. This could be due to network issues, server downtime, or incorrect configuration. Please verify your settings and try again.',
   },
 };
 
@@ -214,12 +215,14 @@ export const EmptyContainer: StoryObj<typeof ToastContainer> = {
 
 // Interactive example with state management
 export const InteractiveContainer = () => {
-  const [toasts, setToasts] = useState<Array<{
-    id: string;
-    type: ToastType;
-    title: string;
-    message?: string;
-  }>>([]);
+  const [toasts, setToasts] = useState<
+    Array<{
+      id: string;
+      type: ToastType;
+      title: string;
+      message?: string;
+    }>
+  >([]);
 
   const addToast = (type: ToastType) => {
     const id = `toast-${Date.now()}`;

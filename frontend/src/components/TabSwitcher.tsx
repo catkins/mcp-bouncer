@@ -14,10 +14,16 @@ export function TabSwitcher({ value, onChange }: { value: TabKey; onChange: (v: 
 
   return (
     <div className="inline-flex gap-2 mb-4">
-      <button className={`${base} ${value === 'servers' ? active : inactive}`} onClick={() => onChange('servers')}>
+      <button
+        className={`${base} ${value === 'servers' ? active : inactive}`}
+        onClick={() => onChange('servers')}
+      >
         Servers
       </button>
-      <button className={`${base} ${value === 'clients' ? active : inactive}`} onClick={() => onChange('clients')}>
+      <button
+        className={`${base} ${value === 'clients' ? active : inactive}`}
+        onClick={() => onChange('clients')}
+      >
         Clients
       </button>
     </div>

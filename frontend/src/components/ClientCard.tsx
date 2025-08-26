@@ -4,11 +4,10 @@ import { ClockIcon } from '@heroicons/react/24/outline';
 
 import { formatDistance } from 'date-fns';
 
-
 function timeAgo(input: string | Date | null): string {
   if (!input) return '';
   return formatDistance(input, new Date(), {
-    addSuffix: true
+    addSuffix: true,
   });
 }
 

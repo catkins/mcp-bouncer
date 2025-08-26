@@ -336,21 +336,21 @@ export function ServerForm({
 
           {(formData.transport === TransportType.TransportSSE ||
             formData.transport === TransportType.TransportStreamableHTTP) && (
-              <FormInput
-                id="server-endpoint"
-                label="Endpoint"
-                value={formData.endpoint || ''}
-                onChange={value => {
-                  setFormData(prev => ({ ...prev, endpoint: value }));
-                  if (errors.endpoint) {
-                    setErrors(prev => ({ ...prev, endpoint: '' }));
-                  }
-                }}
-                error={errors.endpoint}
-                required
-                placeholder="https://example.com/mcp"
-              />
-            )}
+            <FormInput
+              id="server-endpoint"
+              label="Endpoint"
+              value={formData.endpoint || ''}
+              onChange={value => {
+                setFormData(prev => ({ ...prev, endpoint: value }));
+                if (errors.endpoint) {
+                  setErrors(prev => ({ ...prev, endpoint: '' }));
+                }
+              }}
+              error={errors.endpoint}
+              required
+              placeholder="https://example.com/mcp"
+            />
+          )}
 
           {formData.transport === TransportType.TransportStreamableHTTP && (
             <ToggleSwitch
@@ -476,56 +476,56 @@ export function ServerForm({
 
           {(formData.transport === TransportType.TransportSSE ||
             formData.transport === TransportType.TransportStreamableHTTP) && (
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
-                    HTTP Headers
-                  </label>
-                  <LoadingButton
-                    type="button"
-                    onClick={addHeader}
-                    variant="secondary"
-                    size="sm"
-                    className="text-xs px-1.5 py-0.5 h-5"
-                  >
-                    <PlusIcon className="h-2.5 w-2.5 inline-block" />
-                    Add
-                  </LoadingButton>
-                </div>
-                <div className="space-y-1.5">
-                  {Object.entries(formData.headers || {}).map(([key, value], index) => (
-                    <div key={key} className="flex items-center gap-1.5">
-                      <input
-                        type="text"
-                        value={key}
-                        onChange={e => updateHeader(key, e.target.value, value)}
-                        className="w-1/3 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
-                        placeholder="Header name"
-                        aria-label={`HTTP header name ${index + 1}`}
-                      />
-                      <input
-                        type="text"
-                        value={value}
-                        onChange={e => updateHeader(key, key, e.target.value)}
-                        className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
-                        placeholder="Value"
-                        aria-label={`HTTP header value ${index + 1}`}
-                      />
-                      <LoadingButton
-                        type="button"
-                        onClick={() => removeHeader(key)}
-                        variant="danger"
-                        size="sm"
-                        className="p-1.5"
-                        aria-label={`Remove HTTP header ${key}`}
-                      >
-                        <TrashIcon className="h-3 w-3" />
-                      </LoadingButton>
-                    </div>
-                  ))}
-                </div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                  HTTP Headers
+                </label>
+                <LoadingButton
+                  type="button"
+                  onClick={addHeader}
+                  variant="secondary"
+                  size="sm"
+                  className="text-xs px-1.5 py-0.5 h-5"
+                >
+                  <PlusIcon className="h-2.5 w-2.5 inline-block" />
+                  Add
+                </LoadingButton>
               </div>
-            )}
+              <div className="space-y-1.5">
+                {Object.entries(formData.headers || {}).map(([key, value], index) => (
+                  <div key={key} className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={key}
+                      onChange={e => updateHeader(key, e.target.value, value)}
+                      className="w-1/3 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
+                      placeholder="Header name"
+                      aria-label={`HTTP header name ${index + 1}`}
+                    />
+                    <input
+                      type="text"
+                      value={value}
+                      onChange={e => updateHeader(key, key, e.target.value)}
+                      className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
+                      placeholder="Value"
+                      aria-label={`HTTP header value ${index + 1}`}
+                    />
+                    <LoadingButton
+                      type="button"
+                      onClick={() => removeHeader(key)}
+                      variant="danger"
+                      size="sm"
+                      className="p-1.5"
+                      aria-label={`Remove HTTP header ${key}`}
+                    >
+                      <TrashIcon className="h-3 w-3" />
+                    </LoadingButton>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="pt-1">
             <ToggleSwitch

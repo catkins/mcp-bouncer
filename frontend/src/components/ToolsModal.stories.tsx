@@ -9,7 +9,7 @@ const mockMCPService = {
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     const toolsData = {
-      'fetch': [
+      fetch: [
         {
           name: 'fetch_url',
           description: 'Fetch content from a URL',
@@ -17,9 +17,9 @@ const mockMCPService = {
             type: 'object',
             properties: {
               url: { type: 'string', description: 'URL to fetch' },
-              method: { type: 'string', enum: ['GET', 'POST'], default: 'GET' }
-            }
-          }
+              method: { type: 'string', enum: ['GET', 'POST'], default: 'GET' },
+            },
+          },
         },
         {
           name: 'download_file',
@@ -28,9 +28,9 @@ const mockMCPService = {
             type: 'object',
             properties: {
               url: { type: 'string', description: 'URL to download from' },
-              filename: { type: 'string', description: 'Local filename to save as' }
-            }
-          }
+              filename: { type: 'string', description: 'Local filename to save as' },
+            },
+          },
         },
         {
           name: 'parse_html',
@@ -39,21 +39,21 @@ const mockMCPService = {
             type: 'object',
             properties: {
               html: { type: 'string', description: 'HTML content to parse' },
-              selector: { type: 'string', description: 'CSS selector to extract' }
-            }
-          }
-        }
+              selector: { type: 'string', description: 'CSS selector to extract' },
+            },
+          },
+        },
       ],
-      'buildkite': [
+      buildkite: [
         {
           name: 'list_pipelines',
           description: 'List all pipelines in the organization',
           inputSchema: {
             type: 'object',
             properties: {
-              org_slug: { type: 'string', description: 'Organization slug' }
-            }
-          }
+              org_slug: { type: 'string', description: 'Organization slug' },
+            },
+          },
         },
         {
           name: 'get_build',
@@ -63,9 +63,9 @@ const mockMCPService = {
             properties: {
               org_slug: { type: 'string', description: 'Organization slug' },
               pipeline_slug: { type: 'string', description: 'Pipeline slug' },
-              build_number: { type: 'string', description: 'Build number' }
-            }
-          }
+              build_number: { type: 'string', description: 'Build number' },
+            },
+          },
         },
         {
           name: 'create_build',
@@ -76,9 +76,9 @@ const mockMCPService = {
               org_slug: { type: 'string', description: 'Organization slug' },
               pipeline_slug: { type: 'string', description: 'Pipeline slug' },
               commit: { type: 'string', description: 'Commit SHA' },
-              branch: { type: 'string', description: 'Branch name' }
-            }
-          }
+              branch: { type: 'string', description: 'Branch name' },
+            },
+          },
         },
         {
           name: 'list_builds',
@@ -87,12 +87,12 @@ const mockMCPService = {
             type: 'object',
             properties: {
               org_slug: { type: 'string', description: 'Organization slug' },
-              pipeline_slug: { type: 'string', description: 'Pipeline slug' }
-            }
-          }
-        }
+              pipeline_slug: { type: 'string', description: 'Pipeline slug' },
+            },
+          },
+        },
       ],
-      'context7': [
+      context7: [
         {
           name: 'search_context',
           description: 'Search through context data',
@@ -100,9 +100,9 @@ const mockMCPService = {
             type: 'object',
             properties: {
               query: { type: 'string', description: 'Search query' },
-              limit: { type: 'number', description: 'Maximum results to return' }
-            }
-          }
+              limit: { type: 'number', description: 'Maximum results to return' },
+            },
+          },
         },
         {
           name: 'get_context',
@@ -110,12 +110,12 @@ const mockMCPService = {
           inputSchema: {
             type: 'object',
             properties: {
-              id: { type: 'string', description: 'Context ID' }
-            }
-          }
-        }
+              id: { type: 'string', description: 'Context ID' },
+            },
+          },
+        },
       ],
-      'empty-server': []
+      'empty-server': [],
     };
 
     if (serverName === 'error-server') {
@@ -134,7 +134,7 @@ const mockMCPService = {
     }
 
     return { success: true };
-  }
+  },
 };
 
 // Mock the service module for Storybook
@@ -242,12 +242,10 @@ export const Interactive = () => {
     <div className="p-8">
       <div className="space-y-4 mb-8">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Server:
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Server:</label>
           <select
             value={serverName}
-            onChange={(e) => setServerName(e.target.value)}
+            onChange={e => setServerName(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-md bg-white"
           >
             <option value="fetch">Fetch Server (3 tools)</option>
@@ -265,11 +263,7 @@ export const Interactive = () => {
         </button>
       </div>
 
-      <ToolsModal
-        serverName={serverName}
-        isOpen={isOpen}
-        onClose={() => setIsOpen(false)}
-      />
+      <ToolsModal serverName={serverName} isOpen={isOpen} onClose={() => setIsOpen(false)} />
     </div>
   );
 };
@@ -290,7 +284,7 @@ export const LoadingState = () => {
       GetClientTools: async (serverName: string) => {
         await new Promise(resolve => setTimeout(resolve, 3000));
         return mockMCPService.GetClientTools(serverName);
-      }
+      },
     };
 
     if (typeof window !== 'undefined') {
@@ -307,11 +301,7 @@ export const LoadingState = () => {
         Open Slow Loading Modal
       </button>
 
-      <ToolsModal
-        serverName="fetch"
-        isOpen={isOpen}
-        onClose={() => setIsOpen(false)}
-      />
+      <ToolsModal serverName="fetch" isOpen={isOpen} onClose={() => setIsOpen(false)} />
     </div>
   );
 };
@@ -351,10 +341,10 @@ export const ManyTools = () => {
             properties: {
               param1: { type: 'string', description: 'First parameter' },
               param2: { type: 'string', description: 'Second parameter' },
-            }
-          }
+            },
+          },
         }));
-      }
+      },
     };
 
     if (typeof window !== 'undefined') {
@@ -371,11 +361,7 @@ export const ManyTools = () => {
         Open Modal with Many Tools
       </button>
 
-      <ToolsModal
-        serverName="many-tools"
-        isOpen={isOpen}
-        onClose={() => setIsOpen(false)}
-      />
+      <ToolsModal serverName="many-tools" isOpen={isOpen} onClose={() => setIsOpen(false)} />
     </div>
   );
 };

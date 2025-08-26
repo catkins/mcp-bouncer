@@ -135,7 +135,10 @@ export function ServerCard({
                 </button>
               )}
               {clientStatus?.oauth_authenticated && (
-                <span className="inline-flex items-center p-1 bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-400 rounded-full" title="OAuth Authenticated">
+                <span
+                  className="inline-flex items-center p-1 bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-400 rounded-full"
+                  title="OAuth Authenticated"
+                >
                   <ShieldCheckIcon className="w-3 h-3" />
                 </span>
               )}
