@@ -1,4 +1,4 @@
-version: '3'
+version: "3"
 
 includes:
   common: ./build/Taskfile.yml
@@ -9,7 +9,7 @@ includes:
 vars:
   APP_NAME: "mcp-bouncer"
   BIN_DIR: "bin"
-  VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
+  VITE_PORT: "{{.WAILS_VITE_PORT | default 9245}}"
 
 tasks:
   build:
@@ -33,12 +33,12 @@ tasks:
       - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
 
   format:
-    summary: Formats frontend TypeScript with Prettier
+    summary: Formats Typescript and Go code
     cmds:
       - npm --prefix frontend run format
+      - go fmt ./...
 
   format:check:
     summary: Checks formatting in frontend via Prettier
     cmds:
       - npm --prefix frontend run format:check
-
