@@ -11,6 +11,7 @@ This file provides guidance to coding agents when working with code in this repo
 - **Run built app**: `task run` - Runs the built application. This is blocking.
 - **Go Type Documentation**: Use `go doc <package or type>` to understand Go types and APIs when debugging or working with unfamiliar code.
 - **Format code**: `task format` - Formats all TypeScript and Go code with Prettier and Go fmt
+- **Events**: When defining events to publish to the frontend, ensure they are defined as constants in `events.go`
 
 IMPORTANT: Blocking commands MUST be run in a background agent, or in a tmux pane.
 
