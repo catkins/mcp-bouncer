@@ -53,14 +53,8 @@ func (s *MCPService) ServiceStartup(ctx context.Context, options application.Ser
 				// Check if listen address changed
 				newAddr := s.settings.GetListenAddr()
 				if newAddr != s.listenAddr {
-					slog.Info("Listen address changed, reloading all clients", "old", s.listenAddr, "new", newAddr)
-					s.listenAddr = newAddr
-					s.server = NewServer(s.listenAddr)
-					s.server.SetEventEmitter(func(name string, data any) {
-						s.emitEvent(name, data)
-					})
-					if err := s.ReloadClients(); err != nil {
-						slog.Error("Failed to reload clients", "error", err)
+					if err := s.restartServer(ctx, newAddr); err != nil {
+						slog.Error("Failed to restart server on listen address change", "error", err)
 					}
 				} else {
 					slog.Debug("Settings updated but no client reload needed")
@@ -397,6 +391,50 @@ func (s *MCPService) AuthorizeClient(name string) error {
 		return s.server.GetClientManager().AuthorizeClient(context.Background(), name)
 	}
 	return fmt.Errorf("server not available")
+}
+
+// restartServer cleanly shuts down the current server and starts a new one on the given address
+func (s *MCPService) restartServer(ctx context.Context, newAddr string) error {
+	old := s.server
+	oldAddr := s.listenAddr
+	s.listenAddr = newAddr
+
+	if old != nil {
+		// Stop all clients and close the server
+		if old.clientManager != nil {
+			old.clientManager.StopAllClients()
+		}
+		if err := old.Close(context.Background()); err != nil {
+			slog.Warn("Error closing old server", "old_addr", oldAddr, "error", err)
+		}
+	}
+
+	// Create and start new server
+	s.server = NewServer(s.listenAddr)
+	s.server.SetEventEmitter(func(name string, data any) {
+		s.emitEvent(name, data)
+	})
+	go func() {
+		if err := s.server.Start(ctx); err != nil {
+			slog.Error("Server start error", "listen_addr", s.listenAddr, "error", err)
+		}
+	}()
+
+	// Reload clients from settings
+	if s.settings != nil {
+		if st := s.settings.GetSettings(); st != nil {
+			if err := s.server.GetClientManager().LoadClientsFromSettings(ctx, st); err != nil {
+				slog.Error("Failed to load clients after server restart", "error", err)
+			}
+		}
+	}
+
+	s.emitEvent(EventServersUpdated, map[string]any{
+		"action":   "server_restarted",
+		"new_addr": s.listenAddr,
+		"old_addr": oldAddr,
+	})
+	return nil
 }
 
 // GetClientStatus returns the status of all clients

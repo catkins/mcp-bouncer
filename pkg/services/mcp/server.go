@@ -60,12 +60,38 @@ func (s *Server) Start(ctx context.Context) error {
 
 	select {
 	case err := <-errCh:
+		// Treat normal server close as non-error
+		if err == http.ErrServerClosed {
+			s.active = false
+			return nil
+		}
 		return err
 	case <-ctx.Done():
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
-		return s.httpServer.Shutdown(shutdownCtx)
+		err := s.httpServer.Shutdown(shutdownCtx)
+		s.active = false
+		if err == http.ErrServerClosed {
+			return nil
+		}
+		return err
 	}
+}
+
+// Close shuts down the HTTP server gracefully
+func (s *Server) Close(ctx context.Context) error {
+	if s.httpServer == nil {
+		s.active = false
+		return nil
+	}
+	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	err := s.httpServer.Shutdown(shutdownCtx)
+	s.active = false
+	if err == http.ErrServerClosed {
+		return nil
+	}
+	return err
 }
 
 // GetClientManager returns the client manager
