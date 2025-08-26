@@ -44,9 +44,7 @@ func (s *MCPService) ServiceStartup(ctx context.Context, options application.Ser
 		s.listenAddr = s.settings.GetListenAddr()
 		s.server = NewServer(s.listenAddr)
 		// Bridge server-emitted events to the app event bus
-		s.server.SetEventEmitter(func(name string, data any) {
-			s.emitEvent(name, data)
-		})
+		s.server.SetEventEmitter(s.emitEvent)
 
 		s.settings.Subscribe(func(event *application.CustomEvent) {
 			if event.Name == "settings:updated" {
@@ -411,9 +409,7 @@ func (s *MCPService) restartServer(ctx context.Context, newAddr string) error {
 
 	// Create and start new server
 	s.server = NewServer(s.listenAddr)
-	s.server.SetEventEmitter(func(name string, data any) {
-		s.emitEvent(name, data)
-	})
+	s.server.SetEventEmitter(s.emitEvent)
 	go func() {
 		if err := s.server.Start(ctx); err != nil {
 			slog.Error("Server start error", "listen_addr", s.listenAddr, "error", err)

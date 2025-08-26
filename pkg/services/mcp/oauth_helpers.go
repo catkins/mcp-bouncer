@@ -1,15 +1,28 @@
 package mcp
 
 import (
+	"errors"
+	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os/exec"
 	"runtime"
 )
 
-// startOAuthCallbackServer starts a local HTTP server for OAuth redirect handling
-func startOAuthCallbackServer(callbackChan chan<- map[string]string) *http.Server {
-	server := &http.Server{Addr: ":8085"}
+// startOAuthCallbackServer starts a local HTTP server for OAuth redirect handling on a free port.
+// It returns the server instance and the redirect URI to configure the OAuth flow.
+func startOAuthCallbackServer(callbackChan chan<- map[string]string) (*http.Server, string, error) {
+	// Bind to a free port on loopback
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to bind oauth callback listener: %w", err)
+	}
+
+	addr := listener.Addr().String() // host:port
+	redirectURI := fmt.Sprintf("http://%s/oauth/callback", addr)
+
+	httpServer := &http.Server{Addr: addr}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/oauth/callback", func(w http.ResponseWriter, r *http.Request) {
 		params := make(map[string]string)
@@ -30,15 +43,15 @@ func startOAuthCallbackServer(callbackChan chan<- map[string]string) *http.Serve
       </html>
     `))
 	})
-	server.Handler = mux
+	httpServer.Handler = mux
 
 	go func() {
-		if err := server.ListenAndServe(); err != nil && err.Error() != "http: Server closed" {
+		if err := httpServer.Serve(listener); err != nil && errors.Is(err, http.ErrServerClosed) {
 			slog.Error("OAuth callback server error", "error", err)
 		}
 	}()
 
-	return server
+	return httpServer, redirectURI, nil
 }
 
 // openDefaultBrowser opens the system browser to a URL

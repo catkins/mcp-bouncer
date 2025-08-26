@@ -229,8 +229,32 @@ func (cm *ClientManager) AuthorizeClient(ctx context.Context, name string) error
 		return fmt.Errorf("server '%s' is not configured to require authorization", name)
 	}
 
-	// Try an initialize call to retrieve the OAuth handler from the error
-	_, err := mc.Client.Initialize(ctx, mcp.InitializeRequest{})
+	// Start callback server on a free port and use its redirect URI in a fresh OAuth client
+	callbackChan := make(chan map[string]string)
+	srv, redirectURI, err := startOAuthCallbackServer(callbackChan)
+	if err != nil {
+		mc.LastError = fmt.Sprintf("failed to start callback server: %s", err)
+		return fmt.Errorf("failed to start callback server: %w", err)
+	}
+	defer srv.Close()
+
+	// Recreate OAuth client with dynamic redirect URI and start it
+	newClient, err := cm.newOAuthClient(mc, redirectURI)
+	if err != nil {
+		mc.LastError = fmt.Sprintf("failed to create OAuth client: %s", err)
+		return fmt.Errorf("failed to create OAuth client: %w", err)
+	}
+	cm.mutex.Lock()
+	mc.Client = newClient
+	cm.mutex.Unlock()
+
+	if err := mc.Client.Start(ctx); err != nil {
+		mc.LastError = fmt.Sprintf("failed to start OAuth client: %s", err)
+		return fmt.Errorf("failed to start OAuth client: %w", err)
+	}
+
+	// Initialize to retrieve the OAuth handler from the error
+	_, err = mc.Client.Initialize(ctx, mcp.InitializeRequest{})
 	if err == nil {
 		return nil
 	}
@@ -245,11 +269,6 @@ func (cm *ClientManager) AuthorizeClient(ctx context.Context, name string) error
 		mc.LastError = "failed to obtain OAuth handler"
 		return fmt.Errorf("failed to obtain OAuth handler")
 	}
-
-	// Start callback server
-	callbackChan := make(chan map[string]string)
-	srv := startOAuthCallbackServer(callbackChan)
-	defer srv.Close()
 
 	// PKCE and state
 	codeVerifier, err := client.GenerateCodeVerifier()
@@ -379,18 +398,10 @@ func (cm *ClientManager) startClientProcess(mc *ManagedClient) error {
 		}
 
 		if mc.Config.RequiresAuth {
-			// Use file-based token store for persistent OAuth tokens
-			tokenStore := NewFileTokenStore(mc.Config.Name)
-			slog.Debug("Creating OAuth client", "server_name", mc.Config.Name, "endpoint", mc.Config.Endpoint)
-			oauthConfig := client.OAuthConfig{
-				RedirectURI: "http://localhost:8085/oauth/callback",
-				Scopes:      []string{"mcp.read", "mcp.write"},
-				TokenStore:  tokenStore,
-				PKCEEnabled: true,
-			}
-			oauthClient, err := client.NewOAuthStreamableHttpClient(mc.Config.Endpoint, oauthConfig)
+			// Create OAuth client with a default redirect URI (may be replaced during authorization)
+			oauthClient, err := cm.newOAuthClient(mc, "http://127.0.0.1:8085/oauth/callback")
 			if err != nil {
-				return fmt.Errorf("failed to create OAuth HTTP client: %w", err)
+				return err
 			}
 			mc.Client = oauthClient
 		} else {
@@ -620,4 +631,22 @@ func (cm *ClientManager) unregisterTool(mc *ManagedClient, toolName string) {
 	prefixedName := fmt.Sprintf("%s:%s", mc.Config.Name, toolName)
 	cm.server.mcp.DeleteTools(prefixedName)
 	slog.Debug("Removed client tool", "client", mc.Config.Name, "tool", toolName, "prefixed_name", prefixedName)
+}
+
+// newOAuthClient constructs a new OAuth streamable HTTP client for the managed client
+func (cm *ClientManager) newOAuthClient(mc *ManagedClient, redirectURI string) (*client.Client, error) {
+	// Use file-based token store for persistent OAuth tokens
+	tokenStore := NewFileTokenStore(mc.Config.Name)
+	slog.Debug("Creating OAuth client", "server_name", mc.Config.Name, "endpoint", mc.Config.Endpoint, "redirect_uri", redirectURI)
+	oauthConfig := client.OAuthConfig{
+		RedirectURI: redirectURI,
+		Scopes:      []string{"mcp.read", "mcp.write"},
+		TokenStore:  tokenStore,
+		PKCEEnabled: true,
+	}
+	oauthClient, err := client.NewOAuthStreamableHttpClient(mc.Config.Endpoint, oauthConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OAuth HTTP client: %w", err)
+	}
+	return oauthClient, nil
 }
