@@ -441,11 +441,7 @@ func (cm *ClientManager) registerClientTools(ctx context.Context, mc *ManagedCli
 			// Strip the prefix from the tool name for the client call
 			request.Params.Name = tool.Name
 
-			slog.Info("Calling tool",
-				"client", mc.Config.Name,
-				"original_tool", tool.Name,
-				"prefixed_tool", request.Params.Name,
-				"request", request)
+			slog.Debug("Calling tool", "client", mc.Config.Name, "tool", tool.Name)
 
 			return mc.Client.CallTool(ctx, request)
 		}
@@ -611,11 +607,7 @@ func (cm *ClientManager) ToggleTool(clientName string, toolName string, enabled 
 			// Strip the prefix from the tool name for the client call
 			request.Params.Name = toolName
 
-			slog.Info("Calling tool",
-				"client", mc.Config.Name,
-				"original_tool", toolName,
-				"prefixed_tool", request.Params.Name,
-				"request", request)
+			slog.Debug("Calling tool", "mcp_server", mc.Config.Name, "tool", toolName)
 
 			// Call the client with the original tool name
 			return mc.Client.CallTool(ctx, request)
