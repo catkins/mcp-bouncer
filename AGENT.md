@@ -10,6 +10,7 @@ This file provides guidance to coding agents when working with code in this repo
 - **Build production**: `wails3 build` or `task build` - Creates production executable in `build/` directory
 - **Run built app**: `task run` - Runs the built application. This is blocking.
 - **Go Type Documentation**: Use `go doc <package or type>` to understand Go types and APIs when debugging or working with unfamiliar code.
+- **Format code**: `task format` - Formats all TypeScript and Go code with Prettier and Go fmt
 
 IMPORTANT: Blocking commands MUST be run in a background agent, or in a tmux pane.
 
