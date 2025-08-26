@@ -495,10 +495,12 @@ func (s *MCPService) ToggleTool(clientName string, toolName string, enabled bool
 func (s *MCPService) emitEvent(name string, data any) {
 	slog.Info("Emitting event", "name", name, "data", data, "callback_count", s.GetCallbackCount())
 
+	// Copy callbacks under read lock, then invoke without holding the lock
 	s.callbacksMutex.RLock()
-	defer s.callbacksMutex.RUnlock()
+	callbacks := append([]func(e *application.CustomEvent){}, s.callbacks...)
+	s.callbacksMutex.RUnlock()
 
-	if len(s.callbacks) == 0 {
+	if len(callbacks) == 0 {
 		slog.Debug("No callbacks registered for MCP service event", "name", name)
 		return
 	}
@@ -509,7 +511,7 @@ func (s *MCPService) emitEvent(name string, data any) {
 		Sender: "mcp_service",
 	}
 
-	for i, callback := range s.callbacks {
+	for i, callback := range callbacks {
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
