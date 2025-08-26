@@ -153,20 +153,24 @@ func (cm *ClientManager) stopClientInternal(name string) error {
 
 	cm.removeClientTools(mc)
 
-	if mc.Transport != nil {
-		done := make(chan struct{})
-		go func() {
-			mc.Transport.Close()
-			close(done)
-		}()
+	// Attempt to stop/close the client if it provides such methods
+	if mc.Client != nil {
+		type closer interface{ Close() error }
+		type stopper interface{ Stop() error }
 
-		// Wait for transport close with timeout
-		select {
-		case <-done:
-			slog.Debug("Transport closed successfully", "name", name)
-		case <-time.After(5 * time.Second):
-			slog.Warn("Transport close timed out", "name", name)
+		// Call Stop() if available
+		if s, ok := any(mc.Client).(stopper); ok {
+			runWithTimeout(s.Stop, 5*time.Second, "name", name, "action", "Stop")
 		}
+
+		// Call Close() if available
+		if c, ok := any(mc.Client).(closer); ok {
+			runWithTimeout(c.Close, 5*time.Second, "name", name, "action", "Close")
+		}
+	}
+
+	if mc.Transport != nil {
+		runWithTimeout(mc.Transport.Close, 5*time.Second, "name", name, "action", "TransportClose")
 	}
 
 	delete(cm.clients, name)
@@ -491,6 +495,26 @@ func (cm *ClientManager) monitorClient(ctx context.Context, mc *ManagedClient) {
 			// The transport will close if the process exits, which will be detected
 			// when we try to make calls to the client
 		}
+	}
+}
+
+// runWithTimeout runs a function with a timeout and logs fields
+func runWithTimeout(fn func() error, timeout time.Duration, logFields ...any) {
+	done := make(chan error, 1)
+	go func() {
+		done <- fn()
+	}()
+
+	logger := slog.With(logFields...)
+	select {
+	case err := <-done:
+		if err != nil {
+			logger.Debug("action returned error", "error", err)
+		} else {
+			logger.Debug("action completed")
+		}
+	case <-time.After(timeout):
+		logger.Warn("action timed out")
 	}
 }
 
