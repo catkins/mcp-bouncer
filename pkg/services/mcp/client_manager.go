@@ -436,26 +436,7 @@ func (cm *ClientManager) registerClientTools(ctx context.Context, mc *ManagedCli
 
 	// Register each tool with the main server
 	for _, tool := range listToolsResult.Tools {
-		// Create a proxy handler that forwards calls to the client
-		handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			// Strip the prefix from the tool name for the client call
-			request.Params.Name = tool.Name
-
-			slog.Debug("Calling tool", "client", mc.Config.Name, "tool", tool.Name)
-
-			return mc.Client.CallTool(ctx, request)
-		}
-
-		// Add tool to main server with prefixed name to avoid conflicts
-		prefixedName := fmt.Sprintf("%s:%s", mc.Config.Name, tool.Name)
-		prefixedTool := mcp.Tool{
-			Name:        prefixedName,
-			Description: fmt.Sprintf("[%s] %s", mc.Config.Name, tool.Description),
-			InputSchema: tool.InputSchema,
-		}
-
-		cm.server.mcp.AddTool(prefixedTool, handler)
-		slog.Debug("Registered client tool", "client", mc.Config.Name, "tool", tool.Name, "prefixed_name", prefixedName)
+		cm.registerTool(mc, tool)
 	}
 
 	return nil
@@ -599,33 +580,44 @@ func (cm *ClientManager) ToggleTool(clientName string, toolName string, enabled 
 		return fmt.Errorf("tool '%s' not found in client '%s'", toolName, clientName)
 	}
 
-	prefixedName := fmt.Sprintf("%s:%s", clientName, toolName)
-
 	if enabled {
 		// Re-register the tool
-		handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			// Strip the prefix from the tool name for the client call
-			request.Params.Name = toolName
-
-			slog.Debug("Calling tool", "mcp_server", mc.Config.Name, "tool", toolName)
-
-			// Call the client with the original tool name
-			return mc.Client.CallTool(ctx, request)
-		}
-
-		prefixedTool := mcp.Tool{
-			Name:        prefixedName,
-			Description: fmt.Sprintf("[%s] %s", mc.Config.Name, targetTool.Description),
-			InputSchema: targetTool.InputSchema,
-		}
-
-		cm.server.mcp.AddTool(prefixedTool, handler)
-		slog.Debug("Re-enabled client tool", "client", mc.Config.Name, "tool", toolName, "prefixed_name", prefixedName)
+		cm.registerTool(mc, *targetTool)
+		slog.Debug("Re-enabled client tool", "client", mc.Config.Name, "tool", toolName)
 	} else {
 		// Remove the tool
-		cm.server.mcp.DeleteTools(prefixedName)
-		slog.Debug("Disabled client tool", "client", mc.Config.Name, "tool", toolName, "prefixed_name", prefixedName)
+		cm.unregisterTool(mc, toolName)
+		slog.Debug("Disabled client tool", "client", mc.Config.Name, "tool", toolName)
 	}
 
 	return nil
+}
+
+// registerTool registers a single tool with the main server under a namespaced name
+func (cm *ClientManager) registerTool(mc *ManagedClient, tool mcp.Tool) {
+	// Create a proxy handler that forwards calls to the client
+	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Forward call to underlying client with original (unprefixed) name
+		request.Params.Name = tool.Name
+		slog.Debug("Calling tool", "client", mc.Config.Name, "tool", tool.Name)
+		return mc.Client.CallTool(ctx, request)
+	}
+
+	// Add tool to main server with prefixed name to avoid conflicts
+	prefixedName := fmt.Sprintf("%s:%s", mc.Config.Name, tool.Name)
+	prefixedTool := mcp.Tool{
+		Name:        prefixedName,
+		Description: fmt.Sprintf("[%s] %s", mc.Config.Name, tool.Description),
+		InputSchema: tool.InputSchema,
+	}
+
+	cm.server.mcp.AddTool(prefixedTool, handler)
+	slog.Debug("Registered client tool", "client", mc.Config.Name, "tool", tool.Name, "prefixed_name", prefixedName)
+}
+
+// unregisterTool removes a single tool from the main server using its namespaced name
+func (cm *ClientManager) unregisterTool(mc *ManagedClient, toolName string) {
+	prefixedName := fmt.Sprintf("%s:%s", mc.Config.Name, toolName)
+	cm.server.mcp.DeleteTools(prefixedName)
+	slog.Debug("Removed client tool", "client", mc.Config.Name, "tool", toolName, "prefixed_name", prefixedName)
 }
