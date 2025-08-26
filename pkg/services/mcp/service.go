@@ -2,10 +2,10 @@ package mcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math/rand"
-	"strings"
 	"sync"
 	"time"
 
@@ -373,7 +373,7 @@ func (s *MCPService) RestartClient(name string) error {
 	}
 	if err := s.server.GetClientManager().RestartClient(context.Background(), name); err != nil {
 		// If client not found, try to start it from settings
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, ErrClientNotFound) {
 			if s.settings != nil {
 				for _, cfg := range s.settings.GetMCPServers() {
 					if cfg.Name == name {
@@ -429,7 +429,7 @@ func (s *MCPService) GetClientTools(clientName string) ([]map[string]interface{}
 		tools, err := s.server.GetClientManager().GetClientTools(clientName)
 		if err != nil {
 			// Auto-start missing client if enabled, then retry once
-			if strings.Contains(err.Error(), "not found") && s.settings != nil {
+			if errors.Is(err, ErrClientNotFound) && s.settings != nil {
 				for _, cfg := range s.settings.GetMCPServers() {
 					if cfg.Name == clientName {
 						if !cfg.Enabled {
@@ -471,7 +471,7 @@ func (s *MCPService) GetClientTools(clientName string) ([]map[string]interface{}
 func (s *MCPService) ToggleTool(clientName string, toolName string, enabled bool) error {
 	if s.server != nil {
 		if err := s.server.GetClientManager().ToggleTool(clientName, toolName, enabled); err != nil {
-			if strings.Contains(err.Error(), "not found") && s.settings != nil {
+			if errors.Is(err, ErrClientNotFound) && s.settings != nil {
 				for _, cfg := range s.settings.GetMCPServers() {
 					if cfg.Name == clientName {
 						if !cfg.Enabled {

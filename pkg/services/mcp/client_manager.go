@@ -189,9 +189,9 @@ func (cm *ClientManager) RestartClient(ctx context.Context, name string) error {
 		cm.mutex.Unlock()
 		if cm.server != nil && cm.server.clientManager != nil {
 			// Access settings indirectly is not available here; return a clear error
-			return fmt.Errorf("client '%s' not found", name)
+			return fmt.Errorf("%w: %s", ErrClientNotFound, name)
 		}
-		return fmt.Errorf("client '%s' not found", name)
+		return fmt.Errorf("%w: %s", ErrClientNotFound, name)
 	}
 	config := mc.Config
 	cm.mutex.Unlock()
@@ -212,7 +212,7 @@ func (cm *ClientManager) AuthorizeClient(ctx context.Context, name string) error
 	mc, exists := cm.clients[name]
 	cm.mutex.RUnlock()
 	if !exists {
-		return fmt.Errorf("client '%s' not found", name)
+		return fmt.Errorf("%w: %s", ErrClientNotFound, name)
 	}
 
 	defer func() {
@@ -542,7 +542,7 @@ func (cm *ClientManager) GetClientTools(clientName string) ([]mcp.Tool, error) {
 
 	mc, exists := cm.clients[clientName]
 	if !exists {
-		return nil, fmt.Errorf("client '%s' not found", clientName)
+		return nil, fmt.Errorf("%w: %s", ErrClientNotFound, clientName)
 	}
 
 	if !mc.Connected {
@@ -559,7 +559,7 @@ func (cm *ClientManager) ToggleTool(clientName string, toolName string, enabled 
 
 	mc, exists := cm.clients[clientName]
 	if !exists {
-		return fmt.Errorf("client '%s' not found", clientName)
+		return fmt.Errorf("%w: %s", ErrClientNotFound, clientName)
 	}
 
 	if !mc.Connected {
