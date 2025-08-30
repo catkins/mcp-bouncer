@@ -10,13 +10,14 @@
     "preview": "vite preview",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
+    "typecheck": "tsc --noEmit",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "@tailwindcss/vite": "^4.1.11",
-    "@wailsio/runtime": "latest",
+    "@wailsio/runtime": "^3.0.0-alpha.66",
     "date-fns": "^4.1.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
@@ -42,6 +43,5 @@
     "typescript": "^5.9.2",
     "vite": "^7.1.1",
     "vitest": "^3.2.4"
-  },
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+  }
 }

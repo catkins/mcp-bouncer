@@ -42,6 +42,7 @@ tasks:
     summary: Checks formatting in frontend via Prettier
     cmds:
       - npm --prefix frontend run format:check
+      - npm --prefix frontend run typecheck
 
   inspector:
     summary: Runs the MCP inspector
