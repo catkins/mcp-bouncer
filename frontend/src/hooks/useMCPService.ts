@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { WailsEvent } from '@wailsio/runtime/types/events';
 import { MCPService } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/mcp';
 import { SettingsService } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings';
 import {
@@ -251,7 +250,7 @@ export function useMCPService() {
     init();
 
     // Listen for server updates
-    const unsubscribe = Events.On('mcp:servers_updated', async (event: WailsEvent) => {
+    const unsubscribe = Events.On('mcp:servers_updated', async (event: Events.WailsEvent) => {
       console.log('Received mcp:servers_updated event:', event);
       await loadServers();
       await loadActive();
@@ -259,7 +258,7 @@ export function useMCPService() {
     });
 
     // Listen for settings updates
-    const unsubscribeSettings = Events.On('settings:updated', async (event: WailsEvent) => {
+    const unsubscribeSettings = Events.On('settings:updated', async (event: Events.WailsEvent) => {
       console.log('Received settings:updated event:', event);
       await loadSettings();
       await loadMcpUrl();
@@ -270,23 +269,26 @@ export function useMCPService() {
     // Listen for client status changes
     const unsubscribeClientStatus = Events.On(
       'mcp:client_status_changed',
-      async (event: WailsEvent) => {
+      async (event: Events.WailsEvent) => {
         console.log('Received mcp:client_status_changed event:', event);
         await loadClientStatus();
       },
     );
 
     // Listen for client errors
-    const unsubscribeClientError = Events.On('mcp:client_error', async (event: WailsEvent) => {
-      console.log('Received mcp:client_error event:', event);
-      const data = event.data as any;
-      if (data && data.server_name) {
-        // Set error for the specific server
-        setToggleError(data.server_name, `${data.action} failed: ${data.error}`);
-        // Reload client status to get updated state
-        await loadClientStatus();
-      }
-    });
+    const unsubscribeClientError = Events.On(
+      'mcp:client_error',
+      async (event: Events.WailsEvent) => {
+        console.log('Received mcp:client_error event:', event);
+        const data = event.data as any;
+        if (data && data.server_name) {
+          // Set error for the specific server
+          setToggleError(data.server_name, `${data.action} failed: ${data.error}`);
+          // Reload client status to get updated state
+          await loadClientStatus();
+        }
+      },
+    );
 
     return () => {
       unsubscribe();

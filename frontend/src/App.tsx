@@ -5,6 +5,7 @@ import { ToastProvider } from './contexts/ToastContext';
 import { ToastContainer } from './components/Toast';
 import { useToast } from './contexts/ToastContext';
 import { useState } from 'react';
+import { useIncomingClients } from './hooks/useIncomingClients';
 
 function AppContent() {
   const {
@@ -23,6 +24,8 @@ function AppContent() {
     loadClientStatus,
     openConfigDirectory,
   } = useMCPService();
+  const { clients } = useIncomingClients();
+
   const { theme, toggleTheme } = useTheme();
   const { toasts, removeToast } = useToast();
   const [tab, setTab] = useState<'servers' | 'clients'>('servers');
@@ -42,7 +45,12 @@ function AppContent() {
       />
       <ToastContainer toasts={toasts} onClose={removeToast} />
       <main className="pt-16 px-6 pb-6 max-w-5xl mx-auto">
-        <TabSwitcher value={tab} onChange={setTab} />
+        <TabSwitcher
+          value={tab}
+          onChange={setTab}
+          serverCount={servers.length}
+          clientCount={clients.length}
+        />
 
         {tab === 'servers' ? (
           <ServerList

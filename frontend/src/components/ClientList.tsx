@@ -1,4 +1,3 @@
-import React from 'react';
 import { useIncomingClients, type IncomingClient } from '../hooks/useIncomingClients';
 import { ClientCard } from './ClientCard';
 

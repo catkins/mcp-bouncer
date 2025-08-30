@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Events } from '@wailsio/runtime';
-import { WailsEvent } from '@wailsio/runtime/types/events';
 import { MCPService } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/mcp';
 
 export type IncomingClient = {
@@ -36,7 +35,7 @@ export function useIncomingClients() {
   useEffect(() => {
     reload();
 
-    const unsub1 = Events.On('mcp:incoming_client_connected', async (e: WailsEvent) => {
+    const unsub1 = Events.On('mcp:incoming_client_connected', async (e: Events.WailsEvent) => {
       const data = e.data as any;
       setClients(prev => {
         const rest = prev.filter(c => c.id !== data.id);
@@ -56,12 +55,12 @@ export function useIncomingClients() {
       });
     });
 
-    const unsub2 = Events.On('mcp:incoming_client_disconnected', async (e: WailsEvent) => {
+    const unsub2 = Events.On('mcp:incoming_client_disconnected', async (e: Events.WailsEvent) => {
       const data = e.data as any;
       setClients(prev => prev.filter(c => c.id !== data.id));
     });
 
-    const unsub3 = Events.On('mcp:incoming_clients_updated', async () => {
+    const unsub3 = Events.On('mcp:incoming_clients_updated', async (e: Events.WailsEvent) => {
       await reload();
     });
 
