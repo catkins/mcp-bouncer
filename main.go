@@ -25,6 +25,8 @@ func main() {
 	settingsService := settings.NewSettingsService()
 	mcpService := mcp.NewMCPService(settingsService)
 
+	startDevServer(mcpService, settingsService)
+
 	// Create a new Wails application by providing the necessary options.
 	// Variables 'Name' and 'Description' are for application metadata.
 	// 'Assets' configures the asset server with the 'FS' variable pointing to the frontend files.

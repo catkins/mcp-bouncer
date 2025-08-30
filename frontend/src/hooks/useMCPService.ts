@@ -8,6 +8,20 @@ import {
 import { ClientStatus } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/mcp/models';
 import { Events } from '@wailsio/runtime';
 
+const isDev = import.meta.env.DEV;
+
+async function fetchAPI(url: string, options: RequestInit = {}) {
+  const response = await fetch(url, options);
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'API request failed');
+  }
+  if (response.status === 204 || response.headers.get('Content-Length') === '0') {
+    return;
+  }
+  return response.json();
+}
+
 export function useMCPService() {
   const [servers, setServers] = useState<MCPServerConfig[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -69,7 +83,7 @@ export function useMCPService() {
   const loadServers = async () => {
     try {
       setLoading('general', true);
-      const serverList = await MCPService.List();
+      const serverList = isDev ? await fetchAPI('/api/mcp/servers') : await MCPService.List();
       console.log('Loaded servers:', serverList);
       setServers(serverList);
     } catch (error) {
@@ -82,7 +96,9 @@ export function useMCPService() {
 
   const loadSettings = async () => {
     try {
-      const currentSettings = await SettingsService.GetSettings();
+      const currentSettings = isDev
+        ? await fetchAPI('/api/settings')
+        : await SettingsService.GetSettings();
       setSettings(currentSettings);
     } catch (error) {
       console.error('Failed to load settings:', error);
@@ -92,7 +108,7 @@ export function useMCPService() {
 
   const loadMcpUrl = async () => {
     try {
-      const url = await MCPService.ListenAddr();
+      const url = isDev ? await fetchAPI('/api/mcp/listen-addr') : await MCPService.ListenAddr();
       setMcpUrl(url);
     } catch (error) {
       console.error('Failed to load MCP URL:', error);
@@ -102,7 +118,7 @@ export function useMCPService() {
 
   const loadActive = async () => {
     try {
-      const active = await MCPService.IsActive();
+      const active = isDev ? await fetchAPI('/api/mcp/is-active') : await MCPService.IsActive();
       setIsActive(active);
     } catch (error) {
       console.error('Failed to load active state:', error);
@@ -112,7 +128,9 @@ export function useMCPService() {
 
   const loadClientStatus = async () => {
     try {
-      const status = await MCPService.GetClientStatus();
+      const status = isDev
+        ? await fetchAPI('/api/mcp/client-status')
+        : await MCPService.GetClientStatus();
       setClientStatus(status);
     } catch (error) {
       console.error('Failed to load client status:', error);
@@ -124,7 +142,15 @@ export function useMCPService() {
     try {
       setLoading('addServer', true);
       setError('addServer');
-      await MCPService.AddMCPServer(serverConfig);
+      if (isDev) {
+        await fetchAPI('/api/mcp/servers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(serverConfig),
+        });
+      } else {
+        await MCPService.AddMCPServer(serverConfig);
+      }
       await loadServers();
     } catch (error) {
       console.error('Failed to add server:', error);
@@ -139,7 +165,15 @@ export function useMCPService() {
     try {
       setLoading('updateServer', true);
       setError('updateServer');
-      await MCPService.UpdateMCPServer(serverName, serverConfig);
+      if (isDev) {
+        await fetchAPI(`/api/mcp/servers/${serverName}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(serverConfig),
+        });
+      } else {
+        await MCPService.UpdateMCPServer(serverName, serverConfig);
+      }
       await loadServers();
     } catch (error) {
       console.error('Failed to update server:', error);
@@ -154,7 +188,11 @@ export function useMCPService() {
     try {
       setLoading('removeServer', true);
       setError('removeServer');
-      await MCPService.RemoveMCPServer(serverName);
+      if (isDev) {
+        await fetchAPI(`/api/mcp/servers/${serverName}`, { method: 'DELETE' });
+      } else {
+        await MCPService.RemoveMCPServer(serverName);
+      }
       await loadServers();
     } catch (error) {
       console.error('Failed to remove server:', error);
@@ -166,13 +204,8 @@ export function useMCPService() {
   };
 
   const toggleServer = async (serverName: string, enabled: boolean) => {
-    // Clear any previous error for this server
     setToggleError(serverName);
-
-    // Set loading state for this specific server
     setToggleLoading(serverName, true);
-
-    // Optimistic update - immediately update the UI
     setServers(prevServers =>
       prevServers.map(server => (server.name === serverName ? { ...server, enabled } : server)),
     );
@@ -181,22 +214,24 @@ export function useMCPService() {
       const server = servers.find(s => s.name === serverName);
       if (server) {
         const updatedServer = { ...server, enabled };
-        await MCPService.UpdateMCPServer(serverName, updatedServer);
-
-        // Reload client status to reflect the new state
+        if (isDev) {
+          await fetchAPI(`/api/mcp/servers/${serverName}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updatedServer),
+          });
+        } else {
+          await MCPService.UpdateMCPServer(serverName, updatedServer);
+        }
         await loadClientStatus();
       }
     } catch (error) {
       console.error('Failed to toggle server:', error);
-
-      // Revert optimistic update on error
       setServers(prevServers =>
         prevServers.map(server =>
           server.name === serverName ? { ...server, enabled: !enabled } : server,
         ),
       );
-
-      // Set error for this specific server
       setToggleError(serverName, `Failed to ${enabled ? 'enable' : 'disable'} server`);
       throw error;
     } finally {
@@ -207,7 +242,11 @@ export function useMCPService() {
   const restartServer = async (serverName: string) => {
     setRestartLoading(serverName, true);
     try {
-      await MCPService.RestartClient(serverName);
+      if (isDev) {
+        await fetchAPI(`/api/mcp/servers/${serverName}/restart`, { method: 'POST' });
+      } else {
+        await MCPService.RestartClient(serverName);
+      }
       await loadClientStatus();
     } catch (error) {
       console.error('Failed to restart server:', error);
@@ -220,7 +259,11 @@ export function useMCPService() {
 
   const authorizeServer = async (serverName: string) => {
     try {
-      await MCPService.AuthorizeClient(serverName);
+      if (isDev) {
+        await fetchAPI(`/api/mcp/servers/${serverName}/authorize`, { method: 'POST' });
+      } else {
+        await MCPService.AuthorizeClient(serverName);
+      }
       await loadClientStatus();
     } catch (error) {
       console.error('Failed to authorize server:', error);
@@ -231,7 +274,11 @@ export function useMCPService() {
 
   const openConfigDirectory = async () => {
     try {
-      await SettingsService.OpenConfigDirectory();
+      if (isDev) {
+        await fetchAPI('/api/settings/open-config-directory', { method: 'POST' });
+      } else {
+        await SettingsService.OpenConfigDirectory();
+      }
     } catch (error) {
       console.error('Failed to open config directory:', error);
       setError('general', 'Failed to open config directory');
@@ -249,46 +296,41 @@ export function useMCPService() {
 
     init();
 
-    // Listen for server updates
-    const unsubscribe = Events.On('mcp:servers_updated', async (event: Events.WailsEvent) => {
-      console.log('Received mcp:servers_updated event:', event);
+    if (isDev) {
+      const interval = setInterval(() => {
+        loadServers();
+        loadActive();
+        loadClientStatus();
+        loadSettings();
+        loadMcpUrl();
+      }, 2000);
+      return () => clearInterval(interval);
+    }
+
+    const unsubscribe = Events.On('mcp:servers_updated', async () => {
       await loadServers();
       await loadActive();
       await loadClientStatus();
     });
 
-    // Listen for settings updates
-    const unsubscribeSettings = Events.On('settings:updated', async (event: Events.WailsEvent) => {
-      console.log('Received settings:updated event:', event);
+    const unsubscribeSettings = Events.On('settings:updated', async () => {
       await loadSettings();
       await loadMcpUrl();
       await loadServers();
       await loadClientStatus();
     });
 
-    // Listen for client status changes
-    const unsubscribeClientStatus = Events.On(
-      'mcp:client_status_changed',
-      async (event: Events.WailsEvent) => {
-        console.log('Received mcp:client_status_changed event:', event);
-        await loadClientStatus();
-      },
-    );
+    const unsubscribeClientStatus = Events.On('mcp:client_status_changed', async () => {
+      await loadClientStatus();
+    });
 
-    // Listen for client errors
-    const unsubscribeClientError = Events.On(
-      'mcp:client_error',
-      async (event: Events.WailsEvent) => {
-        console.log('Received mcp:client_error event:', event);
-        const data = event.data as any;
-        if (data && data.server_name) {
-          // Set error for the specific server
-          setToggleError(data.server_name, `${data.action} failed: ${data.error}`);
-          // Reload client status to get updated state
-          await loadClientStatus();
-        }
-      },
-    );
+    const unsubscribeClientError = Events.On('mcp:client_error', async event => {
+      const data = event.data as any;
+      if (data && data.server_name) {
+        setToggleError(data.server_name, `${data.action} failed: ${data.error}`);
+        await loadClientStatus();
+      }
+    });
 
     return () => {
       unsubscribe();
