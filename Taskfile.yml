@@ -42,3 +42,10 @@ tasks:
     summary: Checks formatting in frontend via Prettier
     cmds:
       - npm --prefix frontend run format:check
+
+  inspector:
+    summary: Runs the MCP inspector
+    env:
+      DANGEROUSLY_OMIT_AUTH: "true"
+    cmds:
+      - npx -y @modelcontextprotocol/inspector@latest --transport http --server-url http://localhost:8091/mcp
