@@ -1,21 +1,18 @@
 import type { StorybookConfig } from '@storybook/react-vite';
 
 const config: StorybookConfig = {
-  stories: [
-    "../src/**/*.mdx",
-    "../src/**/*.stories.@(js|jsx|mjs|ts|tsx)"
-  ],
+  stories: ['../src/**/*.mdx', '../src/**/*.stories.@(js|jsx|mjs|ts|tsx)'],
   addons: [
-    "@chromatic-com/storybook",
-    "@storybook/addon-docs",
-    "@storybook/addon-themes",
-    "@storybook/addon-vitest"
+    '@chromatic-com/storybook',
+    '@storybook/addon-docs',
+    '@storybook/addon-themes',
+    '@storybook/addon-vitest',
   ],
   framework: {
-    name: "@storybook/react-vite",
-    options: {}
+    name: '@storybook/react-vite',
+    options: {},
   },
-  viteFinal: async (config) => {
+  viteFinal: async config => {
     try {
       const tailwindcss = await import('@tailwindcss/vite');
       config.plugins = config.plugins || [];
@@ -26,14 +23,14 @@ const config: StorybookConfig = {
     return config;
   },
   docs: {
-    defaultName: 'Documentation'
+    defaultName: 'Documentation',
   },
   typescript: {
     reactDocgen: 'react-docgen-typescript',
     reactDocgenTypescriptOptions: {
       shouldExtractLiteralValuesFromEnum: true,
-      propFilter: (prop) => (prop.parent ? !/node_modules/.test(prop.parent.fileName) : true),
+      propFilter: prop => (prop.parent ? !/node_modules/.test(prop.parent.fileName) : true),
     },
-  }
+  },
 };
 export default config;

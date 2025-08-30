@@ -5,6 +5,7 @@ bin
 dist
 coverage
 bindings
+storybook-static
 
 # Parent project build outputs (when run from repo root)
 ../build

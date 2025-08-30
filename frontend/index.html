@@ -8,12 +8,12 @@
     <title>Wails App</title>
     <script>
       // Prevent theme flashing by setting theme before page loads
-      (function() {
-        const savedTheme = localStorage.getItem('theme')
-        const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-        const theme = savedTheme || (systemPrefersDark ? 'dark' : 'light')
-        document.documentElement.classList.add(theme)
-      })()
+      (function () {
+        const savedTheme = localStorage.getItem('theme');
+        const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const theme = savedTheme || (systemPrefersDark ? 'dark' : 'light');
+        document.documentElement.classList.add(theme);
+      })();
     </script>
   </head>
   <body>
