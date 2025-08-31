@@ -284,13 +284,35 @@ export function useMCPService() {
       },
     );
 
+    // Poll client status every 5s to keep UI fresh even if events are missed
+    let cancelled = false;
+    let ticking = false;
+    const tick = async () => {
+      if (ticking) return;
+      ticking = true;
+      try {
+        if (!cancelled) {
+          await loadClientStatus();
+        }
+      } finally {
+        ticking = false;
+      }
+    };
+    const intervalId = setInterval(tick, 5000);
+    // optional immediate tick
+    tick();
+
     return () => {
       unsubscribe();
       unsubscribeSettings();
       unsubscribeClientStatus();
       unsubscribeClientError();
+      cancelled = true;
+      clearInterval(intervalId);
     };
   }, []);
+
+  // Note: We piggyback polling into the main effect to avoid extra hooks in some storybook contexts
 
   return {
     servers,

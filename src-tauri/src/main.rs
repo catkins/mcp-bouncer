@@ -2,12 +2,10 @@
 
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager};
-use axum::{extract::State, http::{HeaderMap, StatusCode, Response}, body::Body as AxumBody};
-use bytes::Bytes;
 use futures::future::join_all;
 use rmcp::{Service as McpService, RoleServer, ServiceExt};
 use rmcp::service::RoleClient;
-use rmcp::transport::{StreamableHttpClientTransport, TokioChildProcess, ConfigureCommandExt};
+use rmcp::transport::{StreamableHttpClientTransport, TokioChildProcess};
 use rmcp::model as mcp;
 use rmcp::transport::streamable_http_server::{
     session::local::LocalSessionManager,
@@ -15,7 +13,6 @@ use rmcp::transport::streamable_http_server::{
     StreamableHttpService,
 };
 use std::{collections::HashMap, fs, path::PathBuf, sync::{Arc, OnceLock}};
-use tokio::io::{AsyncWriteExt, AsyncBufReadExt};
 
 // ---------- Shared types (mirror of previous Wails bindings) ----------
 
@@ -142,14 +139,10 @@ fn save_clients_state(state: &ClientsState) -> Result<(), String> {
 
 // ---------- Streamable HTTP MCP proxy (basic) ----------
 
-#[derive(Clone)]
-struct ProxyState {
-    app: tauri::AppHandle,
-}
-
 static PROXY_STARTED: OnceLock<()> = OnceLock::new();
-static STDIO_REGISTRY: OnceLock<tokio::sync::Mutex<HashMap<String, Arc<StdioClient>>>> = OnceLock::new();
-static CLIENT_REGISTRY: OnceLock<tokio::sync::Mutex<HashMap<String, Arc<rmcp::service::RunningService<RoleClient, ()>>>>> = OnceLock::new();
+type ClientService = rmcp::service::RunningService<RoleClient, ()>;
+type ClientRegistry = tokio::sync::Mutex<HashMap<String, Arc<ClientService>>>;
+static CLIENT_REGISTRY: OnceLock<ClientRegistry> = OnceLock::new();
 
 fn spawn_mcp_proxy(app: &tauri::AppHandle) {
     if PROXY_STARTED.set(()).is_err() {
@@ -161,7 +154,7 @@ fn spawn_mcp_proxy(app: &tauri::AppHandle) {
         // RMCP Streamable HTTP service bound at /mcp
         let service: StreamableHttpService<BouncerService, LocalSessionManager> =
             StreamableHttpService::new(
-                move || Ok(BouncerService { app: app_handle.clone() }),
+                move || Ok(BouncerService { _app: app_handle.clone() }),
                 Default::default(),
                 StreamableHttpServerConfig { stateful_mode: true, sse_keep_alive: Some(std::time::Duration::from_secs(15)) },
             );
@@ -175,85 +168,7 @@ fn spawn_mcp_proxy(app: &tauri::AppHandle) {
 }
 
 // ---------- STDIO client management ----------
-
-struct StdioClient {
-    writer: tokio::sync::Mutex<tokio::process::ChildStdin>,
-    reader: tokio::sync::Mutex<tokio::io::BufReader<tokio::process::ChildStdout>>,
-}
-
-async fn ensure_stdio_client(name: &str, cfg: &MCPServerConfig) -> Result<Arc<StdioClient>, String> {
-    let reg = STDIO_REGISTRY.get_or_init(|| tokio::sync::Mutex::new(HashMap::new()));
-    let mut guard = reg.lock().await;
-    if let Some(c) = guard.get(name) {
-        return Ok(c.clone());
-    }
-    let cmd = cfg.command.clone();
-    if cmd.is_empty() { return Err("missing command".into()); }
-    let mut command = tokio::process::Command::new(cmd);
-    if let Some(args) = &cfg.args { command.args(args); }
-    if let Some(envmap) = &cfg.env { command.envs(envmap.clone()); }
-    command.stdin(std::process::Stdio::piped()).stdout(std::process::Stdio::piped());
-    let mut child = command.spawn().map_err(|e| format!("spawn: {e}"))?;
-    let stdin = child.stdin.take().ok_or("no child stdin")?;
-    let stdout = child.stdout.take().ok_or("no child stdout")?;
-    let client = Arc::new(StdioClient {
-        writer: tokio::sync::Mutex::new(stdin),
-        reader: tokio::sync::Mutex::new(tokio::io::BufReader::new(stdout)),
-    });
-    guard.insert(name.to_string(), client.clone());
-    Ok(client)
-}
-
-async fn stdio_rpc(name: &str, method: &str, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    let cfg = get_server_by_name(name).ok_or_else(|| "server not found".to_string())?;
-    let Some(TransportType::TransportStdio) = cfg.transport else { return Err("not stdio".into()); };
-    let client = ensure_stdio_client(name, &cfg).await?;
-    // Write one JSON-RPC line and read one line back
-    let req = serde_json::json!({"jsonrpc":"2.0","id":"1","method":method,"params":params});
-    let mut writer = client.writer.lock().await;
-    let line = serde_json::to_string(&req).map_err(|e| format!("json: {e}"))? + "\n";
-    writer.write_all(line.as_bytes()).await.map_err(|e| format!("write: {e}"))?;
-    writer.flush().await.map_err(|e| format!("flush: {e}"))?;
-    drop(writer);
-
-    let mut reader = client.reader.lock().await;
-    let mut buf = String::new();
-    let n = reader.read_line(&mut buf).await.map_err(|e| format!("read: {e}"))?;
-    if n == 0 { return Err("stdio client closed".into()); }
-    let v: serde_json::Value = serde_json::from_str(&buf).map_err(|e| format!("parse: {e}; buf={buf}"))?;
-    Ok(v)
-}
-
-#[derive(Clone)]
-struct Upstream {
-    url: String,
-    headers: HashMap<String, String>,
-}
-
-fn select_upstream_by_name(name: &str) -> Option<Upstream> {
-    let s = load_settings();
-    s.mcp_servers
-        .into_iter()
-        .find(|c| c.name == name && c.enabled)
-        .and_then(|c| match c.transport {
-            Some(TransportType::TransportStreamableHTTP) => Some(Upstream {
-                url: c.endpoint.unwrap_or_default(),
-                headers: c.headers.unwrap_or_default(),
-            }),
-            _ => None,
-        })
-}
-
-fn select_default_upstream() -> Option<Upstream> {
-    let s = load_settings();
-    s.mcp_servers
-        .into_iter()
-        .find(|c| c.enabled && matches!(c.transport, Some(TransportType::TransportStreamableHTTP)))
-        .map(|c| Upstream {
-            url: c.endpoint.unwrap_or_default(),
-            headers: c.headers.unwrap_or_default(),
-        })
-}
+// No custom STDIO JSON-RPC client; STDIO is handled by rmcp via TokioChildProcess.
 
 fn get_server_by_name(name: &str) -> Option<MCPServerConfig> {
     load_settings().mcp_servers.into_iter().find(|c| c.name == name)
@@ -263,16 +178,15 @@ fn get_server_by_name(name: &str) -> Option<MCPServerConfig> {
 
 #[derive(Clone)]
 struct BouncerService {
-    app: tauri::AppHandle,
+    _app: tauri::AppHandle,
 }
 
 impl McpService<RoleServer> for BouncerService {
-    fn handle_request(
+    async fn handle_request(
         &self,
         request: mcp::ClientRequest,
         _context: rmcp::service::RequestContext<RoleServer>,
-    ) -> impl std::future::Future<Output = Result<mcp::ServerResult, mcp::ErrorData>> + Send + '_ {
-        async move {
+    ) -> Result<mcp::ServerResult, mcp::ErrorData> {
             match request {
                 mcp::ClientRequest::InitializeRequest(_req) => {
                     let capabilities = mcp::ServerCapabilities::builder()
@@ -358,16 +272,13 @@ impl McpService<RoleServer> for BouncerService {
                     Ok(mcp::ServerResult::empty(()))
                 }
             }
-        }
     }
 
-    fn handle_notification(
+    async fn handle_notification(
         &self,
         _notification: mcp::ClientNotification,
         _context: rmcp::service::NotificationContext<RoleServer>,
-    ) -> impl std::future::Future<Output = Result<(), mcp::ErrorData>> + Send + '_ {
-        async move { Ok(()) }
-    }
+    ) -> Result<(), mcp::ErrorData> { Ok(()) }
 
     fn get_info(&self) -> mcp::ServerInfo {
         mcp::ServerInfo {
@@ -436,7 +347,7 @@ async fn mcp_get_client_status() -> Result<HashMap<String, ClientStatus>, String
             tasks.push(async move {
                 let cfg_opt = get_server_by_name(&name);
                 if let Some(cfg) = cfg_opt {
-                    if let Some(tools) = fetch_tools_for_cfg(&cfg).await.ok() {
+                    if let Ok(tools) = fetch_tools_for_cfg(&cfg).await {
                         return Some((name, tools.len() as u32));
                     }
                 }
@@ -449,6 +360,15 @@ async fn mcp_get_client_status() -> Result<HashMap<String, ClientStatus>, String
     for r in results.into_iter().flatten() {
         if let Some(cs) = map.get_mut(&r.0) {
             cs.tools = r.1;
+        }
+    }
+    // mark connected if client is running in registry
+    if let Some(reg) = CLIENT_REGISTRY.get() {
+        let guard = reg.lock().await;
+        for name in guard.keys() {
+            if let Some(cs) = map.get_mut(name) {
+                cs.connected = true;
+            }
         }
     }
     // overlay from persisted clients_state
@@ -517,9 +437,27 @@ async fn mcp_update_server(app: tauri::AppHandle, name: String, config: MCPServe
             }
         }
 
+        let enabling = config.enabled;
+        let server_name = item.name.clone();
         *item = config;
+        let _ = item;
         save_settings(&s)?;
+        // notify UI that servers changed first
         let _ = app.emit("mcp:servers_updated", &serde_json::json!({"reason":"update"}));
+        // try to connect if enabling
+        if enabling {
+            if let Some(cfg) = get_server_by_name(&server_name) {
+            match ensure_rmcp_client(&server_name, &cfg).await {
+                Ok(_) => {
+                    update_client_overlay_connected(&server_name, true)?;
+                    let _ = app.emit("mcp:client_status_changed", &serde_json::json!({"server_name": server_name, "action":"enable"}));
+                }
+                Err(e) => {
+                    set_client_overlay_error(&server_name, &e)?;
+                    let _ = app.emit("mcp:client_error", &serde_json::json!({"server_name": server_name, "action":"enable", "error": e}));
+                }
+            }}
+        }
         let _ = app.emit("mcp:incoming_clients_updated", &serde_json::json!({"reason":"servers_changed"}));
         Ok(())
     } else {
@@ -536,6 +474,7 @@ async fn mcp_remove_server(app: tauri::AppHandle, name: String) -> Result<(), St
         return Err("server not found".into());
     }
     save_settings(&s)?;
+    let _ = remove_rmcp_client(&name).await;
     let _ = app.emit("mcp:servers_updated", &serde_json::json!({"reason":"remove"}));
     let _ = app.emit("mcp:incoming_clients_updated", &serde_json::json!({"reason":"servers_changed"}));
     Ok(())
@@ -545,8 +484,30 @@ async fn mcp_remove_server(app: tauri::AppHandle, name: String) -> Result<(), St
 async fn mcp_toggle_server_enabled(app: tauri::AppHandle, name: String, enabled: bool) -> Result<(), String> {
     let mut s = load_settings();
     if let Some(item) = s.mcp_servers.iter_mut().find(|c| c.name == name) {
+        let server_name = item.name.clone();
         item.enabled = enabled;
+        let _ = item;
         save_settings(&s)?;
+        // notify UI that servers changed first
+        let _ = app.emit("mcp:servers_updated", &serde_json::json!({"reason":"toggle", "enabled": enabled}));
+        if enabled {
+            if let Some(cfg) = get_server_by_name(&server_name) {
+                match ensure_rmcp_client(&server_name, &cfg).await {
+                    Ok(_) => {
+                        update_client_overlay_connected(&server_name, true)?;
+                        let _ = app.emit("mcp:client_status_changed", &serde_json::json!({"server_name": server_name, "action":"enable"}));
+                    }
+                    Err(e) => {
+                        set_client_overlay_error(&server_name, &e)?;
+                        let _ = app.emit("mcp:client_error", &serde_json::json!({"server_name": server_name, "action":"enable", "error": e}));
+                    }
+                }
+            }
+        } else {
+            let _ = remove_rmcp_client(&server_name).await;
+            update_client_overlay_connected(&server_name, false)?;
+            let _ = app.emit("mcp:client_status_changed", &serde_json::json!({"server_name": server_name, "action":"disable"}));
+        }
         let _ = app.emit("mcp:servers_updated", &serde_json::json!({"reason":"toggle"}));
         let _ = app.emit("mcp:incoming_clients_updated", &serde_json::json!({"reason":"servers_changed"}));
         Ok(())
@@ -578,12 +539,11 @@ async fn mcp_restart_client(app: tauri::AppHandle, name: String) -> Result<(), S
         _ => {}
     }
 
-    // Simulate a restart: set connected=true and clear last_error
-    let mut state = load_clients_state();
-    let entry = state.0.entry(name.clone()).or_default();
-    entry.connected = Some(true);
-    entry.last_error = None;
-    save_clients_state(&state)?;
+    // Ensure client exists; mark connected
+    if let Some(cfg) = get_server_by_name(&name) {
+        let _ = ensure_rmcp_client(&name, &cfg).await;
+    }
+    update_client_overlay_connected(&name, true)?;
     let _ = app.emit(
         "mcp:client_status_changed",
         &serde_json::json!({"server_name": name, "action":"restart"}),
@@ -661,58 +621,32 @@ async fn ensure_rmcp_client(name: &str, cfg: &MCPServerConfig) -> Result<Arc<rmc
     Ok(arc)
 }
 
-#[tauri::command]
-async fn mcp_rpc(name: String, method: String, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    let Some(cfg) = get_server_by_name(&name) else { return Err("server not found".into()); };
-    match cfg.transport {
-        Some(TransportType::TransportStreamableHTTP) => {
-            let endpoint = cfg.endpoint.unwrap_or_default();
-            if endpoint.is_empty() { return Err("no endpoint".into()); }
-            let headers = cfg.headers.unwrap_or_default();
-            let client = reqwest::Client::new();
-            let mut rb = client.post(endpoint);
-            for (k, v) in headers.iter() { rb = rb.header(k, v); }
-            let body = serde_json::json!({"jsonrpc":"2.0","id":"1","method":method,"params":params});
-            let res = rb.json(&body).send().await.map_err(|e| format!("request: {e}"))?;
-            let status = res.status();
-            let json: serde_json::Value = res.json().await.map_err(|e| format!("parse: {e}"))?;
-            if !status.is_success() { return Err(format!("upstream {}: {:?}", status, json)); }
-            Ok(json)
-        }
-        Some(TransportType::TransportStdio) => {
-            stdio_rpc(&name, &method, params).await
-        }
-        _ => Err("unsupported transport for rpc".into()),
-    }
+fn update_client_overlay_connected(name: &str, connected: bool) -> Result<(), String> {
+    let mut state = load_clients_state();
+    let entry = state.0.entry(name.to_string()).or_default();
+    entry.connected = Some(connected);
+    if connected { entry.last_error = None; }
+    save_clients_state(&state)
 }
 
-#[tauri::command]
-async fn mcp_proxy_request(name: Option<String>, payload: serde_json::Value) -> Result<serde_json::Value, String> {
-    let cfg = if let Some(n) = name { get_server_by_name(&n) } else { select_default_upstream().and_then(|up| load_settings().mcp_servers.into_iter().find(|c| c.endpoint.as_deref() == Some(&up.url))) };
-    let Some(cfg) = cfg else { return Err("server not found".into()); };
-    match cfg.transport {
-        Some(TransportType::TransportStreamableHTTP) => {
-            let endpoint = cfg.endpoint.unwrap_or_default();
-            if endpoint.is_empty() { return Err("no endpoint".into()); }
-            let headers = cfg.headers.unwrap_or_default();
-            let client = reqwest::Client::new();
-            let mut rb = client.post(endpoint);
-            for (k, v) in headers.iter() { rb = rb.header(k, v); }
-            let res = rb.json(&payload).send().await.map_err(|e| format!("request: {e}"))?;
-            let status = res.status();
-            let json: serde_json::Value = res.json().await.map_err(|e| format!("parse: {e}"))?;
-            if !status.is_success() { return Err(format!("upstream {}: {:?}", status, json)); }
-            Ok(json)
-        }
-        Some(TransportType::TransportStdio) => {
-            // Expect payload as a full JSON-RPC object with method/params
-            let method = payload.get("method").and_then(|v| v.as_str()).ok_or("missing method")?.to_string();
-            let params = payload.get("params").cloned().unwrap_or(serde_json::json!({}));
-            stdio_rpc(&cfg.name, &method, params).await
-        }
-        _ => Err("unsupported transport for rpc".into()),
-    }
+fn set_client_overlay_error(name: &str, err: &str) -> Result<(), String> {
+    let mut state = load_clients_state();
+    let entry = state.0.entry(name.to_string()).or_default();
+    entry.last_error = Some(err.to_string());
+    save_clients_state(&state)
 }
+
+async fn remove_rmcp_client(name: &str) -> Result<(), String> {
+    if let Some(reg) = CLIENT_REGISTRY.get() {
+        let mut guard = reg.lock().await;
+        if let Some(service) = guard.remove(name) {
+            service.cancellation_token().cancel();
+        }
+    }
+    Ok(())
+}
+
+// No legacy mcp_rpc/mcp_proxy_request commands; HTTP path handled by rmcp client where needed.
 
 #[tauri::command]
 async fn mcp_toggle_tool(client_name: String, tool_name: String, enabled: bool) -> Result<(), String> {
@@ -762,7 +696,7 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             // start the proxy server (idempotent)
-            spawn_mcp_proxy(&app.app_handle());
+            spawn_mcp_proxy(app.app_handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -779,8 +713,6 @@ fn main() {
             mcp_authorize_client,
             mcp_get_client_tools,
             mcp_toggle_tool,
-            mcp_rpc,
-            mcp_proxy_request,
             settings_get_settings,
             settings_open_config_directory,
             settings_update_settings
