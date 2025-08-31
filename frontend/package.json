@@ -18,7 +18,6 @@
     "@tauri-apps/api": "^2.0.0",
     "@heroicons/react": "^2.2.0",
     "@tailwindcss/vite": "^4.1.11",
-    "@wailsio/runtime": "^3.0.0-alpha.66",
     "date-fns": "^4.1.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
