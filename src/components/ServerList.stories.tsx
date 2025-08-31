@@ -234,24 +234,24 @@ export const MixedTransports: Story = {
   args: {
     servers: [
       ...mockServers,
-      new MCPServerConfig({
+      {
         name: 'sse-server',
         description: 'SSE server for real-time updates',
         transport: TransportType.TransportSSE,
         endpoint: 'https://mcp.example.com/sse',
         enabled: true,
         command: '',
-      }),
+      },
     ],
     clientStatus: {
       ...mockClientStatus,
-      'sse-server': new ClientStatus({
+      'sse-server': {
         name: 'sse-server',
         connected: true,
         tools: 5,
         authorization_required: false,
         oauth_authenticated: true,
-      }),
+      },
     },
   },
 };
@@ -260,20 +260,20 @@ export const AuthenticationRequired: Story = {
   args: {
     servers: mockServers,
     clientStatus: {
-      fetch: new ClientStatus({
+      fetch: {
         name: 'fetch',
         connected: false,
         tools: 0,
         authorization_required: true,
         oauth_authenticated: false,
-      }),
-      buildkite: new ClientStatus({
+      },
+      buildkite: {
         name: 'buildkite',
         connected: true,
         tools: 27,
         authorization_required: false,
         oauth_authenticated: true,
-      }),
+      },
       'disabled-server': mockClientStatus['disabled-server'],
     },
   },
@@ -283,7 +283,7 @@ export const LargeList: Story = {
   args: {
     servers: [
       ...mockServers,
-      new MCPServerConfig({
+      {
         name: 'server-4',
         description: 'Another server',
         command: 'node',
@@ -291,16 +291,16 @@ export const LargeList: Story = {
         transport: TransportType.TransportStdio,
         enabled: true,
         env: {},
-      }),
-      new MCPServerConfig({
+      },
+      {
         name: 'server-5',
         description: 'Yet another server',
         transport: TransportType.TransportSSE,
         endpoint: 'https://api.example.com/sse',
         enabled: false,
         command: '',
-      }),
-      new MCPServerConfig({
+      },
+      {
         name: 'server-6',
         description: 'HTTP server with auth',
         transport: TransportType.TransportStreamableHTTP,
@@ -308,31 +308,31 @@ export const LargeList: Story = {
         enabled: true,
         command: '',
         requires_auth: true,
-      }),
+      },
     ],
     clientStatus: {
       ...mockClientStatus,
-      'server-4': new ClientStatus({
+      'server-4': {
         name: 'server-4',
         connected: true,
         tools: 3,
         authorization_required: false,
         oauth_authenticated: false,
-      }),
-      'server-5': new ClientStatus({
+      },
+      'server-5': {
         name: 'server-5',
         connected: false,
         tools: 0,
         authorization_required: false,
         oauth_authenticated: false,
-      }),
-      'server-6': new ClientStatus({
+      },
+      'server-6': {
         name: 'server-6',
         connected: true,
         tools: 15,
         authorization_required: false,
         oauth_authenticated: true,
-      }),
+      },
     },
   },
 };

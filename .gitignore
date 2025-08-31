@@ -1,9 +1,6 @@
-.task
 bin
-frontend/dist
-frontend/node_modules
-build/linux/appimage/build
-build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
+dist
+node_modules
 *storybook.log
 storybook-static
 
@@ -11,3 +8,15 @@ storybook-static
 .env
 
 /.plans/
+
+# Rust target dir
+src-tauri/target/
+
+# Tauri build artifacts
+src-tauri/src-tauri/target/
+src-tauri/.cargo/
+src-tauri/.tauri/
+src-tauri/gen/
+
+# OS
+.DS_Store
