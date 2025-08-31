@@ -1,18 +1,20 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
-
-use serde::{Deserialize, Serialize};
-use tauri::{Emitter, Manager};
 use futures::future::join_all;
-use rmcp::{Service as McpService, RoleServer, ServiceExt};
-use rmcp::service::RoleClient;
-use rmcp::transport::{StreamableHttpClientTransport, TokioChildProcess};
 use rmcp::model as mcp;
+use rmcp::service::RoleClient;
 use rmcp::transport::streamable_http_server::{
-    session::local::LocalSessionManager,
-    StreamableHttpServerConfig,
-    StreamableHttpService,
+    StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
 };
-use std::{collections::HashMap, fs, path::PathBuf, sync::{Arc, OnceLock}};
+use rmcp::transport::{StreamableHttpClientTransport, TokioChildProcess};
+use rmcp::{RoleServer, Service as McpService, ServiceExt};
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::HashMap,
+    fs,
+    path::PathBuf,
+    sync::{Arc, OnceLock},
+};
+use tauri::{Emitter, Manager};
 
 // ---------- Shared types (mirror of previous Wails bindings) ----------
 
@@ -154,13 +156,22 @@ fn spawn_mcp_proxy(app: &tauri::AppHandle) {
         // RMCP Streamable HTTP service bound at /mcp
         let service: StreamableHttpService<BouncerService, LocalSessionManager> =
             StreamableHttpService::new(
-                move || Ok(BouncerService { _app: app_handle.clone() }),
+                move || {
+                    Ok(BouncerService {
+                        _app: app_handle.clone(),
+                    })
+                },
                 Default::default(),
-                StreamableHttpServerConfig { stateful_mode: true, sse_keep_alive: Some(std::time::Duration::from_secs(15)) },
+                StreamableHttpServerConfig {
+                    stateful_mode: true,
+                    sse_keep_alive: Some(std::time::Duration::from_secs(15)),
+                },
             );
         let router = Router::new().nest_service("/mcp", service);
         let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 8091));
-        let listener = tokio::net::TcpListener::bind(addr).await.expect("bind 8091");
+        let listener = tokio::net::TcpListener::bind(addr)
+            .await
+            .expect("bind 8091");
         if let Err(e) = axum::serve(listener, router).await {
             eprintln!("MCP server error: {e}");
         }
@@ -171,7 +182,10 @@ fn spawn_mcp_proxy(app: &tauri::AppHandle) {
 // No custom STDIO JSON-RPC client; STDIO is handled by rmcp via TokioChildProcess.
 
 fn get_server_by_name(name: &str) -> Option<MCPServerConfig> {
-    load_settings().mcp_servers.into_iter().find(|c| c.name == name)
+    load_settings()
+        .mcp_servers
+        .into_iter()
+        .find(|c| c.name == name)
 }
 
 // ---------------- RMCP Service Implementation ----------------
@@ -187,104 +201,122 @@ impl McpService<RoleServer> for BouncerService {
         request: mcp::ClientRequest,
         _context: rmcp::service::RequestContext<RoleServer>,
     ) -> Result<mcp::ServerResult, mcp::ErrorData> {
-            match request {
-                mcp::ClientRequest::InitializeRequest(_req) => {
-                    let capabilities = mcp::ServerCapabilities::builder()
-                        .enable_logging()
-                        .enable_tools()
-                        .enable_tool_list_changed()
-                        .build();
-                    let result = mcp::InitializeResult {
-                        protocol_version: mcp::ProtocolVersion::V_2025_03_26,
-                        capabilities,
-                        server_info: mcp::Implementation { name: "MCP Bouncer".into(), version: env!("CARGO_PKG_VERSION").into() },
-                        instructions: None,
-                    };
-                    Ok(mcp::ServerResult::InitializeResult(result))
-                }
-                mcp::ClientRequest::ListToolsRequest(_req) => {
-                    let s = load_settings();
-                    let mut tools: Vec<mcp::Tool> = Vec::new();
-                    for cfg in s.mcp_servers.into_iter().filter(|c| c.enabled) {
-                        if let Ok(list) = fetch_tools_for_cfg(&cfg).await {
-                            for item in list {
-                                if let Some(t) = to_mcp_tool(&cfg.name, &item) {
-                                    tools.push(t);
-                                }
+        match request {
+            mcp::ClientRequest::InitializeRequest(_req) => {
+                let capabilities = mcp::ServerCapabilities::builder()
+                    .enable_logging()
+                    .enable_tools()
+                    .enable_tool_list_changed()
+                    .build();
+                let result = mcp::InitializeResult {
+                    protocol_version: mcp::ProtocolVersion::V_2025_03_26,
+                    capabilities,
+                    server_info: mcp::Implementation {
+                        name: "MCP Bouncer".into(),
+                        version: env!("CARGO_PKG_VERSION").into(),
+                    },
+                    instructions: None,
+                };
+                Ok(mcp::ServerResult::InitializeResult(result))
+            }
+            mcp::ClientRequest::ListToolsRequest(_req) => {
+                let s = load_settings();
+                let mut tools: Vec<mcp::Tool> = Vec::new();
+                for cfg in s.mcp_servers.into_iter().filter(|c| c.enabled) {
+                    if let Ok(list) = fetch_tools_for_cfg(&cfg).await {
+                        for item in list {
+                            if let Some(t) = to_mcp_tool(&cfg.name, &item) {
+                                tools.push(t);
                             }
                         }
                     }
-                    Ok(mcp::ServerResult::ListToolsResult(mcp::ListToolsResult { tools, next_cursor: None }))
                 }
-                mcp::ClientRequest::CallToolRequest(req) => {
-                    // Expect tool name like "server::tool"
-                    let name = req.params.name.to_string();
-                    let (server_name, tool_name) = name
-                        .split_once("::")
-                        .map(|(a, b)| (a.to_string(), b.to_string()))
-                        .unwrap_or((String::new(), name.clone()));
-                    let args_obj = req
-                        .params
-                        .arguments
-                        .clone()
-                        .map(serde_json::Value::Object)
-                        .and_then(|v| v.as_object().cloned());
-                    let cfg_opt = if !server_name.is_empty() {
-                        get_server_by_name(&server_name)
-                    } else {
-                        // default to first enabled HTTP/stdio server
-                        load_settings()
-                            .mcp_servers
-                            .into_iter()
-                            .find(|c| c.enabled)
-                    };
-                    if let Some(cfg) = cfg_opt {
-                        match ensure_rmcp_client(&cfg.name, &cfg).await {
-                            Ok(client) => {
-                                match client
-                                    .call_tool(mcp::CallToolRequestParam {
-                                        name: tool_name.into(),
-                                        arguments: args_obj,
-                                    })
-                                    .await
-                                {
-                                    Ok(res) => Ok(mcp::ServerResult::CallToolResult(res)),
-                                    Err(e) => Ok(mcp::ServerResult::CallToolResult(mcp::CallToolResult { content: vec![mcp::Content::text(format!("error: {e}"))], structured_content: None, is_error: Some(true) })),
+                Ok(mcp::ServerResult::ListToolsResult(mcp::ListToolsResult {
+                    tools,
+                    next_cursor: None,
+                }))
+            }
+            mcp::ClientRequest::CallToolRequest(req) => {
+                // Expect tool name like "server::tool"
+                let name = req.params.name.to_string();
+                let (server_name, tool_name) = name
+                    .split_once("::")
+                    .map(|(a, b)| (a.to_string(), b.to_string()))
+                    .unwrap_or((String::new(), name.clone()));
+                let args_obj = req
+                    .params
+                    .arguments
+                    .clone()
+                    .map(serde_json::Value::Object)
+                    .and_then(|v| v.as_object().cloned());
+                let cfg_opt = if !server_name.is_empty() {
+                    get_server_by_name(&server_name)
+                } else {
+                    // default to first enabled HTTP/stdio server
+                    load_settings().mcp_servers.into_iter().find(|c| c.enabled)
+                };
+                if let Some(cfg) = cfg_opt {
+                    match ensure_rmcp_client(&cfg.name, &cfg).await {
+                        Ok(client) => {
+                            match client
+                                .call_tool(mcp::CallToolRequestParam {
+                                    name: tool_name.into(),
+                                    arguments: args_obj,
+                                })
+                                .await
+                            {
+                                Ok(res) => Ok(mcp::ServerResult::CallToolResult(res)),
+                                Err(e) => {
+                                    Ok(mcp::ServerResult::CallToolResult(mcp::CallToolResult {
+                                        content: vec![mcp::Content::text(format!("error: {e}"))],
+                                        structured_content: None,
+                                        is_error: Some(true),
+                                    }))
                                 }
                             }
-                            Err(e) => Ok(mcp::ServerResult::CallToolResult(mcp::CallToolResult {
-                                content: vec![mcp::Content::text(format!("error: {e}"))],
-                                structured_content: None,
-                                is_error: Some(true),
-                            })),
                         }
-                    } else {
-                        Ok(mcp::ServerResult::CallToolResult(mcp::CallToolResult {
-                            content: vec![mcp::Content::text("no server".to_string())],
+                        Err(e) => Ok(mcp::ServerResult::CallToolResult(mcp::CallToolResult {
+                            content: vec![mcp::Content::text(format!("error: {e}"))],
                             structured_content: None,
                             is_error: Some(true),
-                        }))
+                        })),
                     }
-                }
-                other => {
-                    // For unhandled requests, return empty
-                    let _ = other; // silence
-                    Ok(mcp::ServerResult::empty(()))
+                } else {
+                    Ok(mcp::ServerResult::CallToolResult(mcp::CallToolResult {
+                        content: vec![mcp::Content::text("no server".to_string())],
+                        structured_content: None,
+                        is_error: Some(true),
+                    }))
                 }
             }
+            other => {
+                // For unhandled requests, return empty
+                let _ = other; // silence
+                Ok(mcp::ServerResult::empty(()))
+            }
+        }
     }
 
     async fn handle_notification(
         &self,
         _notification: mcp::ClientNotification,
         _context: rmcp::service::NotificationContext<RoleServer>,
-    ) -> Result<(), mcp::ErrorData> { Ok(()) }
+    ) -> Result<(), mcp::ErrorData> {
+        Ok(())
+    }
 
     fn get_info(&self) -> mcp::ServerInfo {
         mcp::ServerInfo {
             protocol_version: mcp::ProtocolVersion::V_2025_03_26,
-            capabilities: mcp::ServerCapabilities::builder().enable_logging().enable_tools().enable_tool_list_changed().build(),
-            server_info: mcp::Implementation { name: "MCP Bouncer".into(), version: env!("CARGO_PKG_VERSION").into() },
+            capabilities: mcp::ServerCapabilities::builder()
+                .enable_logging()
+                .enable_tools()
+                .enable_tool_list_changed()
+                .build(),
+            server_info: mcp::Implementation {
+                name: "MCP Bouncer".into(),
+                version: env!("CARGO_PKG_VERSION").into(),
+            },
             instructions: None,
         }
     }
@@ -292,7 +324,10 @@ impl McpService<RoleServer> for BouncerService {
 
 fn to_mcp_tool(server: &str, v: &serde_json::Value) -> Option<mcp::Tool> {
     let name = v.get("name")?.as_str()?.to_string();
-    let description = v.get("description").and_then(|d| d.as_str()).map(|s| s.to_string());
+    let description = v
+        .get("description")
+        .and_then(|d| d.as_str())
+        .map(|s| s.to_string());
     // input schema: try inputSchema or input_schema object
     let schema_obj = v
         .get("inputSchema")
@@ -303,7 +338,11 @@ fn to_mcp_tool(server: &str, v: &serde_json::Value) -> Option<mcp::Tool> {
     fullname.push_str(server);
     fullname.push_str("::");
     fullname.push_str(&name);
-    Some(mcp::Tool::new(fullname, description.unwrap_or_default(), schema_obj))
+    Some(mcp::Tool::new(
+        fullname,
+        description.unwrap_or_default(),
+        schema_obj,
+    ))
 }
 
 #[tauri::command]
@@ -375,10 +414,18 @@ async fn mcp_get_client_status() -> Result<HashMap<String, ClientStatus>, String
     let overlay = load_clients_state();
     for (name, state) in overlay.0.into_iter() {
         if let Some(cs) = map.get_mut(&name) {
-            if let Some(v) = state.connected { cs.connected = v; }
-            if state.last_error.is_some() { cs.last_error = state.last_error; }
-            if let Some(v) = state.authorization_required { cs.authorization_required = v; }
-            if let Some(v) = state.oauth_authenticated { cs.oauth_authenticated = v; }
+            if let Some(v) = state.connected {
+                cs.connected = v;
+            }
+            if state.last_error.is_some() {
+                cs.last_error = state.last_error;
+            }
+            if let Some(v) = state.authorization_required {
+                cs.authorization_required = v;
+            }
+            if let Some(v) = state.oauth_authenticated {
+                cs.oauth_authenticated = v;
+            }
         }
     }
     Ok(map)
@@ -398,12 +445,19 @@ async fn mcp_add_server(app: tauri::AppHandle, config: MCPServerConfig) -> Resul
     s.mcp_servers.push(config);
     save_settings(&s)?;
     let _ = app.emit("mcp:servers_updated", &serde_json::json!({"reason":"add"}));
-    let _ = app.emit("mcp:incoming_clients_updated", &serde_json::json!({"reason":"servers_changed"}));
+    let _ = app.emit(
+        "mcp:incoming_clients_updated",
+        &serde_json::json!({"reason":"servers_changed"}),
+    );
     Ok(())
 }
 
 #[tauri::command]
-async fn mcp_update_server(app: tauri::AppHandle, name: String, config: MCPServerConfig) -> Result<(), String> {
+async fn mcp_update_server(
+    app: tauri::AppHandle,
+    name: String,
+    config: MCPServerConfig,
+) -> Result<(), String> {
     let mut s = load_settings();
     if let Some(item) = s.mcp_servers.iter_mut().find(|c| c.name == name) {
         // Simulate an auth error when enabling a server that requires auth but is not authorized
@@ -443,22 +497,32 @@ async fn mcp_update_server(app: tauri::AppHandle, name: String, config: MCPServe
         let _ = item;
         save_settings(&s)?;
         // notify UI that servers changed first
-        let _ = app.emit("mcp:servers_updated", &serde_json::json!({"reason":"update"}));
+        let _ = app.emit(
+            "mcp:servers_updated",
+            &serde_json::json!({"reason":"update"}),
+        );
         // try to connect if enabling
         if enabling {
             if let Some(cfg) = get_server_by_name(&server_name) {
-            match ensure_rmcp_client(&server_name, &cfg).await {
-                Ok(_) => {
-                    update_client_overlay_connected(&server_name, true)?;
-                    let _ = app.emit("mcp:client_status_changed", &serde_json::json!({"server_name": server_name, "action":"enable"}));
+                match ensure_rmcp_client(&server_name, &cfg).await {
+                    Ok(_) => {
+                        update_client_overlay_connected(&server_name, true)?;
+                        let _ = app.emit(
+                            "mcp:client_status_changed",
+                            &serde_json::json!({"server_name": server_name, "action":"enable"}),
+                        );
+                    }
+                    Err(e) => {
+                        set_client_overlay_error(&server_name, &e)?;
+                        let _ = app.emit("mcp:client_error", &serde_json::json!({"server_name": server_name, "action":"enable", "error": e}));
+                    }
                 }
-                Err(e) => {
-                    set_client_overlay_error(&server_name, &e)?;
-                    let _ = app.emit("mcp:client_error", &serde_json::json!({"server_name": server_name, "action":"enable", "error": e}));
-                }
-            }}
+            }
         }
-        let _ = app.emit("mcp:incoming_clients_updated", &serde_json::json!({"reason":"servers_changed"}));
+        let _ = app.emit(
+            "mcp:incoming_clients_updated",
+            &serde_json::json!({"reason":"servers_changed"}),
+        );
         Ok(())
     } else {
         Err("server not found".into())
@@ -475,13 +539,23 @@ async fn mcp_remove_server(app: tauri::AppHandle, name: String) -> Result<(), St
     }
     save_settings(&s)?;
     let _ = remove_rmcp_client(&name).await;
-    let _ = app.emit("mcp:servers_updated", &serde_json::json!({"reason":"remove"}));
-    let _ = app.emit("mcp:incoming_clients_updated", &serde_json::json!({"reason":"servers_changed"}));
+    let _ = app.emit(
+        "mcp:servers_updated",
+        &serde_json::json!({"reason":"remove"}),
+    );
+    let _ = app.emit(
+        "mcp:incoming_clients_updated",
+        &serde_json::json!({"reason":"servers_changed"}),
+    );
     Ok(())
 }
 
 #[tauri::command]
-async fn mcp_toggle_server_enabled(app: tauri::AppHandle, name: String, enabled: bool) -> Result<(), String> {
+async fn mcp_toggle_server_enabled(
+    app: tauri::AppHandle,
+    name: String,
+    enabled: bool,
+) -> Result<(), String> {
     let mut s = load_settings();
     if let Some(item) = s.mcp_servers.iter_mut().find(|c| c.name == name) {
         let server_name = item.name.clone();
@@ -489,13 +563,19 @@ async fn mcp_toggle_server_enabled(app: tauri::AppHandle, name: String, enabled:
         let _ = item;
         save_settings(&s)?;
         // notify UI that servers changed first
-        let _ = app.emit("mcp:servers_updated", &serde_json::json!({"reason":"toggle", "enabled": enabled}));
+        let _ = app.emit(
+            "mcp:servers_updated",
+            &serde_json::json!({"reason":"toggle", "enabled": enabled}),
+        );
         if enabled {
             if let Some(cfg) = get_server_by_name(&server_name) {
                 match ensure_rmcp_client(&server_name, &cfg).await {
                     Ok(_) => {
                         update_client_overlay_connected(&server_name, true)?;
-                        let _ = app.emit("mcp:client_status_changed", &serde_json::json!({"server_name": server_name, "action":"enable"}));
+                        let _ = app.emit(
+                            "mcp:client_status_changed",
+                            &serde_json::json!({"server_name": server_name, "action":"enable"}),
+                        );
                     }
                     Err(e) => {
                         set_client_overlay_error(&server_name, &e)?;
@@ -506,10 +586,19 @@ async fn mcp_toggle_server_enabled(app: tauri::AppHandle, name: String, enabled:
         } else {
             let _ = remove_rmcp_client(&server_name).await;
             update_client_overlay_connected(&server_name, false)?;
-            let _ = app.emit("mcp:client_status_changed", &serde_json::json!({"server_name": server_name, "action":"disable"}));
+            let _ = app.emit(
+                "mcp:client_status_changed",
+                &serde_json::json!({"server_name": server_name, "action":"disable"}),
+            );
         }
-        let _ = app.emit("mcp:servers_updated", &serde_json::json!({"reason":"toggle"}));
-        let _ = app.emit("mcp:incoming_clients_updated", &serde_json::json!({"reason":"servers_changed"}));
+        let _ = app.emit(
+            "mcp:servers_updated",
+            &serde_json::json!({"reason":"toggle"}),
+        );
+        let _ = app.emit(
+            "mcp:incoming_clients_updated",
+            &serde_json::json!({"reason":"servers_changed"}),
+        );
         Ok(())
     } else {
         Err("server not found".into())
@@ -559,7 +648,10 @@ async fn mcp_authorize_client(app: tauri::AppHandle, name: String) -> Result<(),
     entry.oauth_authenticated = Some(true);
     entry.authorization_required = Some(false);
     save_clients_state(&state)?;
-    let _ = app.emit("mcp:client_status_changed", &serde_json::json!({"server_name": name, "action":"authorize"}));
+    let _ = app.emit(
+        "mcp:client_status_changed",
+        &serde_json::json!({"server_name": name, "action":"authorize"}),
+    );
     Ok(())
 }
 
@@ -593,26 +685,45 @@ async fn fetch_tools_for_cfg(cfg: &MCPServerConfig) -> Result<Vec<serde_json::Va
     Ok(vals)
 }
 
-async fn ensure_rmcp_client(name: &str, cfg: &MCPServerConfig) -> Result<Arc<rmcp::service::RunningService<RoleClient, ()>>, String> {
+async fn ensure_rmcp_client(
+    name: &str,
+    cfg: &MCPServerConfig,
+) -> Result<Arc<rmcp::service::RunningService<RoleClient, ()>>, String> {
     let reg = CLIENT_REGISTRY.get_or_init(|| tokio::sync::Mutex::new(HashMap::new()));
     let mut guard = reg.lock().await;
-    if let Some(c) = guard.get(name) { return Ok(c.clone()); }
+    if let Some(c) = guard.get(name) {
+        return Ok(c.clone());
+    }
     let service = match cfg.transport {
         Some(TransportType::TransportStreamableHTTP) => {
             let endpoint = cfg.endpoint.clone().unwrap_or_default();
-            if endpoint.is_empty() { return Err("no endpoint".into()); }
+            if endpoint.is_empty() {
+                return Err("no endpoint".into());
+            }
             let transport = StreamableHttpClientTransport::from_uri(endpoint);
-            ().serve(transport).await.map_err(|e| format!("rmcp serve: {e}"))?
+            ().serve(transport)
+                .await
+                .map_err(|e| format!("rmcp serve: {e}"))?
         }
         Some(TransportType::TransportStdio) => {
             let cmd = cfg.command.clone();
-            if cmd.is_empty() { return Err("missing command".into()); }
+            if cmd.is_empty() {
+                return Err("missing command".into());
+            }
             let mut command = tokio::process::Command::new(cmd);
             // Configure args/env
-            if let Some(args) = &cfg.args { command.args(args); }
-            if let Some(envmap) = &cfg.env { for (k,v) in envmap { command.env(k, v); } }
+            if let Some(args) = &cfg.args {
+                command.args(args);
+            }
+            if let Some(envmap) = &cfg.env {
+                for (k, v) in envmap {
+                    command.env(k, v);
+                }
+            }
             let transport = TokioChildProcess::new(command).map_err(|e| format!("spawn: {e}"))?;
-            ().serve(transport).await.map_err(|e| format!("rmcp serve: {e}"))?
+            ().serve(transport)
+                .await
+                .map_err(|e| format!("rmcp serve: {e}"))?
         }
         _ => return Err("unsupported transport".into()),
     };
@@ -625,7 +736,9 @@ fn update_client_overlay_connected(name: &str, connected: bool) -> Result<(), St
     let mut state = load_clients_state();
     let entry = state.0.entry(name.to_string()).or_default();
     entry.connected = Some(connected);
-    if connected { entry.last_error = None; }
+    if connected {
+        entry.last_error = None;
+    }
     save_clients_state(&state)
 }
 
@@ -649,7 +762,11 @@ async fn remove_rmcp_client(name: &str) -> Result<(), String> {
 // No legacy mcp_rpc/mcp_proxy_request commands; HTTP path handled by rmcp client where needed.
 
 #[tauri::command]
-async fn mcp_toggle_tool(client_name: String, tool_name: String, enabled: bool) -> Result<(), String> {
+async fn mcp_toggle_tool(
+    client_name: String,
+    tool_name: String,
+    enabled: bool,
+) -> Result<(), String> {
     // Persist simple per-client enabled map in tools_state.json
     #[derive(Serialize, Deserialize, Default)]
     struct ToolsState(HashMap<String, HashMap<String, bool>>);
@@ -659,7 +776,8 @@ async fn mcp_toggle_tool(client_name: String, tool_name: String, enabled: bool) 
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok())
         .unwrap_or_default();
-    state.0
+    state
+        .0
         .entry(client_name)
         .or_default()
         .insert(tool_name, enabled);
@@ -683,7 +801,10 @@ async fn settings_open_config_directory() -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn settings_update_settings(app: tauri::AppHandle, settings: Option<Settings>) -> Result<(), String> {
+async fn settings_update_settings(
+    app: tauri::AppHandle,
+    settings: Option<Settings>,
+) -> Result<(), String> {
     let s = settings.unwrap_or_else(default_settings);
     save_settings(&s)?;
     let _ = app.emit("settings:updated", &serde_json::json!({"reason":"update"}));
