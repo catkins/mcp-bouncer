@@ -6,10 +6,8 @@ import {
   TrashIcon,
   ChevronDownIcon,
 } from '@heroicons/react/24/outline';
-import {
-  TransportType,
-  MCPServerConfig,
-} from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models';
+import { TransportType } from '../tauri/bridge';
+import type { MCPServerConfig } from '../tauri/bridge';
 import { LoadingButton } from './LoadingButton';
 import { ToggleSwitch } from './ToggleSwitch';
 

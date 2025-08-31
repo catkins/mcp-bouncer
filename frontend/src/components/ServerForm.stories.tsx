@@ -1,13 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { ServerForm } from './ServerForm';
-import {
-  MCPServerConfig,
-  TransportType,
-} from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models';
+import type { MCPServerConfig } from '../tauri/bridge';
+import { TransportType } from '../tauri/bridge';
 
 // Mock existing servers for validation testing
-const mockExistingServers = [
-  new MCPServerConfig({
+const mockExistingServers: MCPServerConfig[] = [
+  {
     name: 'existing-server',
     description: 'An existing server',
     command: 'node',
@@ -15,8 +13,8 @@ const mockExistingServers = [
     transport: TransportType.TransportStdio,
     enabled: true,
     env: {},
-  }),
-  new MCPServerConfig({
+  },
+  {
     name: 'another-server',
     description: 'Another existing server',
     command: 'python',
@@ -24,7 +22,7 @@ const mockExistingServers = [
     transport: TransportType.TransportStdio,
     enabled: false,
     env: { DEBUG: 'true' },
-  }),
+  },
 ];
 
 const meta: Meta<typeof ServerForm> = {
@@ -77,7 +75,7 @@ export const AddNewServerWithExisting: Story = {
 
 export const EditStdioServer: Story = {
   args: {
-    server: new MCPServerConfig({
+    server: {
       name: 'fetch',
       description: 'Fetch things from the web',
       command: 'uvx',
@@ -88,14 +86,14 @@ export const EditStdioServer: Story = {
         API_KEY: 'your-api-key',
         DEBUG: 'true',
       },
-    }),
+    },
     existingServers: mockExistingServers,
   },
 };
 
 export const EditHttpServer: Story = {
   args: {
-    server: new MCPServerConfig({
+    server: {
       name: 'buildkite',
       description: 'CI/CD pipeline integration',
       transport: TransportType.TransportStreamableHTTP,
@@ -106,14 +104,14 @@ export const EditHttpServer: Story = {
         Authorization: 'Bearer token123',
         'Content-Type': 'application/json',
       },
-    }),
+    },
     existingServers: mockExistingServers,
   },
 };
 
 export const EditSseServer: Story = {
   args: {
-    server: new MCPServerConfig({
+    server: {
       name: 'Context7',
       description: 'SSE server for real-time updates',
       transport: TransportType.TransportSSE,
@@ -123,14 +121,14 @@ export const EditSseServer: Story = {
       headers: {
         'X-API-Key': 'secret-key',
       },
-    }),
+    },
     existingServers: mockExistingServers,
   },
 };
 
 export const EditServerWithAuth: Story = {
   args: {
-    server: new MCPServerConfig({
+    server: {
       name: 'oauth-server',
       description: 'Server requiring OAuth authentication',
       transport: TransportType.TransportStreamableHTTP,
@@ -141,14 +139,14 @@ export const EditServerWithAuth: Story = {
       headers: {
         'Content-Type': 'application/json',
       },
-    }),
+    },
     existingServers: mockExistingServers,
   },
 };
 
 export const EditComplexStdioServer: Story = {
   args: {
-    server: new MCPServerConfig({
+    server: {
       name: 'complex-server',
       description: 'A complex server with many environment variables and arguments',
       command: 'python',
@@ -162,14 +160,14 @@ export const EditComplexStdioServer: Story = {
         CACHE_TTL: '3600',
         FEATURE_FLAGS: 'feature1,feature2,feature3',
       },
-    }),
+    },
     existingServers: mockExistingServers,
   },
 };
 
 export const EditDisabledServer: Story = {
   args: {
-    server: new MCPServerConfig({
+    server: {
       name: 'disabled-server',
       description: 'A server that is currently disabled',
       command: 'node',
@@ -177,14 +175,14 @@ export const EditDisabledServer: Story = {
       transport: TransportType.TransportStdio,
       enabled: false,
       env: {},
-    }),
+    },
     existingServers: mockExistingServers,
   },
 };
 
 export const LoadingState: Story = {
   args: {
-    server: new MCPServerConfig({
+    server: {
       name: 'test-server',
       description: 'Testing server',
       command: 'echo',
@@ -192,7 +190,7 @@ export const LoadingState: Story = {
       transport: TransportType.TransportStdio,
       enabled: true,
       env: {},
-    }),
+    },
     loading: true,
     existingServers: mockExistingServers,
   },
@@ -200,7 +198,7 @@ export const LoadingState: Story = {
 
 export const MinimalStdioServer: Story = {
   args: {
-    server: new MCPServerConfig({
+    server: {
       name: 'minimal',
       description: '',
       command: 'echo',
@@ -208,13 +206,13 @@ export const MinimalStdioServer: Story = {
       transport: TransportType.TransportStdio,
       enabled: true,
       env: {},
-    }),
+    },
   },
 };
 
 export const MinimalHttpServer: Story = {
   args: {
-    server: new MCPServerConfig({
+    server: {
       name: 'minimal-http',
       description: '',
       transport: TransportType.TransportStreamableHTTP,
@@ -222,7 +220,7 @@ export const MinimalHttpServer: Story = {
       enabled: true,
       command: '',
       headers: {},
-    }),
+    },
   },
 };
 

@@ -1,13 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { ServerCard } from './ServerCard';
-import {
-  MCPServerConfig,
-  TransportType,
-} from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models';
-import { ClientStatus } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/mcp/models';
+import type { MCPServerConfig, ClientStatus } from '../tauri/bridge';
+import { TransportType } from '../tauri/bridge';
 
 // Mock server configs using class constructors
-const mockServerConfig = new MCPServerConfig({
+const mockServerConfig: MCPServerConfig = {
   name: 'fetch',
   description: 'fetch things',
   command: 'uvx',
@@ -18,34 +15,34 @@ const mockServerConfig = new MCPServerConfig({
     API_KEY: 'your-api-key',
     DEBUG: 'true',
   },
-});
+};
 
-const mockConnectedStatus = new ClientStatus({
+const mockConnectedStatus: ClientStatus = {
   name: 'fetch',
   connected: true,
   tools: 11,
   last_error: undefined,
   authorization_required: false,
   oauth_authenticated: false,
-});
+};
 
-const mockDisconnectedStatus = new ClientStatus({
+const mockDisconnectedStatus: ClientStatus = {
   name: 'fetch',
   connected: false,
   tools: 0,
   last_error: 'Connection timeout',
   authorization_required: false,
   oauth_authenticated: false,
-});
+};
 
-const mockAuthRequiredStatus = new ClientStatus({
+const mockAuthRequiredStatus: ClientStatus = {
   name: 'fetch',
   connected: false,
   tools: 0,
   last_error: undefined,
   authorization_required: true,
   oauth_authenticated: false,
-});
+};
 
 const meta: Meta<typeof ServerCard> = {
   title: 'Components/ServerCard',
@@ -122,20 +119,20 @@ export const RestartLoading: Story = {
 
 export const DisabledServer: Story = {
   args: {
-    server: new MCPServerConfig({
+    server: {
       ...mockServerConfig,
       enabled: false,
-    }),
-    clientStatus: new ClientStatus({
+    },
+    clientStatus: {
       ...mockDisconnectedStatus,
       connected: false,
-    }),
+    },
   },
 };
 
 export const HttpServer: Story = {
   args: {
-    server: new MCPServerConfig({
+    server: {
       name: 'buildkite',
       description: 'CI/CD pipeline integration',
       transport: TransportType.TransportStreamableHTTP,
@@ -146,34 +143,34 @@ export const HttpServer: Story = {
         Authorization: 'Bearer token123',
         'Content-Type': 'application/json',
       },
-    }),
-    clientStatus: new ClientStatus({
+    },
+    clientStatus: {
       name: 'buildkite',
       connected: true,
       tools: 27,
       authorization_required: false,
       oauth_authenticated: false,
-    }),
+    },
   },
 };
 
 export const SseServer: Story = {
   args: {
-    server: new MCPServerConfig({
+    server: {
       name: 'Context7',
       description: 'SSE server for real-time updates',
       transport: TransportType.TransportSSE,
       endpoint: 'https://mcp.context7.com/sse',
       enabled: true,
       command: '',
-    }),
-    clientStatus: new ClientStatus({
+    },
+    clientStatus: {
       name: 'Context7',
       connected: true,
       tools: 2,
       authorization_required: false,
       oauth_authenticated: true,
-    }),
+    },
   },
 };
 

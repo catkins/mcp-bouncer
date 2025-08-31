@@ -12,8 +12,7 @@ import {
   KeyIcon,
   ShieldCheckIcon,
 } from '@heroicons/react/24/outline';
-import { MCPServerConfig } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models';
-import { ClientStatus } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/mcp/models';
+import type { MCPServerConfig, ClientStatus } from '../tauri/bridge';
 import { LoadingButton } from './LoadingButton';
 import { ToggleSwitch } from './ToggleSwitch';
 

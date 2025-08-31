@@ -1,14 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { ServerList } from './ServerList';
-import {
-  MCPServerConfig,
-  TransportType,
-} from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models';
-import { ClientStatus } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/mcp/models';
+import type { MCPServerConfig, ClientStatus } from '../tauri/bridge';
+import { TransportType } from '../tauri/bridge';
 
 // Mock server configurations
-const mockServers = [
-  new MCPServerConfig({
+const mockServers: MCPServerConfig[] = [
+  {
     name: 'fetch',
     description: 'Fetch things from the web',
     command: 'uvx',
@@ -18,8 +15,8 @@ const mockServers = [
     env: {
       API_KEY: 'your-api-key',
     },
-  }),
-  new MCPServerConfig({
+  },
+  {
     name: 'buildkite',
     description: 'CI/CD pipeline integration',
     transport: TransportType.TransportStreamableHTTP,
@@ -29,8 +26,8 @@ const mockServers = [
     headers: {
       Authorization: 'Bearer token123',
     },
-  }),
-  new MCPServerConfig({
+  },
+  {
     name: 'disabled-server',
     description: 'A server that is currently disabled',
     command: 'python',
@@ -38,62 +35,62 @@ const mockServers = [
     transport: TransportType.TransportStdio,
     enabled: false,
     env: {},
-  }),
+  },
 ];
 
 // Mock client status
-const mockClientStatus = {
-  fetch: new ClientStatus({
+const mockClientStatus: Record<string, ClientStatus> = {
+  fetch: {
     name: 'fetch',
     connected: true,
     tools: 11,
     last_error: undefined,
     authorization_required: false,
     oauth_authenticated: false,
-  }),
-  buildkite: new ClientStatus({
+  },
+  buildkite: {
     name: 'buildkite',
     connected: true,
     tools: 27,
     last_error: undefined,
     authorization_required: false,
     oauth_authenticated: false,
-  }),
-  'disabled-server': new ClientStatus({
+  },
+  'disabled-server': {
     name: 'disabled-server',
     connected: false,
     tools: 0,
     last_error: undefined,
     authorization_required: false,
     oauth_authenticated: false,
-  }),
+  },
 };
 
-const mockClientStatusWithErrors = {
-  fetch: new ClientStatus({
+const mockClientStatusWithErrors: Record<string, ClientStatus> = {
+  fetch: {
     name: 'fetch',
     connected: false,
     tools: 0,
     last_error: 'Connection timeout',
     authorization_required: false,
     oauth_authenticated: false,
-  }),
-  buildkite: new ClientStatus({
+  },
+  buildkite: {
     name: 'buildkite',
     connected: false,
     tools: 0,
     last_error: 'Authentication failed',
     authorization_required: true,
     oauth_authenticated: false,
-  }),
-  'disabled-server': new ClientStatus({
+  },
+  'disabled-server': {
     name: 'disabled-server',
     connected: false,
     tools: 0,
     last_error: undefined,
     authorization_required: false,
     oauth_authenticated: false,
-  }),
+  },
 };
 
 const mockLoadingStates = {

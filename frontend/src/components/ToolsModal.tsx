@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { XMarkIcon, WrenchScrewdriverIcon, PowerIcon } from '@heroicons/react/24/outline';
-import { MCPService } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/mcp';
+import { MCPService } from '../tauri/bridge';
 import { ToggleSwitch } from './ToggleSwitch';
 import { LoadingButton } from './LoadingButton';
 

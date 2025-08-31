@@ -1,0 +1,12 @@
+# Rust target dir
+src-tauri/target/
+
+# Tauri build artifacts
+src-tauri/src-tauri/target/
+src-tauri/.cargo/
+src-tauri/.tauri/
+src-tauri/gen/
+
+# OS
+.DS_Store
+

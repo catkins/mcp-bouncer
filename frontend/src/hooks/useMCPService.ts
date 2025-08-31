@@ -1,12 +1,6 @@
 import { useState, useEffect } from 'react';
-import { MCPService } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/mcp';
-import { SettingsService } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings';
-import {
-  MCPServerConfig,
-  Settings,
-} from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/settings/models';
-import { ClientStatus } from '../../bindings/github.com/catkins/mcp-bouncer/pkg/services/mcp/models';
-import { Events } from '@wailsio/runtime';
+import { MCPService, SettingsService, Events } from '../tauri/bridge';
+import type { MCPServerConfig, Settings, ClientStatus } from '../tauri/bridge';
 
 export function useMCPService() {
   const [servers, setServers] = useState<MCPServerConfig[]>([]);
@@ -250,7 +244,7 @@ export function useMCPService() {
     init();
 
     // Listen for server updates
-    const unsubscribe = Events.On('mcp:servers_updated', async (event: Events.WailsEvent) => {
+    const unsubscribe = Events.On('mcp:servers_updated', async (event: any) => {
       console.log('Received mcp:servers_updated event:', event);
       await loadServers();
       await loadActive();
@@ -258,7 +252,7 @@ export function useMCPService() {
     });
 
     // Listen for settings updates
-    const unsubscribeSettings = Events.On('settings:updated', async (event: Events.WailsEvent) => {
+    const unsubscribeSettings = Events.On('settings:updated', async (event: any) => {
       console.log('Received settings:updated event:', event);
       await loadSettings();
       await loadMcpUrl();
@@ -269,7 +263,7 @@ export function useMCPService() {
     // Listen for client status changes
     const unsubscribeClientStatus = Events.On(
       'mcp:client_status_changed',
-      async (event: Events.WailsEvent) => {
+      async (event: any) => {
         console.log('Received mcp:client_status_changed event:', event);
         await loadClientStatus();
       },
@@ -278,7 +272,7 @@ export function useMCPService() {
     // Listen for client errors
     const unsubscribeClientError = Events.On(
       'mcp:client_error',
-      async (event: Events.WailsEvent) => {
+      async (event: any) => {
         console.log('Received mcp:client_error event:', event);
         const data = event.data as any;
         if (data && data.server_name) {
