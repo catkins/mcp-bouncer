@@ -1,76 +1,66 @@
-# CLAUDE.md
-
 This file provides guidance to coding agents when working with code in this repository.
 
-## Development Commands
+## Development Commands (Tauri v2)
 
-### Go backend development Development
-- **Development mode**: `wails3 dev` or `task dev` - Runs with hot reload for both frontend and backend, and starts storybook on. This is blocking.
-  - **Note**: `wails3 dev` must be run in a background process (eg. in a tmux session)
-- **Build production**: `wails3 build` or `task build` - Creates production executable in `build/` directory
-- **Run built app**: `task run` - Runs the built application. This is blocking.
-- **Go Type Documentation**: Use `go doc <package or type>` to understand Go types and APIs when debugging or working with unfamiliar code.
-- **Format code**: `task format` - Formats all TypeScript and Go code with Prettier and Go fmt
-- **Events**: When defining events to publish to the frontend, ensure they are defined as constants in `events.go`
+### App (dev/build)
+- Dev (Vite + Tauri): `npx tauri dev`
+- Build app: `cargo tauri build`
+- Backend only: `cargo build --manifest-path src-tauri/Cargo.toml`
 
-IMPORTANT: Blocking commands MUST be run in a background agent, or in a tmux pane.
-
-### Frontend Development
-- **Frontend build (dev)**: `npm run --prefix frontend build:dev` - TypeScript compilation with dev settings
-- **Frontend build (prod)**: `npm run --prefix frontend build` - Optimized production build
-- **Format code**: `task format` - Formats all TypeScript code with Prettier
-- **Check formatting**: `task format:check` - Checks if code is properly formatted
-
-### Task Runner
-The project uses Taskfile (Task) as the build system. Use `task --list` to see all available tasks.
+### Frontend
+- Dev server: `npm run dev`
+- Build: `npm run build`
+- Format: `npm run format` / `npm run format:check`
 
 ## Architecture Overview
 
 ### Application Structure
-This is a **[Wails 3](https://github.com/wailsapp/wails/tree/v3-alpha) application** that creates a desktop app combining Go backend services with a TypeScript/HTML frontend.
+This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the official **rmcp** SDK for MCP.
 
 **Main Components:**
+- `src-tauri/src/main.rs`: Tauri entry, rmcp Streamable HTTP server, Tauri commands, events
+- `src-tauri/tauri.conf.json`: Tauri config (build hooks and frontendDist)
+- `src-tauri/capabilities/events.json`: grants `event.listen` to the main window/webview
+- `src/tauri/bridge.ts`: minimal adapter for Tauri `invoke` + `listen`
+- `src/`: React 19 + TypeScript frontend (Vite, Tailwind 4)
 
-- `main.go`: Application entry point that initializes Wails app and MCP service
-- `pkg/services/mcp/`: Go service layer containing MCP server/client functionality
-- `pkg/services/settings/`: Go service layer managing settings
-- `frontend/`: Web-based UI built with TypeScript and vanilla HTML/CSS
-- After making changes in `pkg/services` regenerate bindings with `wails3 generate bindings -ts` which will update generated code in `frontend/bindings`
+### Backend (Rust)
+- Hosts an rmcp Streamable HTTP server at `http://127.0.0.1:8091/mcp`
+- Aggregates tools from all enabled upstream servers; tool names are `server::tool`
+- Upstream clients via rmcp:
+  - Streamable HTTP: `StreamableHttpClientTransport`
+  - STDIO: `TokioChildProcess`
+- Emits events consumed by UI:
+  - `mcp:servers_updated`, `settings:updated`, `mcp:client_status_changed`, `mcp:client_error`, `mcp:incoming_clients_updated`
+- Settings JSON: `$XDG_CONFIG_HOME/mcp-bouncer/settings.json`
 
-**Frontend:**
+### Frontend (React)
+- Uses `@tauri-apps/api` with `src/tauri/bridge.ts`
+- Hooks (`useMCPService`, `useIncomingClients`) subscribe via `event.listen`
+- No Wails bindings — do not import from `frontend/bindings` or `@wailsio/runtime`
 
-- Imports auto-generated Go service bindings from `bindings/` directory
-- React frontend using Vite for builds
-- Tailwind CSS 4 is used for styling
-- Storybook for component development and testing
-  - When `wails3 dev` is running, Storybook is automatically started and accessible at `http://localhost:6006`
-  - Use the playwright MCP browser tools to interact with components in the Storybook UI
+## Project Structure (Tauri standard)
 
-### Key Integration Points
-1. **Service Binding**: Go services are automatically bound to frontend via Wails
-2. **Event System**: Backend emits custom events that frontend can listen to
-3. **Asset Embedding**: Frontend dist files are embedded into Go binary using `go:embed`
+```
+├── src/                  # React app
+├── public/
+├── index.html
+├── package.json
+├── vite.config.ts
+└── src-tauri/            # Rust (Tauri) crate
+    ├── Cargo.toml
+    ├── build.rs
+    ├── tauri.conf.json
+    ├── capabilities/
+    │   └── events.json
+    └── src/main.rs
+```
 
-### Configuration
-- `build/config.yml`: Wails project configuration including app metadata and dev mode settings
-- `Taskfile.yml`: Build task definitions with OS-specific includes
-- Frontend config in `frontend/package.json` and `frontend/tsconfig.json`
-- `frontend/.prettierrc.json`: Prettier formatting configuration for consistent code style
+## Notes & Guidelines
+- Capabilities: if you need new WebView permissions (e.g., shell, fs), add a capability JSON under `src-tauri/capabilities/` and reference it in `tauri.conf.json` under `app.security.capabilities`.
+- MCP server routing: keep tool names `server::tool` to avoid collisions across upstreams.
+- Settings shape: keep fields stable; UI relies on them. Extend carefully and emit `settings:updated` after writes.
+- Events: match existing event names; the UI hooks already listen for them.
 
-## Development Notes
-
-### Project Purpose
-- This is MCP Bouncer, a local gateway that can manage and route requests to multiple MCP servers.
-- It exposes a Streamable HTTP MCP Server at http://localhost:8091/mcp, and proxies requests to configured MCP Servers
-- Also tracks incoming MCP client sessions and surfaces them in the UI (Clients tab)
-- It is configured in the UI, but configuration is saved in `$XDG_CONFIG_HOME/mcp-bouncer/settings.json`
-- It supports STDIO, SSE and Streamable HTTP (including OAuth) MCP Servers
-
-### File Structure Patterns
-- Go services follow `pkg/services/{service-name}/` pattern
-- Wails auto-generates TypeScript bindings in `frontend/bindings/`
-- Build artifacts go to `build/` and `bin/` directories
-
-### Other guidelines
-
-**Git Commits**: Only create git commits when explicitly asked by the user. Do not automatically commit changes unless the user specifically requests it.
+## Git Commits
+Only create git commits when explicitly asked by the user. Do not automatically commit changes unless requested.
