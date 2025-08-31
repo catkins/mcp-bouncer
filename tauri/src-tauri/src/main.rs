@@ -5,6 +5,15 @@ use tauri::{Emitter, Manager};
 use axum::{extract::State, http::{HeaderMap, StatusCode, Response}, body::Body as AxumBody};
 use bytes::Bytes;
 use futures::future::join_all;
+use rmcp::{Service as McpService, RoleServer, ServiceExt};
+use rmcp::service::RoleClient;
+use rmcp::transport::{StreamableHttpClientTransport, TokioChildProcess, ConfigureCommandExt};
+use rmcp::model as mcp;
+use rmcp::transport::streamable_http_server::{
+    session::local::LocalSessionManager,
+    StreamableHttpServerConfig,
+    StreamableHttpService,
+};
 use std::{collections::HashMap, fs, path::PathBuf, sync::{Arc, OnceLock}};
 use tokio::io::{AsyncWriteExt, AsyncBufReadExt};
 
@@ -140,6 +149,7 @@ struct ProxyState {
 
 static PROXY_STARTED: OnceLock<()> = OnceLock::new();
 static STDIO_REGISTRY: OnceLock<tokio::sync::Mutex<HashMap<String, Arc<StdioClient>>>> = OnceLock::new();
+static CLIENT_REGISTRY: OnceLock<tokio::sync::Mutex<HashMap<String, Arc<rmcp::service::RunningService<RoleClient, ()>>>>> = OnceLock::new();
 
 fn spawn_mcp_proxy(app: &tauri::AppHandle) {
     if PROXY_STARTED.set(()).is_err() {
@@ -147,15 +157,19 @@ fn spawn_mcp_proxy(app: &tauri::AppHandle) {
     }
     let app_handle = app.clone();
     tauri::async_runtime::spawn(async move {
-        use axum::{routing::post, Router};
-        let state = ProxyState { app: app_handle.clone() };
-        let router = Router::new()
-            .route("/mcp", post(proxy_mcp))
-            .with_state(state);
+        use axum::Router;
+        // RMCP Streamable HTTP service bound at /mcp
+        let service: StreamableHttpService<BouncerService, LocalSessionManager> =
+            StreamableHttpService::new(
+                move || Ok(BouncerService { app: app_handle.clone() }),
+                Default::default(),
+                StreamableHttpServerConfig { stateful_mode: true, sse_keep_alive: Some(std::time::Duration::from_secs(15)) },
+            );
+        let router = Router::new().nest_service("/mcp", service);
         let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 8091));
         let listener = tokio::net::TcpListener::bind(addr).await.expect("bind 8091");
         if let Err(e) = axum::serve(listener, router).await {
-            eprintln!("MCP proxy server error: {e}");
+            eprintln!("MCP server error: {e}");
         }
     });
 }
@@ -245,49 +259,140 @@ fn get_server_by_name(name: &str) -> Option<MCPServerConfig> {
     load_settings().mcp_servers.into_iter().find(|c| c.name == name)
 }
 
-async fn proxy_mcp(
-    State(state): State<ProxyState>,
-    headers: HeaderMap,
-    body: Bytes,
-) -> Result<Response<AxumBody>, StatusCode> {
-    let mut server_name: Option<String> = None;
-    for (k, v) in headers.iter() {
-        if k.as_str().eq_ignore_ascii_case("x-mcp-server") {
-            server_name = v.to_str().ok().map(|s| s.to_string());
-            break;
+// ---------------- RMCP Service Implementation ----------------
+
+#[derive(Clone)]
+struct BouncerService {
+    app: tauri::AppHandle,
+}
+
+impl McpService<RoleServer> for BouncerService {
+    fn handle_request(
+        &self,
+        request: mcp::ClientRequest,
+        _context: rmcp::service::RequestContext<RoleServer>,
+    ) -> impl std::future::Future<Output = Result<mcp::ServerResult, mcp::ErrorData>> + Send + '_ {
+        async move {
+            match request {
+                mcp::ClientRequest::InitializeRequest(_req) => {
+                    let capabilities = mcp::ServerCapabilities::builder()
+                        .enable_logging()
+                        .enable_tools()
+                        .enable_tool_list_changed()
+                        .build();
+                    let result = mcp::InitializeResult {
+                        protocol_version: mcp::ProtocolVersion::V_2025_03_26,
+                        capabilities,
+                        server_info: mcp::Implementation { name: "MCP Bouncer".into(), version: env!("CARGO_PKG_VERSION").into() },
+                        instructions: None,
+                    };
+                    Ok(mcp::ServerResult::InitializeResult(result))
+                }
+                mcp::ClientRequest::ListToolsRequest(_req) => {
+                    let s = load_settings();
+                    let mut tools: Vec<mcp::Tool> = Vec::new();
+                    for cfg in s.mcp_servers.into_iter().filter(|c| c.enabled) {
+                        if let Ok(list) = fetch_tools_for_cfg(&cfg).await {
+                            for item in list {
+                                if let Some(t) = to_mcp_tool(&cfg.name, &item) {
+                                    tools.push(t);
+                                }
+                            }
+                        }
+                    }
+                    Ok(mcp::ServerResult::ListToolsResult(mcp::ListToolsResult { tools, next_cursor: None }))
+                }
+                mcp::ClientRequest::CallToolRequest(req) => {
+                    // Expect tool name like "server::tool"
+                    let name = req.params.name.to_string();
+                    let (server_name, tool_name) = name
+                        .split_once("::")
+                        .map(|(a, b)| (a.to_string(), b.to_string()))
+                        .unwrap_or((String::new(), name.clone()));
+                    let args_obj = req
+                        .params
+                        .arguments
+                        .clone()
+                        .map(serde_json::Value::Object)
+                        .and_then(|v| v.as_object().cloned());
+                    let cfg_opt = if !server_name.is_empty() {
+                        get_server_by_name(&server_name)
+                    } else {
+                        // default to first enabled HTTP/stdio server
+                        load_settings()
+                            .mcp_servers
+                            .into_iter()
+                            .find(|c| c.enabled)
+                    };
+                    if let Some(cfg) = cfg_opt {
+                        match ensure_rmcp_client(&cfg.name, &cfg).await {
+                            Ok(client) => {
+                                match client
+                                    .call_tool(mcp::CallToolRequestParam {
+                                        name: tool_name.into(),
+                                        arguments: args_obj,
+                                    })
+                                    .await
+                                {
+                                    Ok(res) => Ok(mcp::ServerResult::CallToolResult(res)),
+                                    Err(e) => Ok(mcp::ServerResult::CallToolResult(mcp::CallToolResult { content: vec![mcp::Content::text(format!("error: {e}"))], structured_content: None, is_error: Some(true) })),
+                                }
+                            }
+                            Err(e) => Ok(mcp::ServerResult::CallToolResult(mcp::CallToolResult {
+                                content: vec![mcp::Content::text(format!("error: {e}"))],
+                                structured_content: None,
+                                is_error: Some(true),
+                            })),
+                        }
+                    } else {
+                        Ok(mcp::ServerResult::CallToolResult(mcp::CallToolResult {
+                            content: vec![mcp::Content::text("no server".to_string())],
+                            structured_content: None,
+                            is_error: Some(true),
+                        }))
+                    }
+                }
+                other => {
+                    // For unhandled requests, return empty
+                    let _ = other; // silence
+                    Ok(mcp::ServerResult::empty(()))
+                }
+            }
         }
     }
-    let upstream = if let Some(name) = server_name {
-        select_upstream_by_name(&name)
-    } else {
-        select_default_upstream()
-    };
-    let Some(up) = upstream else {
-        return Err(StatusCode::SERVICE_UNAVAILABLE);
-    };
 
-    let client = reqwest::Client::new();
-    let mut rb = client.post(&up.url);
-    for (k, v) in &up.headers {
-        rb = rb.header(k, v);
+    fn handle_notification(
+        &self,
+        _notification: mcp::ClientNotification,
+        _context: rmcp::service::NotificationContext<RoleServer>,
+    ) -> impl std::future::Future<Output = Result<(), mcp::ErrorData>> + Send + '_ {
+        async move { Ok(()) }
     }
-    let res = match rb.header("content-type", "application/json").body(body).send().await {
-        Ok(r) => r,
-        Err(_) => return Err(StatusCode::BAD_GATEWAY),
-    };
 
-    // Emit a coarse incoming update
-    let _ = state
-        .app
-        .emit("mcp:incoming_clients_updated", &serde_json::json!({"reason":"proxy_request"}));
-
-    let status = StatusCode::from_u16(res.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
-    let mut resp_builder = Response::builder().status(status);
-    for (k, v) in res.headers().iter() {
-        if let Ok(val) = v.to_str() { resp_builder = resp_builder.header(k.as_str(), val); }
+    fn get_info(&self) -> mcp::ServerInfo {
+        mcp::ServerInfo {
+            protocol_version: mcp::ProtocolVersion::V_2025_03_26,
+            capabilities: mcp::ServerCapabilities::builder().enable_logging().enable_tools().enable_tool_list_changed().build(),
+            server_info: mcp::Implementation { name: "MCP Bouncer".into(), version: env!("CARGO_PKG_VERSION").into() },
+            instructions: None,
+        }
     }
-    let bytes = res.bytes().await.unwrap_or_default();
-    Ok(resp_builder.body(AxumBody::from(bytes)).unwrap())
+}
+
+fn to_mcp_tool(server: &str, v: &serde_json::Value) -> Option<mcp::Tool> {
+    let name = v.get("name")?.as_str()?.to_string();
+    let description = v.get("description").and_then(|d| d.as_str()).map(|s| s.to_string());
+    // input schema: try inputSchema or input_schema object
+    let schema_obj = v
+        .get("inputSchema")
+        .or_else(|| v.get("input_schema"))
+        .and_then(|s| s.as_object().cloned())
+        .unwrap_or_default();
+    let mut fullname = String::new();
+    fullname.push_str(server);
+    fullname.push_str("::");
+    fullname.push_str(&name);
+    Some(mcp::Tool::new(fullname, description.unwrap_or_default(), schema_obj))
 }
 
 #[tauri::command]
@@ -501,38 +606,59 @@ async fn mcp_authorize_client(app: tauri::AppHandle, name: String) -> Result<(),
 #[tauri::command]
 async fn mcp_get_client_tools(client_name: String) -> Result<Vec<serde_json::Value>, String> {
     if let Some(cfg) = get_server_by_name(&client_name) {
-        let tools = fetch_tools_for_cfg(&cfg).await.unwrap_or_default();
-        return Ok(tools);
+        let client = ensure_rmcp_client(&cfg.name, &cfg).await?;
+        let tools = client
+            .list_all_tools()
+            .await
+            .map_err(|e| format!("rmcp list tools: {e}"))?;
+        let vals: Vec<serde_json::Value> = tools
+            .into_iter()
+            .map(|t| serde_json::to_value(t).unwrap_or(serde_json::json!({})))
+            .collect();
+        return Ok(vals);
     }
     Ok(Vec::new())
 }
 
 async fn fetch_tools_for_cfg(cfg: &MCPServerConfig) -> Result<Vec<serde_json::Value>, String> {
-    if matches!(cfg.transport, Some(TransportType::TransportStdio)) {
-        let v = stdio_rpc(&cfg.name, "tools/list", serde_json::json!({})).await?;
-        if let Some(arr) = v.get("result").and_then(|r| r.get("tools")).and_then(|t| t.as_array()) { return Ok(arr.clone()); }
-        if let Some(arr) = v.get("tools").and_then(|t| t.as_array()) { return Ok(arr.clone()); }
-        if let Some(arr) = v.as_array() { return Ok(arr.clone()); }
-        return Ok(Vec::new());
-    }
-    if !matches!(cfg.transport, Some(TransportType::TransportStreamableHTTP)) {
-        return Ok(vec![]);
-    }
-    let endpoint = cfg.endpoint.clone().unwrap_or_default();
-    if endpoint.is_empty() { return Ok(Vec::new()); }
-    let headers = cfg.headers.clone().unwrap_or_default();
-    let client = reqwest::Client::new();
-    let mut rb = client.post(endpoint);
-    for (k, v) in headers.iter() { rb = rb.header(k, v); }
-    let body = serde_json::json!({"jsonrpc":"2.0","id":"1","method":"tools/list","params":{}});
-    let res = rb.json(&body).send().await.map_err(|e| format!("request: {e}"))?;
-    let status = res.status();
-    let json: serde_json::Value = res.json().await.map_err(|e| format!("parse: {e}"))?;
-    if !status.is_success() { return Err(format!("upstream {}: {:?}", status, json)); }
-    if let Some(arr) = json.get("result").and_then(|r| r.get("tools")).and_then(|t| t.as_array()) { return Ok(arr.clone()); }
-    if let Some(arr) = json.get("tools").and_then(|t| t.as_array()) { return Ok(arr.clone()); }
-    if let Some(arr) = json.as_array() { return Ok(arr.clone()); }
-    Ok(Vec::new())
+    let client = ensure_rmcp_client(&cfg.name, cfg).await?;
+    let tools = client
+        .list_all_tools()
+        .await
+        .map_err(|e| format!("rmcp list tools: {e}"))?;
+    let vals: Vec<serde_json::Value> = tools
+        .into_iter()
+        .map(|t| serde_json::to_value(t).unwrap_or(serde_json::json!({})))
+        .collect();
+    Ok(vals)
+}
+
+async fn ensure_rmcp_client(name: &str, cfg: &MCPServerConfig) -> Result<Arc<rmcp::service::RunningService<RoleClient, ()>>, String> {
+    let reg = CLIENT_REGISTRY.get_or_init(|| tokio::sync::Mutex::new(HashMap::new()));
+    let mut guard = reg.lock().await;
+    if let Some(c) = guard.get(name) { return Ok(c.clone()); }
+    let service = match cfg.transport {
+        Some(TransportType::TransportStreamableHTTP) => {
+            let endpoint = cfg.endpoint.clone().unwrap_or_default();
+            if endpoint.is_empty() { return Err("no endpoint".into()); }
+            let transport = StreamableHttpClientTransport::from_uri(endpoint);
+            ().serve(transport).await.map_err(|e| format!("rmcp serve: {e}"))?
+        }
+        Some(TransportType::TransportStdio) => {
+            let cmd = cfg.command.clone();
+            if cmd.is_empty() { return Err("missing command".into()); }
+            let mut command = tokio::process::Command::new(cmd);
+            // Configure args/env
+            if let Some(args) = &cfg.args { command.args(args); }
+            if let Some(envmap) = &cfg.env { for (k,v) in envmap { command.env(k, v); } }
+            let transport = TokioChildProcess::new(command).map_err(|e| format!("spawn: {e}"))?;
+            ().serve(transport).await.map_err(|e| format!("rmcp serve: {e}"))?
+        }
+        _ => return Err("unsupported transport".into()),
+    };
+    let arc = Arc::new(service);
+    guard.insert(name.to_string(), arc.clone());
+    Ok(arc)
 }
 
 #[tauri::command]
