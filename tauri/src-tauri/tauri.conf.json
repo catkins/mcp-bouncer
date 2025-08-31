@@ -10,8 +10,12 @@
     "devUrl": "http://localhost:5173"
   },
   "app": {
+    "security": {
+      "capabilities": ["events"]
+    },
     "windows": [
       {
+        "label": "main",
         "title": "MCP Bouncer",
         "width": 1200,
         "height": 800,
