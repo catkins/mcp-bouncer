@@ -90,10 +90,12 @@ mod tests {
             let stamp = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
-                .as_millis();
+                .as_nanos();
+            let tid = format!("{:?}", std::thread::current().id());
             let dir = std::env::temp_dir().join(format!(
-                "mcp-bouncer-status-{}-{}",
+                "mcp-bouncer-status-{}-{}-{}",
                 std::process::id(),
+                tid,
                 stamp
             ));
             fs::create_dir_all(&dir).unwrap();
