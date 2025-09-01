@@ -27,6 +27,16 @@ steps:
           config: .buildkite/docker-compose.yml
           progress: plain
 
+  - label: ":vitest: Frontend Tests"
+    command: |
+      npm ci
+      npm run test:run
+    plugins:
+      - docker-compose#v5.10.0:
+          run: app
+          config: .buildkite/docker-compose.yml
+          progress: plain
+
   - label: ":tauri: Tauri Build"
     command: |
       cargo tauri build --verbose
