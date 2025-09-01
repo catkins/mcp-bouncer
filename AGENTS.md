@@ -1,76 +1,109 @@
-# CLAUDE.md
-
 This file provides guidance to coding agents when working with code in this repository.
 
-## Development Commands
+## Development Commands (Tauri v2)
 
-### Go backend development Development
-- **Development mode**: `wails3 dev` or `task dev` - Runs with hot reload for both frontend and backend, and starts storybook on. This is blocking.
-  - **Note**: `wails3 dev` must be run in a background process (eg. in a tmux session)
-- **Build production**: `wails3 build` or `task build` - Creates production executable in `build/` directory
-- **Run built app**: `task run` - Runs the built application. This is blocking.
-- **Go Type Documentation**: Use `go doc <package or type>` to understand Go types and APIs when debugging or working with unfamiliar code.
-- **Format code**: `task format` - Formats all TypeScript and Go code with Prettier and Go fmt
-- **Events**: When defining events to publish to the frontend, ensure they are defined as constants in `events.go`
+### App (dev/build)
+- Dev (Vite + Tauri): `npx tauri dev`
+- Build app: `cargo tauri build`
+- Backend only: `cargo build --manifest-path src-tauri/Cargo.toml`
 
-IMPORTANT: Blocking commands MUST be run in a background agent, or in a tmux pane.
+Tip: From the repository root, prefer passing `--manifest-path` for Rust backend tasks:
 
-### Frontend Development
-- **Frontend build (dev)**: `npm run --prefix frontend build:dev` - TypeScript compilation with dev settings
-- **Frontend build (prod)**: `npm run --prefix frontend build` - Optimized production build
-- **Format code**: `task format` - Formats all TypeScript code with Prettier
-- **Check formatting**: `task format:check` - Checks if code is properly formatted
+- Run tests: `cargo test --manifest-path src-tauri/Cargo.toml`
+- Type-check: `cargo check --manifest-path src-tauri/Cargo.toml`
+- Build (debug): `cargo build --manifest-path src-tauri/Cargo.toml`
 
-### Task Runner
-The project uses Taskfile (Task) as the build system. Use `task --list` to see all available tasks.
+### Frontend
+- Dev server: `npm run dev`
+- Build: `npm run build`
+- Tests: `npm run test:run` (Vitest + React Testing Library)
+- Format: `npm run format` / `npm run format:check`
+
+#### Verify Changes (required)
+- Run `npm run build` to catch type errors and bundling issues.
+- Run ALL tests (no warnings allowed):
+  - Rust: `cargo test --manifest-path src-tauri/Cargo.toml`
+  - Frontend: `npm run test:run`
 
 ## Architecture Overview
 
 ### Application Structure
-This is a **[Wails 3](https://github.com/wailsapp/wails/tree/v3-alpha) application** that creates a desktop app combining Go backend services with a TypeScript/HTML frontend.
+This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the official **rmcp** SDK for MCP.
 
 **Main Components:**
+- `src-tauri/src/main.rs`: Tauri entry, rmcp Streamable HTTP server, Tauri commands, events
+- `src-tauri/src/lib.rs`: Library crate exporting backend modules for testing/commands
+- `src-tauri/src/config.rs`: Settings, client-state, tools toggle persistence + shared types
+- `src-tauri/src/client.rs`: RMCP client lifecycle and registry
+- `src-tauri/src/status.rs`: Client status aggregation logic
+- `src-tauri/src/events.rs`: Event emission abstraction and helpers
+- `src-tauri/src/app_logic.rs`: Thin adapters (e.g., settings update) using config + events
+- `src-tauri/src/incoming.rs`: In-memory registry of incoming clients recorded on rmcp Initialize
+- `src-tauri/tauri.conf.json`: Tauri config (build hooks and frontendDist)
+- `src-tauri/capabilities/events.json`: grants `event.listen` to the main window/webview
+- `src/tauri/bridge.ts`: minimal adapter for Tauri `invoke` + `listen`
+- `src/`: React 19 + TypeScript frontend (Vite, Tailwind 4)
 
-- `main.go`: Application entry point that initializes Wails app and MCP service
-- `pkg/services/mcp/`: Go service layer containing MCP server/client functionality
-- `pkg/services/settings/`: Go service layer managing settings
-- `frontend/`: Web-based UI built with TypeScript and vanilla HTML/CSS
-- After making changes in `pkg/services` regenerate bindings with `wails3 generate bindings -ts` which will update generated code in `frontend/bindings`
+### Backend (Rust)
+- Hosts an rmcp Streamable HTTP server at `http://127.0.0.1:8091/mcp`
+- Aggregates tools from all enabled upstream servers; tool names are `server::tool`
+- Upstream clients via rmcp:
+  - Streamable HTTP: `StreamableHttpClientTransport`
+  - STDIO: `TokioChildProcess`
+- Emits events consumed by UI:
+  - `mcp:servers_updated`, `settings:updated`, `mcp:client_status_changed`, `mcp:client_error`, `mcp:incoming_clients_updated`
+- Settings JSON: `$XDG_CONFIG_HOME/mcp-bouncer/settings.json`
+- Incoming clients: recorded when rmcp Initialize is received; `connected_at` uses RFC3339 (ISO 8601) strings for robust JS parsing.
 
-**Frontend:**
+#### Testability Notes (backend)
 
-- Imports auto-generated Go service bindings from `bindings/` directory
-- React frontend using Vite for builds
-- Tailwind CSS 4 is used for styling
-- Storybook for component development and testing
-  - When `wails3 dev` is running, Storybook is automatically started and accessible at `http://localhost:6006`
-  - Use the playwright MCP browser tools to interact with components in the Storybook UI
+- Avoid business logic in `main.rs`. Implement in `config.rs`, `client.rs`, `status.rs`, or a focused module and import from `main.rs`.
+- Filesystem: accept a `&dyn ConfigProvider` when adding persistence so tests can redirect IO.
+- Events: use `events::EventEmitter` and helper functions (`servers_updated`, `client_status_changed`, etc.). In Tauri commands, wrap `AppHandle` with `TauriEventEmitter`. In tests, use `MockEventEmitter`.
+- Status: prefer `status::compute_client_status_map_with(cp, registry, lister)` for unit tests; production code uses `compute_client_status_map` which defaults to the OS provider.
+- Incoming: use `incoming::record_connect(name, version, title)` within rmcp Initialize handler. Client info extraction in `main.rs` looks under both `clientInfo.*` and `params.client_info.*` shapes.
 
-### Key Integration Points
-1. **Service Binding**: Go services are automatically bound to frontend via Wails
-2. **Event System**: Backend emits custom events that frontend can listen to
-3. **Asset Embedding**: Frontend dist files are embedded into Go binary using `go:embed`
+#### Running Tests
 
-### Configuration
-- `build/config.yml`: Wails project configuration including app metadata and dev mode settings
-- `Taskfile.yml`: Build task definitions with OS-specific includes
-- Frontend config in `frontend/package.json` and `frontend/tsconfig.json`
-- `frontend/.prettierrc.json`: Prettier formatting configuration for consistent code style
+- Rust backend: `cd src-tauri && cargo test --lib --tests`
+- Frontend: `npm run test:run`
 
-## Development Notes
+### Frontend Testing (RTL)
+- Library: React Testing Library (`@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom`).
+- Setup: `vitest.config.ts` uses `jsdom` with `src/test/setup.ts` for polyfills and Tauri API mocks.
+- Render helper: use `src/test/render.tsx` to render components with providers.
+- Queries: prefer accessible queries (role/name/label) over test ids; use `findBy*` or `waitFor` for async.
+- Hooks: test hooks through a minimal harness component and RTL `render` (do not use `react-test-renderer` nor manual roots).
+- Avoid: enzyme, react-test-renderer, manually creating React roots; assert behavior via the DOM, not implementation details.
+- Clean output: tests should run with zero warnings; console noise is suppressed in setup.
 
-### Project Purpose
-- This is MCP Bouncer, a local gateway that can manage and route requests to multiple MCP servers.
-- It exposes a Streamable HTTP MCP Server at http://localhost:8091/mcp, and proxies requests to configured MCP Servers
-- Also tracks incoming MCP client sessions and surfaces them in the UI (Clients tab)
-- It is configured in the UI, but configuration is saved in `$XDG_CONFIG_HOME/mcp-bouncer/settings.json`
-- It supports STDIO, SSE and Streamable HTTP (including OAuth) MCP Servers
+### Frontend (React)
+- Uses `@tauri-apps/api` with `src/tauri/bridge.ts`
+- Hooks (`useMCPService`, `useIncomingClients`) subscribe via `event.listen`
+- No Wails bindings — do not import from `frontend/bindings` or `@wailsio/runtime`
 
-### File Structure Patterns
-- Go services follow `pkg/services/{service-name}/` pattern
-- Wails auto-generates TypeScript bindings in `frontend/bindings/`
-- Build artifacts go to `build/` and `bin/` directories
+## Project Structure (Tauri standard)
 
-### Other guidelines
+```
+├── src/                  # React app
+├── public/
+├── index.html
+├── package.json
+├── vite.config.ts
+└── src-tauri/            # Rust (Tauri) crate
+    ├── Cargo.toml
+    ├── build.rs
+    ├── tauri.conf.json
+    ├── capabilities/
+    │   └── events.json
+    └── src/main.rs
+```
 
-**Git Commits**: Only create git commits when explicitly asked by the user. Do not automatically commit changes unless the user specifically requests it.
+## Notes & Guidelines
+- Capabilities: if you need new WebView permissions (e.g., shell, fs), add a capability JSON under `src-tauri/capabilities/` and reference it in `tauri.conf.json` under `app.security.capabilities`.
+- MCP server routing: keep tool names `server::tool` to avoid collisions across upstreams.
+- Settings shape: keep fields stable; UI relies on them. Extend carefully and emit `settings:updated` after writes.
+- Events: match existing event names; the UI hooks already listen for them.
+
+## Git Commits
+Only create git commits when explicitly asked by the user. Do not automatically commit changes unless requested. Before committing, always run both Rust and frontend tests locally and ensure they pass cleanly with zero warnings.

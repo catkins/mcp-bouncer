@@ -1,6 +1,6 @@
 # MCP Bouncer
 
-A desktop application that serves as a gateway and management interface for Model Context Protocol (MCP) servers. Built with Wails3, it provides a modern, cross-platform GUI for configuring, managing, and monitoring MCP servers with support for multiple transport protocols.
+A desktop application that serves as a gateway and management interface for Model Context Protocol (MCP) servers. Now built with Tauri v2 (Rust + WebView) and the official Rust MCP SDK (rmcp). It provides a modern, cross‑platform GUI for configuring, managing, and monitoring MCP servers with support for multiple transport protocols.
 
 > **⚠️ Early Development Software**  
 > This project is in early development and may have bugs, incomplete features, or breaking changes. Use at your own risk and please report any issues you encounter.
@@ -24,15 +24,20 @@ MCP Bouncer acts as a centralized hub for managing Model Context Protocol server
 - Real-time status monitoring with connection health indicators
 
 ### 🔧 Transport Protocol Support
-- **stdio**: Traditional process-based transport for local MCP servers
-- **SSE**: Server-Sent Events for HTTP-based streaming
-- **Streamable HTTP**: HTTP-based transport with streaming capabilities
+- **stdio**: Process‑based transport for local MCP servers (via rmcp TokioChildProcess)
+- **Streamable HTTP**: HTTP transport with streaming capabilities (via rmcp client/server)
+- SSE support is planned; the UI already models it
 
 ### 🎨 Modern UI
 - Clean, responsive interface built with React and Tailwind CSS
 - Dark/light theme support
 - Toast notifications for user feedback
 - Compact, efficient layout design
+
+### 👀 Incoming Clients
+- As MCP clients connect to the built‑in Streamable HTTP server, they appear in the Incoming Clients list.
+- Shows reported client `name`, `version`, and optional `title` (when provided by the client during Initialize).
+- Connection time `connected_at` is in RFC3339 (ISO 8601) format for reliable display in the UI.
 
 ### ⚙️ Configuration Management
 - Automatic settings persistence in platform-specific locations
@@ -48,9 +53,9 @@ MCP Bouncer acts as a centralized hub for managing Model Context Protocol server
 ## Quick Start
 
 ### Prerequisites
-- Go 1.24.0 or later
-- Node.js 18+ (for frontend development)
-- Wails3 CLI: `go install github.com/wailsapp/wails/v3/cmd/wails@latest`
+- Node.js 18+
+- Rust toolchain (stable, recent enough for `edition = 2024`)
+- Tauri CLI (optional): `npm i -g @tauri-apps/cli` or use `npx tauri`
 
 ### Development
 1. Clone the repository:
@@ -58,27 +63,25 @@ MCP Bouncer acts as a centralized hub for managing Model Context Protocol server
    git clone https://github.com/catkins/mcp-bouncer.git
    cd mcp-bouncer
    ```
-
-2. Install frontend dependencies:
+2. Install frontend deps:
    ```bash
-   cd frontend
    npm install
-   cd ..
    ```
-
-3. Run in development mode:
+3. Dev run (Vite + Tauri):
    ```bash
-   wails3 dev
+   npx tauri dev
+   # or
+   tauri dev
    ```
 
 ### Building
 ```bash
-# Build for production
-wails3 build
+# Build the web assets and bundle the app
+cargo tauri build
 
-# Build for development (unminified)
-cd frontend && npm run build:dev && cd ..
-wails3 build
+# Or separately
+npm run build
+cargo build --manifest-path src-tauri/Cargo.toml --release
 ```
 
 ## Configuration
@@ -117,7 +120,7 @@ The application automatically manages settings in platform-specific locations:
       "enabled": false
     }
   ],
-  "listen_addr": "localhost:8091",
+  "listen_addr": "http://localhost:8091/mcp",
   "auto_start": false
 }
 ```
@@ -140,17 +143,27 @@ The application automatically manages settings in platform-specific locations:
 
 ```
 mcp-bouncer/
-├── frontend/                 # React + TypeScript frontend
-│   ├── src/
-│   │   ├── components/       # UI components
-│   │   ├── hooks/           # Custom React hooks
-│   │   └── contexts/        # React contexts
-│   └── package.json
-├── pkg/services/
-│   ├── mcp/                 # MCP server management
-│   └── settings/            # Configuration management
-├── main.go                  # Application entry point
-└── settings.example.json    # Example configuration
+├── src/                      # React + TypeScript source
+├── public/                   # Static assets
+├── index.html                # Vite entry
+├── package.json              # Frontend scripts/deps
+├── vite.config.ts            # Vite config
+├── src-tauri/                # Tauri (Rust) crate
+│   ├── Cargo.toml
+│   ├── build.rs              # Generates a placeholder icon if missing
+│   ├── tauri.conf.json       # Tauri v2 configuration
+│   ├── capabilities/
+│   │   └── events.json       # Grants event.listen to main window
+│   └── src/
+│       ├── lib.rs            # Backend library exposing modules for tests/commands
+│       ├── config.rs         # Settings + client-state persistence and shared types
+│       ├── client.rs         # RMCP client lifecycle and registry helpers
+│       ├── status.rs         # Client status aggregation logic
+│       ├── events.rs         # Event emission abstraction + helpers
+│       ├── app_logic.rs      # Thin orchestration adapters (e.g., settings update)
+│       ├── incoming.rs       # In‑memory registry for incoming clients (Initialize)
+│       └── main.rs           # App entry; thin Tauri commands wiring
+└── settings.example.json     # Example configuration
 ```
 
 ## Usage Examples
@@ -175,16 +188,34 @@ mcp-bouncer/
 ## Development
 
 ### Architecture
-- **Backend**: Go with Wails3 framework
-- **Frontend**: React 19 + TypeScript + Tailwind CSS 4
-- **MCP Integration**: Uses `mark3labs/mcp-go` for MCP protocol handling
-- **Settings**: JSON-based configuration with automatic persistence
+- **Backend**: Rust (Tauri v2). Hosts an rmcp Streamable HTTP server at `http://127.0.0.1:8091/mcp`.
+  - Aggregates and proxies to configured upstream MCP servers (Streamable HTTP, STDIO) via rmcp clients.
+  - Tool names are prefixed `server::tool` to disambiguate across servers.
+  - Emits UI events (servers_updated, settings:updated, client_status_changed, client_error, incoming_clients_updated).
+  - Tracks incoming clients on rmcp Initialize; timestamps are RFC3339 for easy JS parsing.
+  - Code is split into focused modules (config, client, status, events) for testability; `main.rs` stays thin.
+- **Frontend**: React 19 + TypeScript + Tailwind CSS 4 + Vite.
+  - Uses `@tauri-apps/api` and a small adapter at `src/tauri/bridge.ts` for commands and events.
+- **Settings**: JSON at `$XDG_CONFIG_HOME/mcp-bouncer/settings.json`.
 
-### Key Components
-- `MCPService`: Manages MCP server lifecycle and connections
-- `SettingsService`: Handles configuration persistence
-- `ServerList`: Main UI component for server management
-- `useMCPService`: React hook for MCP service integration
+### Dev Commands
+- Dev app: `npx tauri dev`
+- Build app: `cargo tauri build`
+- Just backend: `cargo build --manifest-path src-tauri/Cargo.toml`
+- Just frontend: `npm run dev` / `npm run build`
+
+From the repository root, pass `--manifest-path` for Rust backend workflows:
+
+```bash
+# Type-check backend from root
+cargo check --manifest-path src-tauri/Cargo.toml
+
+# Run backend tests from root
+cargo test --manifest-path src-tauri/Cargo.toml --lib --tests
+
+# Build backend only from root
+cargo build --manifest-path src-tauri/Cargo.toml
+```
 
 ## Contributing
 
@@ -201,5 +232,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Related Links
 
 - [Model Context Protocol](https://modelcontextprotocol.io/)
-- [Wails3 Documentation](https://v3.wails.io/)
-- [MCP Go Library](https://github.com/mark3labs/mcp-go)
+- [Tauri v2 Docs](https://v2.tauri.app/)
+- [rmcp (Rust MCP SDK)](https://docs.rs/rmcp/latest/rmcp/)

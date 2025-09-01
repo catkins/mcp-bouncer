@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "MCP Bouncer",
+  "version": "0.1.0",
+  "identifier": "app.mcp.bouncer",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173"
+  },
+  "app": {
+    "security": {
+      "capabilities": ["events"]
+    },
+    "windows": [
+      {
+        "label": "main",
+        "title": "MCP Bouncer",
+        "width": 1200,
+        "height": 800,
+        "resizable": true
+      }
+    ]
+  }
+}

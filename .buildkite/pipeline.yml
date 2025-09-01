@@ -1,6 +1,29 @@
 steps:
-  - label: "Build"
-    command: wails3 build
+  - label: ":test_tube: Backend Tests"
+    commands:
+      - cargo clippy --manifest-path src-tauri/Cargo.toml
+      - cargo test --manifest-path src-tauri/Cargo.toml --lib --tests
+    plugins:
+      - docker-compose#v5.10.0:
+          run: app
+          config: .buildkite/docker-compose.yml
+          progress: plain
+
+  - label: ":node::vitest: Frontend Build & Test"
+    commands:
+      - npm ci
+      - npm run build
+      - npm run test:run
+
+    plugins:
+      - docker-compose#v5.10.0:
+          run: app
+          config: .buildkite/docker-compose.yml
+          progress: plain
+
+  - label: ":tauri: Tauri Build"
+    command: |
+      cargo tauri build --verbose
     plugins:
       - docker-compose#v5.10.0:
           run: app
