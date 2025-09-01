@@ -1,36 +1,20 @@
 steps:
-  - label: ":rust: Backend Check"
-    command: |
-      cargo check --manifest-path src-tauri/Cargo.toml
-    plugins:
-      - docker-compose#v5.10.0:
-          run: app
-          config: .buildkite/docker-compose.yml
-          progress: plain
-
   - label: ":test_tube: Backend Tests"
-    command: |
-      cargo test --manifest-path src-tauri/Cargo.toml --lib --tests
+    commands:
+      - cargo check --manifest-path src-tauri/Cargo.toml
+      - cargo test --manifest-path src-tauri/Cargo.toml --lib --tests
     plugins:
       - docker-compose#v5.10.0:
           run: app
           config: .buildkite/docker-compose.yml
           progress: plain
 
-  - label: ":node: Frontend Build"
-    command: |
-      npm ci
-      npm run build
-    plugins:
-      - docker-compose#v5.10.0:
-          run: app
-          config: .buildkite/docker-compose.yml
-          progress: plain
+  - label: ":node::vitest: Frontend Build & Test"
+    commands:
+      - npm ci
+      - npm run build
+      - npm run test:run
 
-  - label: ":vitest: Frontend Tests"
-    command: |
-      npm ci
-      npm run test:run
     plugins:
       - docker-compose#v5.10.0:
           run: app
