@@ -4,6 +4,7 @@ use rmcp::transport::streamable_http_server::{
     session::local::LocalSessionManager, StreamableHttpServerConfig, StreamableHttpService,
 };
 use rmcp::{RoleServer, Service as McpService};
+use futures::future::join_all;
 use std::{collections::HashMap, fs, sync::OnceLock};
 use tauri::Manager;
 
@@ -51,6 +52,60 @@ mod extract_tests {
         assert_eq!(extract_str(&b, &["params.client_info.name"]).unwrap(), "ParamClient");
         assert_eq!(extract_str(&b, &["params.client_info.version"]).unwrap(), "9.9.9");
         assert!(extract_str(&b, &["params.client_info.title"]).is_none());
+    }
+}
+
+#[cfg(test)]
+mod list_tools_tests {
+    use super::aggregate_tools_with;
+    use mcp_bouncer::config::{MCPServerConfig, TransportType};
+    use serde_json::json;
+
+    fn cfg(name: &str) -> MCPServerConfig {
+        MCPServerConfig {
+            name: name.into(),
+            description: String::new(),
+            transport: Some(TransportType::TransportStreamableHTTP),
+            command: String::new(),
+            args: None,
+            env: None,
+            endpoint: Some("http://127.0.0.1".into()),
+            headers: None,
+            requires_auth: Some(false),
+            enabled: true,
+        }
+    }
+
+    #[tokio::test]
+    async fn partial_results_when_one_times_out() {
+        let servers = vec![cfg("fast"), cfg("slow")];
+        let lister = |c: MCPServerConfig| async move {
+            if c.name == "fast" {
+                Ok(vec![json!({"name":"alpha","description":"d"})])
+            } else {
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                Ok(vec![json!({"name":"beta","description":"d"})])
+            }
+        };
+        let tools = aggregate_tools_with(servers, lister, std::time::Duration::from_millis(50)).await;
+        let names: Vec<String> = tools.into_iter().map(|t| t.name.to_string()).collect();
+        assert!(names.contains(&"fast::alpha".to_string()));
+        assert!(!names.iter().any(|n| n.contains("slow::beta")));
+    }
+
+    #[tokio::test]
+    async fn errors_do_not_block_others() {
+        let servers = vec![cfg("ok"), cfg("err")];
+        let lister = |c: MCPServerConfig| async move {
+            if c.name == "ok" {
+                Ok(vec![json!({"name":"x"})])
+            } else {
+                Err("boom".into())
+            }
+        };
+        let tools = aggregate_tools_with(servers, lister, std::time::Duration::from_millis(100)).await;
+        let names: Vec<String> = tools.into_iter().map(|t| t.name.to_string()).collect();
+        assert_eq!(names, vec!["ok::x".to_string()]);
     }
 }
 
@@ -157,21 +212,11 @@ impl McpService<RoleServer> for BouncerService {
                 Ok(mcp::ServerResult::InitializeResult(result))
             }
             mcp::ClientRequest::ListToolsRequest(_req) => {
+                // Fetch tools from all enabled servers concurrently with a timeout per server
                 let s = load_settings();
-                let mut tools: Vec<mcp::Tool> = Vec::new();
-                for cfg in s.mcp_servers.into_iter().filter(|c| c.enabled) {
-                    if let Ok(list) = fetch_tools_for_cfg(&cfg).await {
-                        for item in list {
-                            if let Some(t) = to_mcp_tool(&cfg.name, &item) {
-                                tools.push(t);
-                            }
-                        }
-                    }
-                }
-                Ok(mcp::ServerResult::ListToolsResult(mcp::ListToolsResult {
-                    tools,
-                    next_cursor: None,
-                }))
+                let servers: Vec<_> = s.mcp_servers.into_iter().filter(|c| c.enabled).collect();
+                let tools = aggregate_tools(servers, std::time::Duration::from_secs(6)).await;
+                Ok(mcp::ServerResult::ListToolsResult(mcp::ListToolsResult { tools, next_cursor: None }))
             }
             mcp::ClientRequest::CallToolRequest(req) => {
                 // Expect tool name like "server::tool"
@@ -280,6 +325,68 @@ fn to_mcp_tool(server: &str, v: &serde_json::Value) -> Option<mcp::Tool> {
         description.unwrap_or_default(),
         schema_obj,
     ))
+}
+
+// Helper used by the ListToolsRequest path, extracted for testing
+#[cfg(test)]
+async fn aggregate_tools_with<F, Fut>(
+    servers: Vec<mcp_bouncer::config::MCPServerConfig>,
+    lister: F,
+    timeout: std::time::Duration,
+) -> Vec<mcp::Tool>
+where
+    F: Fn(mcp_bouncer::config::MCPServerConfig) -> Fut + Clone + Send + Sync + 'static,
+    Fut: std::future::Future<Output = Result<Vec<serde_json::Value>, String>> + Send,
+{
+    let tasks = servers.into_iter().map(|cfg| {
+        let lister = lister.clone();
+        async move {
+            let name = cfg.name.clone();
+            match tokio::time::timeout(timeout, lister(cfg)).await {
+                Ok(Ok(list)) => Some((name, list)),
+                _ => None,
+            }
+        }
+    });
+    let mut tools: Vec<mcp::Tool> = Vec::new();
+    for res in join_all(tasks).await.into_iter().flatten() {
+        let (server_name, list) = res;
+        for item in list {
+            if let Some(t) = to_mcp_tool(&server_name, &item) {
+                tools.push(t);
+            }
+        }
+    }
+    tools
+}
+
+// Production helper used by handler, avoids lifetime hassles for fetch_tools_for_cfg
+async fn aggregate_tools(
+    servers: Vec<mcp_bouncer::config::MCPServerConfig>,
+    timeout: std::time::Duration,
+) -> Vec<mcp::Tool> {
+    let tasks = servers.into_iter().map(|cfg| async move {
+        let name = cfg.name.clone();
+        // Own the config inside the future to satisfy 'static
+        let fut = async move {
+            let boxed = Box::new(cfg);
+            fetch_tools_for_cfg(&boxed).await
+        };
+        match tokio::time::timeout(timeout, fut).await {
+            Ok(Ok(list)) => Some((name, list)),
+            _ => None,
+        }
+    });
+    let mut tools: Vec<mcp::Tool> = Vec::new();
+    for res in join_all(tasks).await.into_iter().flatten() {
+        let (server_name, list) = res;
+        for item in list {
+            if let Some(t) = to_mcp_tool(&server_name, &item) {
+                tools.push(t);
+            }
+        }
+    }
+    tools
 }
 
 #[tauri::command]
