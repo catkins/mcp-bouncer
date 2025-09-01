@@ -138,7 +138,8 @@ mod tests {
         };
 
         let map = compute_client_status_map_with(&cp, reg, lister).await;
-        let cs = map.get("srv1").unwrap();
+        assert!(!map.is_empty());
+        let cs = map.values().find(|v| v.name == "srv1").expect("srv1 present");
         assert_eq!(cs.tools, 3);
     }
 
@@ -176,7 +177,7 @@ mod tests {
         let reg = vec!["srv1".to_string()];
         let lister = |_cfg: MCPServerConfig| async move { Ok::<_, String>(vec![]) };
         let map = compute_client_status_map_with(&cp, reg, lister).await;
-        let cs = map.get("srv1").unwrap();
+        let cs = map.values().find(|v| v.name == "srv1").expect("srv1 present");
         assert_eq!(cs.connected, false); // overlay wins
         assert_eq!(cs.last_error.as_deref(), Some("no token"));
         assert_eq!(cs.authorization_required, true);
