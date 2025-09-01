@@ -71,7 +71,5 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     // Additional status tests can be added using compute_client_status_map_with(cp, ...)
 }
