@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { createRoot } from 'react-dom/client';
-import { act } from 'react';
+import { render, screen } from '../test/render';
+import userEvent from '@testing-library/user-event';
 import { ToastProvider, useToast } from './ToastContext';
 
 function Harness() {
   const { toasts, addToast, removeToast } = useToast();
   return (
     <div>
-      <button id="add" onClick={() => addToast({ type: 'info', title: 't' })} />
-      <button id="rm" onClick={() => toasts[0] && removeToast(toasts[0].id)} />
+      <button aria-label="Add" id="add" onClick={() => addToast({ type: 'info', title: 't' })} />
+      <button aria-label="Remove" id="rm" onClick={() => toasts[0] && removeToast(toasts[0].id)} />
       <div id="count">{toasts.length}</div>
     </div>
   );
@@ -16,31 +16,17 @@ function Harness() {
 
 describe('ToastContext', () => {
   it('adds and removes toasts', async () => {
-    const container = document.createElement('div');
-    document.body.appendChild(container);
-    const root = createRoot(container);
-
-    act(() =>
-      root.render(
-        <ToastProvider>
-          <Harness />
-        </ToastProvider>,
-      ),
+    render(
+      <ToastProvider>
+        <Harness />
+      </ToastProvider>,
     );
-
-    const add = container.querySelector('#add') as HTMLButtonElement;
-    const rm = container.querySelector('#rm') as HTMLButtonElement;
-    const count = () => container.querySelector('#count')!.textContent;
-
-    await act(async () => {
-      add.click();
-      await new Promise(r => setTimeout(r, 0));
-    });
-    expect(count()).toBe('1');
-    await act(async () => {
-      rm.click();
-      await new Promise(r => setTimeout(r, 0));
-    });
-    expect(count()).toBe('0');
+    const addBtn = screen.getByRole('button', { hidden: true, name: /add/i });
+    await userEvent.click(addBtn);
+    expect(screen.getByText('1')).toBeInTheDocument();
+    // remove button (hidden name), second button in the order
+    const rmBtn = screen.getByRole('button', { hidden: true, name: /remove/i });
+    await userEvent.click(rmBtn);
+    expect(screen.getByText('0')).toBeInTheDocument();
   });
 });

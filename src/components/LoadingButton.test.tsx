@@ -1,40 +1,28 @@
-import { describe, it, expect } from 'vitest';
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-import { act } from 'react';
+import { describe, it, expect, vi } from 'vitest';
 import { LoadingButton } from './LoadingButton';
+import { render, screen } from '../test/render';
+import { cleanup } from '@testing-library/react';
+import { afterEach } from 'vitest';
 
-function render(el: React.ReactElement) {
-  const container = document.createElement('div');
-  document.body.appendChild(container);
-  const root = createRoot(container);
-  act(() => root.render(el));
-  return { container, root };
-}
+afterEach(() => cleanup());
+import userEvent from '@testing-library/user-event';
 
 describe('LoadingButton', () => {
   it('invokes onClick', async () => {
-    let called = 0;
-    const { container } = render(
-      <LoadingButton onClick={() => { called += 1; }}>Go</LoadingButton>,
-    );
-    const btn = container.querySelector('button')!;
-    await act(async () => {
-      btn.click();
-    });
-    expect(called).toBe(1);
+    const onClick = vi.fn();
+    render(<LoadingButton onClick={onClick}>Go</LoadingButton>);
+    await userEvent.click(screen.getByRole('button', { name: /go/i }));
+    expect(onClick).toHaveBeenCalled();
   });
 
   it('disabled prevents click', async () => {
-    let called = 0;
-    const { container } = render(
-      <LoadingButton disabled onClick={() => { called += 1; }}>
+    const onClick = vi.fn();
+    const { getByRole } = render(
+      <LoadingButton disabled onClick={onClick}>
         Go
       </LoadingButton>,
     );
-    await act(async () => {
-      container.querySelector('button')!.click();
-    });
-    expect(called).toBe(0);
+    const btn = getByRole('button', { name: /go/i });
+    expect(btn).toBeDisabled();
   });
 });

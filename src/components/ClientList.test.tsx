@@ -1,25 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-import { act } from 'react';
+import { render, screen } from '../test/render';
+import { cleanup } from '@testing-library/react';
+import { afterEach } from 'vitest';
 import { ClientList } from './ClientList';
 
-function render(el: React.ReactElement) {
-  const container = document.createElement('div');
-  document.body.appendChild(container);
-  const root = createRoot(container);
-  act(() => root.render(el));
-  return { container, root };
-}
+afterEach(() => cleanup());
 
 describe('ClientList', () => {
   it('renders empty state', () => {
-    const { container } = render(<ClientList clients={[]} />);
-    expect(container.textContent).toContain('No clients');
+    render(<ClientList clients={[]} />);
+    expect(screen.getByText(/No clients/i)).toBeInTheDocument();
   });
 
   it('renders provided clients', () => {
-    const { container } = render(
+    render(
       <ClientList
         clients={[
           { id: '1', name: 'c1', version: '1.0.0', connected_at: null },
@@ -27,7 +21,7 @@ describe('ClientList', () => {
         ]}
       />,
     );
-    expect(container.textContent).toContain('c1');
-    expect(container.textContent).toContain('c2');
+    expect(screen.getByText('c1')).toBeInTheDocument();
+    expect(screen.getByText('c2')).toBeInTheDocument();
   });
 });

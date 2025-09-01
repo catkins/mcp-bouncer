@@ -1,39 +1,27 @@
-import { describe, it, expect } from 'vitest';
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-import { act } from 'react';
+import { describe, it, expect, vi } from 'vitest';
 import { ToggleSwitch } from './ToggleSwitch';
+import { render, screen } from '../test/render';
+import { cleanup } from '@testing-library/react';
+import { afterEach } from 'vitest';
 
-function render(el: React.ReactElement) {
-  const container = document.createElement('div');
-  document.body.appendChild(container);
-  const root = createRoot(container);
-  act(() => root.render(el));
-  return { container, root };
-}
+afterEach(() => cleanup());
+import userEvent from '@testing-library/user-event';
 
 describe('ToggleSwitch', () => {
   it('calls onChange when toggled', async () => {
-    let v = false;
-    const { container } = render(
-      <ToggleSwitch checked={v} onChange={nv => (v = nv)} label="L" />,
+    const onChange = vi.fn();
+    const { getByRole } = render(
+      <ToggleSwitch checked={false} onChange={onChange} label="L" />,
     );
-    const btn = container.querySelector('button')!;
-    await act(async () => {
-      btn.click();
-    });
-    expect(v).toBe(true);
+    await userEvent.click(getByRole('button', { name: 'L' }));
+    expect(onChange).toHaveBeenCalledWith(true);
   });
 
   it('disabled prevents change', async () => {
-    let v = false;
-    const { container } = render(
-      <ToggleSwitch checked={v} onChange={nv => (v = nv)} disabled label="L" />,
+    const onChange = vi.fn();
+    const { getByRole } = render(
+      <ToggleSwitch checked={false} onChange={onChange} disabled label="L" />,
     );
-    const btn = container.querySelector('button')!;
-    await act(async () => {
-      btn.click();
-    });
-    expect(v).toBe(false);
+    expect(getByRole('button', { name: 'L' })).toBeDisabled();
   });
 });

@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { useEffect } from 'react';
-import { createRoot } from 'react-dom/client';
 import { act } from 'react';
+import { render, waitFor } from '../test/render';
 
 // Mock the Tauri bridge
 vi.mock('../tauri/bridge', async () => {
@@ -39,20 +39,12 @@ function TestHarness({ onState }: { onState: (s: any) => void }) {
 }
 
 describe('useIncomingClients', () => {
-  let container: HTMLDivElement;
-  let root: any;
-  let latestState: any;
-
-  beforeEach(() => {
-    container = document.createElement('div');
-    document.body.appendChild(container);
-    root = createRoot(container);
-    latestState = undefined;
-  });
-
   it('initially loads and updates on events', async () => {
+    let latestState: any;
+    render(<TestHarness onState={s => (latestState = s)} />);
+    // ensure effects run and listeners are registered
     await act(async () => {
-      root.render(<TestHarness onState={s => (latestState = s)} />);
+      await new Promise(r => setTimeout(r, 0));
     });
 
     // Initially empty
@@ -69,13 +61,17 @@ describe('useIncomingClients', () => {
       });
     });
 
-    expect(latestState.clients[0]).toMatchObject({ id: 'c1', name: 'client' });
+    await waitFor(() => {
+      expect(latestState.clients[0]).toMatchObject({ id: 'c1', name: 'client' });
+    });
 
     // Emit disconnect event
     await act(async () => {
       (Events as any).__emit(EventsMap.IncomingClientDisconnected, { id: 'c1' });
     });
 
-    expect(latestState.clients).toEqual([]);
+    await waitFor(() => {
+      expect(latestState.clients).toEqual([]);
+    });
   });
 });

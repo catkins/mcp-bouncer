@@ -16,12 +16,14 @@ Tip: From the repository root, prefer passing `--manifest-path` for Rust backend
 ### Frontend
 - Dev server: `npm run dev`
 - Build: `npm run build`
-- Tests: `npm run test:run` (Vitest)
+- Tests: `npm run test:run` (Vitest + React Testing Library)
 - Format: `npm run format` / `npm run format:check`
 
 #### Verify Changes (required)
 - Run `npm run build` to catch type errors and bundling issues.
-- Run `npm run test:run` to execute the frontend test suite.
+- Run ALL tests (no warnings allowed):
+  - Rust: `cargo test --manifest-path src-tauri/Cargo.toml`
+  - Frontend: `npm run test:run`
 
 ## Architecture Overview
 
@@ -66,6 +68,15 @@ This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the of
 - Rust backend: `cd src-tauri && cargo test --lib --tests`
 - Frontend: `npm run test:run`
 
+### Frontend Testing (RTL)
+- Library: React Testing Library (`@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom`).
+- Setup: `vitest.config.ts` uses `jsdom` with `src/test/setup.ts` for polyfills and Tauri API mocks.
+- Render helper: use `src/test/render.tsx` to render components with providers.
+- Queries: prefer accessible queries (role/name/label) over test ids; use `findBy*` or `waitFor` for async.
+- Hooks: test hooks through a minimal harness component and RTL `render` (do not use `react-test-renderer` nor manual roots).
+- Avoid: enzyme, react-test-renderer, manually creating React roots; assert behavior via the DOM, not implementation details.
+- Clean output: tests should run with zero warnings; console noise is suppressed in setup.
+
 ### Frontend (React)
 - Uses `@tauri-apps/api` with `src/tauri/bridge.ts`
 - Hooks (`useMCPService`, `useIncomingClients`) subscribe via `event.listen`
@@ -95,4 +106,4 @@ This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the of
 - Events: match existing event names; the UI hooks already listen for them.
 
 ## Git Commits
-Only create git commits when explicitly asked by the user. Do not automatically commit changes unless requested.
+Only create git commits when explicitly asked by the user. Do not automatically commit changes unless requested. Before committing, always run both Rust and frontend tests locally and ensure they pass cleanly with zero warnings.

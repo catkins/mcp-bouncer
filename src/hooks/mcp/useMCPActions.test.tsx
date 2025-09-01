@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
-import { createRoot } from 'react-dom/client';
 import { act } from 'react';
+import { render } from '../../test/render';
 
 vi.mock('../../tauri/bridge', async () => {
   const actual = await vi.importActual<Record<string, any>>('../../tauri/bridge');
@@ -42,23 +42,18 @@ function Harness({ servers, onState }: any) {
 
 describe('useMCPActions', () => {
   it('optimistically toggles and reverts on error', async () => {
-    const container = document.createElement('div');
-    document.body.appendChild(container);
-    const root = createRoot(container);
     let st: any;
-    await act(async () => {
-      root.render(
-        <Harness
-          servers={[
-            { name: 'svc', description: '', transport: 'stdio', command: 'cmd', enabled: false },
-          ]}
-          onState={(s: any) => (st = s)}
-        />,
-      );
-    });
+    render(
+      <Harness
+        servers={[
+          { name: 'svc', description: '', transport: 'stdio', command: 'cmd', enabled: false },
+        ]}
+        onState={(s: any) => (st = s)}
+      />,
+    );
 
     // Cause backend to fail
-    (MCPService.UpdateMCPServer as any).mockImplementationOnce(async () => {
+    ;(MCPService.UpdateMCPServer as any).mockImplementationOnce(async () => {
       throw new Error('boom');
     });
 

@@ -1,17 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-import { act } from 'react';
+import { render, screen } from '../test/render';
 import { ServerCard } from './ServerCard';
+import { cleanup } from '@testing-library/react';
+import { afterEach } from 'vitest';
 import { TransportType, type MCPServerConfig, type ClientStatus } from '../tauri/bridge';
 
-function render(el: React.ReactElement) {
-  const container = document.createElement('div');
-  document.body.appendChild(container);
-  const root = createRoot(container);
-  act(() => root.render(el));
-  return { container, root };
-}
+afterEach(() => cleanup());
 
 const baseServer: MCPServerConfig = {
   name: 'svc',
@@ -32,7 +26,7 @@ describe('ServerCard', () => {
       authorization_required: false,
       oauth_authenticated: false,
     };
-    const { container } = render(
+    render(
       <ServerCard
         server={baseServer}
         clientStatus={clientStatus}
@@ -41,8 +35,8 @@ describe('ServerCard', () => {
         onToggle={async () => {}}
       />,
     );
-    expect(container.textContent).toContain('Connected');
-    expect(container.textContent).toContain('stdio');
+    expect(screen.getByText(/Connected/i)).toBeInTheDocument();
+    expect(screen.getByText(/stdio/i)).toBeInTheDocument();
   });
 
   it('shows authorize when required', () => {
@@ -54,7 +48,7 @@ describe('ServerCard', () => {
       oauth_authenticated: false,
     };
     const onAuthorize = vi.fn();
-    const { container } = render(
+    render(
       <ServerCard
         server={{ ...baseServer, enabled: true }}
         clientStatus={status}
@@ -64,7 +58,8 @@ describe('ServerCard', () => {
         onAuthorize={async () => onAuthorize()}
       />,
     );
-    const btn = container.querySelector('button[aria-label^="Authorize"]');
-    expect(btn).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: /authorize svc/i }),
+    ).toBeInTheDocument();
   });
 });

@@ -1,22 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-import { act } from 'react';
+import { render, screen } from '../test/render';
+import userEvent from '@testing-library/user-event';
 import { ServerForm } from './ServerForm';
+import { cleanup } from '@testing-library/react';
+import { afterEach } from 'vitest';
 import { TransportType, type MCPServerConfig } from '../tauri/bridge';
 
-function render(el: React.ReactElement) {
-  const container = document.createElement('div');
-  document.body.appendChild(container);
-  const root = createRoot(container);
-  act(() => root.render(el));
-  return { container, root };
-}
+afterEach(() => cleanup());
 
 describe('ServerForm', () => {
   it('validates required fields based on transport', async () => {
     const calls: any[] = [];
-    const { container } = render(
+    render(
       <ServerForm
         existingServers={[]}
         onSave={async (cfg: MCPServerConfig) => { calls.push(cfg); }}
@@ -25,27 +20,20 @@ describe('ServerForm', () => {
     );
 
     // Name input
-    const name = container.querySelector('#server-name') as HTMLInputElement;
-    name.value = 'x';
-    name.dispatchEvent(new Event('input', { bubbles: true }));
+    const name = screen.getByLabelText(/Name/i) as HTMLInputElement;
+    await userEvent.clear(name);
+    await userEvent.type(name, 'x');
 
     // Command is required for stdio
-    const cmd = container.querySelector('#server-command') as HTMLInputElement;
-    expect(cmd).toBeTruthy();
+    expect(screen.getByLabelText(/Command/i)).toBeInTheDocument();
   });
 
   it('switching transport shows endpoint input', async () => {
-    const { container } = render(
+    render(
       <ServerForm existingServers={[]} onSave={async () => {}} onCancel={() => {}} />,
     );
-
-    const select = container.querySelector('select') as HTMLSelectElement;
-    await act(async () => {
-      select.value = TransportType.TransportSSE;
-      select.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-
-    const endpoint = container.querySelector('#server-endpoint') as HTMLInputElement;
-    expect(endpoint).toBeTruthy();
+    const select = screen.getByRole('combobox') as HTMLSelectElement;
+    await userEvent.selectOptions(select, TransportType.TransportSSE);
+    expect(screen.getByLabelText(/Endpoint/i)).toBeInTheDocument();
   });
 });

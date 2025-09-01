@@ -51,7 +51,7 @@ export function useMCPActions(
     (serverName: string, error?: string) => {
       deps.setErrors((prev: any) => ({
         ...prev,
-        toggleServer: { ...(prev.toggleServer || {}), [serverName]: error },
+        toggleServer: { ...prev.toggleServer, [serverName]: error },
       }));
     },
     [deps],

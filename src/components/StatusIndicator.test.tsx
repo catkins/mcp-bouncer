@@ -1,28 +1,22 @@
 import { describe, it, expect } from 'vitest';
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-import { act } from 'react';
+import { render, screen } from '../test/render';
+import { cleanup } from '@testing-library/react';
+import { afterEach } from 'vitest';
 import { StatusIndicator } from './StatusIndicator';
 
-function render(el: React.ReactElement) {
-  const container = document.createElement('div');
-  document.body.appendChild(container);
-  const root = createRoot(container);
-  act(() => root.render(el));
-  return { container, root };
-}
+afterEach(() => cleanup());
 
 describe('StatusIndicator', () => {
   it('renders checking state', () => {
-    const { container } = render(<StatusIndicator isActive={null} />);
-    expect(container.textContent).toContain('Checking');
+    render(<StatusIndicator isActive={null} />);
+    expect(screen.getByText(/Checking/i)).toBeInTheDocument();
   });
   it('renders active', () => {
-    const { container } = render(<StatusIndicator isActive={true} />);
-    expect(container.textContent).toContain('Active');
+    render(<StatusIndicator isActive={true} />);
+    expect(screen.getByText(/Active/i)).toBeInTheDocument();
   });
   it('renders inactive', () => {
-    const { container } = render(<StatusIndicator isActive={false} />);
-    expect(container.textContent).toContain('Inactive');
+    render(<StatusIndicator isActive={false} />);
+    expect(screen.getByText(/Inactive/i)).toBeInTheDocument();
   });
 });
