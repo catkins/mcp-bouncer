@@ -21,6 +21,10 @@ RUN apt-get update && apt-get install -y \
   patchelf \
   && rm -rf /var/lib/apt/lists/*
 
+# Install Tauri CLI for cargo subcommand
+RUN cargo install tauri-cli --locked
+RUN rustup component add clippy
+
 WORKDIR /app
 
 # Cache frontend dependencies
@@ -29,6 +33,3 @@ RUN npm ci
 
 # Copy the project
 COPY . .
-
-# Install Tauri CLI for cargo subcommand
-RUN cargo install tauri-cli --locked
