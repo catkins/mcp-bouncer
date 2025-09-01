@@ -255,15 +255,14 @@ async fn mcp_restart_client(app: tauri::AppHandle, name: String) -> Result<(), S
 }
 
 #[tauri::command]
-async fn mcp_authorize_client(app: tauri::AppHandle, name: String) -> Result<(), String> {
-    // Simulate successful OAuth: set oauth_authenticated=true and authorization_required=false
-    let mut state = load_clients_state();
-    let entry = state.0.entry(name.clone()).or_default();
-    entry.oauth_authenticated = Some(true);
-    entry.authorization_required = Some(false);
-    save_clients_state(&state)?;
-    client_status_changed(&TauriEventEmitter(app.clone()), &name, "authorize");
-    Ok(())
+async fn mcp_authorize_client(app: tauri::AppHandle, name: String, token: String) -> Result<(), String> {
+    app_logic::authorize_client(
+        &mcp_bouncer::config::OsConfigProvider,
+        &TauriEventEmitter(app.clone()),
+        &name,
+        &token,
+    )
+    .await
 }
 
 #[tauri::command]

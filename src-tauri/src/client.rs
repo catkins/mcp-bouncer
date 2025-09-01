@@ -1,7 +1,11 @@
 use std::{collections::HashMap, sync::Arc};
 
 use rmcp::service::RoleClient;
-use rmcp::transport::{StreamableHttpClientTransport, TokioChildProcess};
+use rmcp::transport::{
+    streamable_http_client::StreamableHttpClientTransportConfig,
+    StreamableHttpClientTransport,
+    TokioChildProcess,
+};
 use rmcp::ServiceExt;
 
 use crate::config::{MCPServerConfig, TransportType};
@@ -27,8 +31,17 @@ pub async fn ensure_rmcp_client(
         Some(TransportType::TransportStreamableHTTP) => {
             let endpoint = cfg.endpoint.clone().unwrap_or_default();
             if endpoint.is_empty() { return Err("no endpoint".into()); }
-            let transport = StreamableHttpClientTransport::from_uri(endpoint);
-            ().serve(transport).await.map_err(|e| format!("rmcp serve: {e}"))?
+            let mut conf = StreamableHttpClientTransportConfig::with_uri(endpoint);
+            if let Some(hmap) = &cfg.headers {
+                if let Some(auth) = hmap.get("Authorization").cloned() {
+                    let token = auth.strip_prefix("Bearer ").unwrap_or(&auth).to_string();
+                    conf = conf.auth_header(token);
+                }
+            }
+            let transport = StreamableHttpClientTransport::from_config(conf);
+            ().serve(transport)
+                .await
+                .map_err(|e| format!("rmcp serve: {e}"))?
         }
         Some(TransportType::TransportStdio) => {
             let cmd = cfg.command.clone();

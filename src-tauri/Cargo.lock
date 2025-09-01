@@ -1988,6 +1988,7 @@ checksum = "0e7465ac9959cc2b1404e8e2367b43684a6d13790fe23056cc8c6c5a6b7bcb94"
 name = "mcp-bouncer"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "axum",
  "base64 0.21.7",
  "bytes",

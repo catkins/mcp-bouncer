@@ -157,9 +157,9 @@ export function useMCPActions(
   );
 
   const authorizeServer = useCallback(
-    async (serverName: string) => {
+    async (serverName: string, token?: string) => {
       try {
-        await MCPService.AuthorizeClient(serverName);
+        await MCPService.AuthorizeClient(serverName, token);
         await deps.loadClientStatus();
       } catch (error) {
         console.error('Failed to authorize server:', error);

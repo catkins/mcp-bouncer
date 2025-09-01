@@ -31,3 +31,6 @@ png = "0.17"
 
 [features]
 default = []
+
+[dev-dependencies]
+async-trait = "0.1"

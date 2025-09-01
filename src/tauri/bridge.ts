@@ -76,8 +76,8 @@ export const MCPService = {
   async RestartClient(name: string): Promise<void> {
     return invoke('mcp_restart_client', { name });
   },
-  async AuthorizeClient(name: string): Promise<void> {
-    return invoke('mcp_authorize_client', { name });
+  async AuthorizeClient(name: string, token?: string): Promise<void> {
+    return invoke('mcp_authorize_client', { name, token: token ?? '' });
   },
   async GetClientTools(clientName: string): Promise<any[]> {
     return invoke('mcp_get_client_tools', { clientName });
