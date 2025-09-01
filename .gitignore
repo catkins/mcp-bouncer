@@ -7,7 +7,7 @@ storybook-static
 .crush/
 .env
 
-/.plans/
+/.plan/
 
 # Rust target dir
 src-tauri/target/

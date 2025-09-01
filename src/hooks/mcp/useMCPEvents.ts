@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import { Events } from '../../tauri/bridge';
-import { EventsMap, type ClientErrorPayload, type TauriEvent } from '../../types/events';
+import { listen } from '@tauri-apps/api/event';
+import { EventsMap, type ClientErrorPayload } from '../../types/events';
 
 export function useMCPEvents(
   deps: {
@@ -13,34 +13,37 @@ export function useMCPEvents(
   },
 ) {
   useEffect(() => {
-    const onServersUpdated = Events.On(EventsMap.ServersUpdated, async (event) => {
+    const unsubs: Array<() => void> = [];
+    let cancelled = false;
+
+    listen(EventsMap.ServersUpdated, async (event) => {
       if (import.meta.env.DEV) console.log('Received mcp:servers_updated event:', event);
       await deps.loadServers();
       await deps.loadActive();
       await deps.loadClientStatus();
-    });
+    }).then(u => (cancelled ? u() : unsubs.push(u)));
 
-    const onSettingsUpdated = Events.On(EventsMap.SettingsUpdated, async (event) => {
+    listen(EventsMap.SettingsUpdated, async (event) => {
       if (import.meta.env.DEV) console.log('Received settings:updated event:', event);
       await deps.loadSettings();
       await deps.loadMcpUrl();
       await deps.loadServers();
       await deps.loadClientStatus();
-    });
+    }).then(u => (cancelled ? u() : unsubs.push(u)));
 
-    const onClientStatusChanged = Events.On(EventsMap.ClientStatusChanged, async (event) => {
+    listen(EventsMap.ClientStatusChanged, async (event) => {
       if (import.meta.env.DEV) console.log('Received mcp:client_status_changed event:', event);
       await deps.loadClientStatus();
-    });
+    }).then(u => (cancelled ? u() : unsubs.push(u)));
 
-    const onClientError = Events.On(EventsMap.ClientError, async (event: TauriEvent<ClientErrorPayload>) => {
+    listen<ClientErrorPayload>(EventsMap.ClientError, async (event) => {
       if (import.meta.env.DEV) console.log('Received mcp:client_error event:', event);
-      const data = event.data;
+      const data = event.payload;
       if (data && data.server_name) {
         deps.setToggleError(data.server_name, `${data.action} failed: ${data.error}`);
         await deps.loadClientStatus();
       }
-    });
+    }).then(u => (cancelled ? u() : unsubs.push(u)));
 
     // Poll client status every 5s as a safety net
     let cancelled = false;
@@ -58,13 +61,9 @@ export function useMCPEvents(
     tick();
 
     return () => {
-      onServersUpdated();
-      onSettingsUpdated();
-      onClientStatusChanged();
-      onClientError();
       cancelled = true;
+      unsubs.forEach(u => u());
       clearInterval(intervalId);
     };
   }, [deps]);
 }
-

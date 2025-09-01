@@ -1,10 +1,8 @@
-// Minimal Tauri v2 adapter replacing Wails runtime/bindings
-// Provides: Events.On, MCPService, SettingsService, and shared types.
+// Tauri v2 bridge: exports MCPService, SettingsService, and shared types.
 
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
 
-// Types matching previous Wails-generated bindings
+// Shared types for frontend-backend communication
 export enum TransportType {
   TransportStdio = 'stdio',
   TransportSSE = 'sse',
@@ -45,33 +43,6 @@ export type IncomingClient = {
   version: string;
   title?: string;
   connected_at: string | Date | null;
-};
-
-// Event compatibility wrapper
-export const Events = {
-  On(event: string, handler: (e: { data: any }) => void): () => void {
-    let unlisten: null | (() => void) = null;
-    let pendingUnsub: boolean = false;
-    // Bridge Tauri event payload into Wails-like signature
-    listen(event, evt => handler({ data: (evt as any).payload }))
-      .then(u => {
-        unlisten = u;
-        if (pendingUnsub && unlisten) {
-          unlisten();
-          unlisten = null;
-        }
-      })
-      .catch(err => console.error('Events.On listen error', err));
-
-    return () => {
-      if (unlisten) {
-        unlisten();
-        unlisten = null;
-      } else {
-        pendingUnsub = true;
-      }
-    };
-  },
 };
 
 export const MCPService = {

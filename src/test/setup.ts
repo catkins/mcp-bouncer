@@ -23,18 +23,16 @@ if (typeof window !== 'undefined' && !('matchMedia' in window)) {
 // Extend expect with jest-dom matchers for better DOM assertions
 import '@testing-library/jest-dom/vitest';
 import { vi } from 'vitest';
+import { mockIPC, clearMocks } from '@tauri-apps/api/mocks';
 
-// Mock Tauri APIs to avoid event/invoke noise in tests
-vi.mock('@tauri-apps/api/event', () => ({
-  listen: vi.fn(async (_name: string, _cb: any) => {
-    // return unsubscribe
-    return () => {};
-  }),
-}));
+// Provide a baseline IPC mock so `invoke` calls are intercepted in tests.
+beforeEach(() => {
+  mockIPC(() => undefined);
+});
 
-vi.mock('@tauri-apps/api/core', () => ({
-  invoke: vi.fn(async (_cmd: string, _args?: any) => undefined),
-}));
+afterEach(() => {
+  clearMocks();
+});
 
 // Silence console warnings/errors from optimistic updates and mocked backends
 console.warn = vi.fn();

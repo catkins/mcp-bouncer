@@ -29,9 +29,3 @@ export interface IncomingClientConnectedPayload {
 export interface IncomingClientDisconnectedPayload {
   id: string;
 }
-
-// Generic wrapper used by our Events.On bridge
-export interface TauriEvent<T = unknown> {
-  data: T;
-}
-

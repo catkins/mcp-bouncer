@@ -3,31 +3,21 @@ import { useEffect } from 'react';
 import { act } from 'react';
 import { render, waitFor } from '../test/render';
 
-// Mock the Tauri bridge
+// Mock the Tauri bridge for service calls only
 vi.mock('../tauri/bridge', async () => {
   const actual = await vi.importActual<Record<string, any>>('../tauri/bridge');
-  let listeners: Record<string, (e: any) => void> = {};
   return {
     ...actual,
     MCPService: {
       ...actual.MCPService,
       GetIncomingClients: vi.fn(async () => []),
     },
-    Events: {
-      On: (event: string, handler: (e: { data: any }) => void) => {
-        listeners[event] = handler;
-        return () => delete listeners[event];
-      },
-      // helper for tests
-      __emit: (event: string, data: any) => {
-        listeners[event]?.({ data });
-      },
-    },
   };
 });
 
 import { useIncomingClients } from './useIncomingClients';
-import { Events } from '../tauri/bridge';
+import { emit } from '@tauri-apps/api/event';
+import { mockIPC } from '@tauri-apps/api/mocks';
 import { EventsMap } from '../types/events';
 
 function TestHarness({ onState }: { onState: (s: any) => void }) {
@@ -40,6 +30,9 @@ function TestHarness({ onState }: { onState: (s: any) => void }) {
 
 describe('useIncomingClients', () => {
   it('initially loads and updates on events', async () => {
+    // enable event mocking for this test
+    mockIPC(() => undefined, { shouldMockEvents: true });
+
     let latestState: any;
     render(<TestHarness onState={s => (latestState = s)} />);
     // ensure effects run and listeners are registered
@@ -52,7 +45,7 @@ describe('useIncomingClients', () => {
 
     // Emit connect event
     await act(async () => {
-      (Events as any).__emit(EventsMap.IncomingClientConnected, {
+      await emit(EventsMap.IncomingClientConnected, {
         id: 'c1',
         name: 'client',
         version: '1.0.0',
@@ -67,7 +60,7 @@ describe('useIncomingClients', () => {
 
     // Emit disconnect event
     await act(async () => {
-      (Events as any).__emit(EventsMap.IncomingClientDisconnected, { id: 'c1' });
+      await emit(EventsMap.IncomingClientDisconnected, { id: 'c1' });
     });
 
     await waitFor(() => {

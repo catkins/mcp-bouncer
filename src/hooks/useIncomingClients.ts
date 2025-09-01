@@ -1,12 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Events, MCPService } from '../tauri/bridge';
+import { MCPService } from '../tauri/bridge';
+import { listen } from '@tauri-apps/api/event';
 import { normalizeConnectedAt } from '../utils/date';
-import {
-  EventsMap,
-  type IncomingClientConnectedPayload,
-  type IncomingClientDisconnectedPayload,
-  type TauriEvent,
-} from '../types/events';
+import { EventsMap, type IncomingClientConnectedPayload, type IncomingClientDisconnectedPayload } from '../types/events';
 
 export type IncomingClient = {
   id: string;
@@ -36,8 +32,8 @@ export function useIncomingClients() {
   useEffect(() => {
     reload();
 
-    const unsub1 = Events.On(EventsMap.IncomingClientConnected, async (e: TauriEvent<IncomingClientConnectedPayload>) => {
-      const data = e.data;
+    const unsub1Promise = listen<IncomingClientConnectedPayload>(EventsMap.IncomingClientConnected, async (e) => {
+      const data = e.payload;
       setClients(prev => {
         const rest = prev.filter(c => c.id !== data.id);
         return [
@@ -53,19 +49,20 @@ export function useIncomingClients() {
       });
     });
 
-    const unsub2 = Events.On(EventsMap.IncomingClientDisconnected, async (e: TauriEvent<IncomingClientDisconnectedPayload>) => {
-      const data = e.data;
+    const unsub2Promise = listen<IncomingClientDisconnectedPayload>(EventsMap.IncomingClientDisconnected, async (e) => {
+      const data = e.payload;
       setClients(prev => prev.filter(c => c.id !== data.id));
     });
 
-    const unsub3 = Events.On(EventsMap.IncomingClientsUpdated, async () => {
+    const unsub3Promise = listen(EventsMap.IncomingClientsUpdated, async () => {
       await reload();
     });
 
     return () => {
-      unsub1();
-      unsub2();
-      unsub3();
+      // Best-effort unsubscribe once listeners are registered
+      unsub1Promise.then(u => u()).catch(() => {});
+      unsub2Promise.then(u => u()).catch(() => {});
+      unsub3Promise.then(u => u()).catch(() => {});
     };
   }, []);
 
