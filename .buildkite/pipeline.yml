@@ -29,7 +29,7 @@ steps:
 
   - label: ":tauri: Tauri Build"
     command: |
-      npx tauri build
+      cargo tauri build --verbose
     plugins:
       - docker-compose#v5.10.0:
           run: app

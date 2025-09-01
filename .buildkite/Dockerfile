@@ -29,3 +29,6 @@ RUN npm ci
 
 # Copy the project
 COPY . .
+
+# Install Tauri CLI for cargo subcommand
+RUN cargo install tauri-cli --locked
