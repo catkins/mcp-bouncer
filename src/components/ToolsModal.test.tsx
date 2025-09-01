@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '../test/render';
+import { render } from '../test/render';
 import { cleanup } from '@testing-library/react';
 import { afterEach } from 'vitest';
 import userEvent from '@testing-library/user-event';

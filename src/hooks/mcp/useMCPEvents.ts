@@ -46,7 +46,6 @@ export function useMCPEvents(
     }).then(u => (cancelled ? u() : unsubs.push(u)));
 
     // Poll client status every 5s as a safety net
-    let cancelled = false;
     let ticking = false;
     const tick = async () => {
       if (ticking) return;
