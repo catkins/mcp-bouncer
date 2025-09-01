@@ -49,13 +49,14 @@ export function ServerList({
   const [editingServer, setEditingServer] = useState<MCPServerConfig | null>(null);
   const [toolsModalServer, setToolsModalServer] = useState<string | null>(null);
 
-  // Debug logging
+  // Optional debug logging in dev
   useEffect(() => {
-    console.log('ServerList state:', {
-      showAddServer,
-      editingServer: !!editingServer,
-      toolsModalServer,
-    });
+    if (import.meta.env.DEV)
+      console.log('ServerList state:', {
+        showAddServer,
+        editingServer: !!editingServer,
+        toolsModalServer,
+      });
   }, [showAddServer, editingServer, toolsModalServer]);
 
   const handleSaveServer = async (serverConfig: MCPServerConfig) => {
@@ -74,13 +75,13 @@ export function ServerList({
   };
 
   const handleCancelServer = () => {
-    console.log('Canceling server form');
+    if (import.meta.env.DEV) console.log('Canceling server form');
     setShowAddServer(false);
     setEditingServer(null);
   };
 
   const handleEditServer = (server: MCPServerConfig) => {
-    console.log('Editing server:', server.name);
+    if (import.meta.env.DEV) console.log('Editing server:', server.name);
     setEditingServer(server);
   };
 
@@ -93,17 +94,17 @@ export function ServerList({
   };
 
   const handleAddServer = () => {
-    console.log('Opening add server form');
+    if (import.meta.env.DEV) console.log('Opening add server form');
     setShowAddServer(true);
   };
 
   const handleOpenTools = (serverName: string) => {
-    console.log('Opening tools modal for server:', serverName);
+    if (import.meta.env.DEV) console.log('Opening tools modal for server:', serverName);
     setToolsModalServer(serverName);
   };
 
   const handleCloseTools = () => {
-    console.log('Closing tools modal');
+    if (import.meta.env.DEV) console.log('Closing tools modal');
     setToolsModalServer(null);
   };
 

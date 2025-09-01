@@ -116,6 +116,7 @@ export function ServerCard({
                     toggleLoading ? 'animate-pulse' : ''
                   }`}
                   title="Click to manage tools"
+                  aria-label={`Open tools for ${server.name}`}
                 >
                   <WrenchScrewdriverIcon className="w-3 h-3" />
                   {clientStatus.tools}
@@ -128,6 +129,7 @@ export function ServerCard({
                     toggleLoading ? 'animate-pulse' : ''
                   }`}
                   title="Authorization required"
+                  aria-label={`Authorize ${server.name}`}
                 >
                   <KeyIcon className="w-3 h-3" />
                   Authorize
@@ -153,6 +155,7 @@ export function ServerCard({
               variant="secondary"
               size="sm"
               className={`p-1.5 transition-all duration-200 ${toggleLoading ? 'opacity-50' : ''}`}
+              ariaLabel={`Restart ${server.name}`}
             >
               <ArrowPathIcon className="h-3.5 w-3.5" />
             </LoadingButton>
@@ -172,6 +175,7 @@ export function ServerCard({
             variant="secondary"
             size="sm"
             className={`p-1.5 transition-all duration-200 ${toggleLoading ? 'opacity-50' : ''}`}
+            ariaLabel={`Edit ${server.name}`}
           >
             <PencilIcon className="h-3.5 w-3.5" />
           </LoadingButton>
@@ -181,6 +185,7 @@ export function ServerCard({
             variant="danger"
             size="sm"
             className={`p-1.5 transition-all duration-200 ${toggleLoading ? 'opacity-50' : ''}`}
+            ariaLabel={`Remove ${server.name}`}
           >
             <TrashIcon className="h-3.5 w-3.5" />
           </LoadingButton>

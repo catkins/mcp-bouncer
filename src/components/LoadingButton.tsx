@@ -9,6 +9,7 @@ interface LoadingButtonProps {
   size?: 'sm' | 'md' | 'lg';
   className?: string;
   type?: 'button' | 'submit';
+  ariaLabel?: string;
 }
 
 export function LoadingButton({
@@ -20,6 +21,7 @@ export function LoadingButton({
   size = 'md',
   className = '',
   type = 'button',
+  ariaLabel,
 }: LoadingButtonProps) {
   const baseClasses =
     'inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden';
@@ -55,6 +57,7 @@ export function LoadingButton({
       type={type}
       onClick={handleClick}
       disabled={loading || disabled}
+      aria-label={ariaLabel}
       className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className} ${
         loading ? 'animate-pulse' : ''
       } ${variant === 'primary' && !loading ? 'animate-gradient' : ''}`}

@@ -1,15 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { IncomingClient } from '../hooks/useIncomingClients';
 import { ClockIcon } from '@heroicons/react/24/outline';
-
-import { formatDistance } from 'date-fns';
-
-function timeAgo(input: string | Date | null): string {
-  if (!input) return '';
-  return formatDistance(input, new Date(), {
-    addSuffix: true,
-  });
-}
+import { timeAgo } from '../utils/date';
 
 export function ClientCard({ client }: { client: IncomingClient }) {
   const [tick, setTick] = useState(0);

@@ -89,6 +89,4 @@
   transition-duration: 150ms;
 }
 
-body {
-  background-color: black;
-}
+/* Respect theme classes managed by useTheme; no hardcoded page bg */

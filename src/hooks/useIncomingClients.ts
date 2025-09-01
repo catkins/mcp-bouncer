@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Events, MCPService } from '../tauri/bridge';
+import { normalizeConnectedAt } from '../utils/date';
+import {
+  EventsMap,
+  type IncomingClientConnectedPayload,
+  type IncomingClientDisconnectedPayload,
+  type TauriEvent,
+} from '../types/events';
 
 export type IncomingClient = {
   id: string;
@@ -18,12 +25,7 @@ export function useIncomingClients() {
       setClients(
         list.map(item => ({
           ...item,
-          connected_at:
-            typeof item.connected_at === 'string' || item.connected_at instanceof Date
-              ? item.connected_at
-              : item.connected_at && item.connected_at.Time
-                ? item.connected_at.Time
-                : item.connected_at,
+          connected_at: normalizeConnectedAt(item.connected_at),
         })),
       );
     } catch (e) {
@@ -34,8 +36,8 @@ export function useIncomingClients() {
   useEffect(() => {
     reload();
 
-    const unsub1 = Events.On('mcp:incoming_client_connected', async (e: any) => {
-      const data = e.data as any;
+    const unsub1 = Events.On(EventsMap.IncomingClientConnected, async (e: TauriEvent<IncomingClientConnectedPayload>) => {
+      const data = e.data;
       setClients(prev => {
         const rest = prev.filter(c => c.id !== data.id);
         return [
@@ -45,21 +47,18 @@ export function useIncomingClients() {
             name: data.name,
             version: data.version,
             title: data.title,
-            connected_at:
-              typeof data.connected_at === 'string'
-                ? data.connected_at
-                : new Date(data.connected_at).toISOString(),
+            connected_at: normalizeConnectedAt(data.connected_at),
           },
         ];
       });
     });
 
-    const unsub2 = Events.On('mcp:incoming_client_disconnected', async (e: any) => {
-      const data = e.data as any;
+    const unsub2 = Events.On(EventsMap.IncomingClientDisconnected, async (e: TauriEvent<IncomingClientDisconnectedPayload>) => {
+      const data = e.data;
       setClients(prev => prev.filter(c => c.id !== data.id));
     });
 
-    const unsub3 = Events.On('mcp:incoming_clients_updated', async (e: any) => {
+    const unsub3 = Events.On(EventsMap.IncomingClientsUpdated, async () => {
       await reload();
     });
 

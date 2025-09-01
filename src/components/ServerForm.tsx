@@ -10,59 +10,10 @@ import { TransportType } from '../tauri/bridge';
 import type { MCPServerConfig } from '../tauri/bridge';
 import { LoadingButton } from './LoadingButton';
 import { ToggleSwitch } from './ToggleSwitch';
+import { FormInput } from './FormInput';
+import { KeyValueList } from './KeyValueList';
 
-interface FormInputProps {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  error?: string;
-  required?: boolean;
-  placeholder?: string;
-  type?: string;
-}
-
-function FormInput({
-  id,
-  label,
-  value,
-  onChange,
-  error,
-  required = false,
-  placeholder,
-  type = 'text',
-}: FormInputProps) {
-  const getInputClassName = () => {
-    const baseClasses =
-      'w-full px-2 py-1.5 border rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:border-transparent text-sm';
-    const errorClasses = 'border-red-500 focus:ring-red-500';
-    const normalClasses =
-      'border-gray-300 dark:border-gray-700 focus:ring-purple-500 dark:focus:ring-purple-400';
-
-    return `${baseClasses} ${error ? errorClasses : normalClasses}`;
-  };
-
-  return (
-    <div>
-      <label
-        htmlFor={id}
-        className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1"
-      >
-        {label} {required && '*'}
-      </label>
-      <input
-        id={id}
-        type={type}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className={getInputClassName()}
-        required={required}
-        placeholder={placeholder}
-      />
-      {error && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
-    </div>
-  );
-}
+// FormInput moved to components/FormInput.tsx
 
 interface ServerFormProps {
   server?: MCPServerConfig | null;
@@ -410,7 +361,7 @@ export function ServerForm({
                       variant="danger"
                       size="sm"
                       className="p-1.5"
-                      aria-label={`Remove argument ${index + 1}`}
+                      ariaLabel={`Remove argument ${index + 1}`}
                     >
                       <TrashIcon className="h-3 w-3 inline-block" />
                     </LoadingButton>
@@ -421,108 +372,30 @@ export function ServerForm({
           )}
 
           {formData.transport === TransportType.TransportStdio && (
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
-                  Environment Variables
-                </label>
-                <LoadingButton
-                  type="button"
-                  onClick={addEnvVar}
-                  variant="secondary"
-                  size="sm"
-                  className="text-xs px-1.5 py-0.5 h-5"
-                >
-                  <PlusIcon className="h-2.5 w-2.5 inline-block" />
-                  Add
-                </LoadingButton>
-              </div>
-              <div className="space-y-1.5">
-                {Object.entries(formData.env || {}).map(([key, value], index) => (
-                  <div key={key} className="flex items-center gap-1.5">
-                    <input
-                      type="text"
-                      value={key}
-                      onChange={e => updateEnvVar(key, e.target.value, value)}
-                      className="w-1/3 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
-                      placeholder="Variable name"
-                      aria-label={`Environment variable name ${index + 1}`}
-                    />
-                    <input
-                      type="text"
-                      value={value}
-                      onChange={e => updateEnvVar(key, key, e.target.value)}
-                      className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
-                      placeholder="Value"
-                      aria-label={`Environment variable value ${index + 1}`}
-                    />
-                    <LoadingButton
-                      type="button"
-                      onClick={() => removeEnvVar(key)}
-                      variant="danger"
-                      size="sm"
-                      className="p-1.5"
-                      aria-label={`Remove environment variable ${key}`}
-                    >
-                      <TrashIcon className="h-3 w-3" />
-                    </LoadingButton>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <KeyValueList
+              label="Environment Variables"
+              items={formData.env || {}}
+              keyPlaceholder="Variable name"
+              valuePlaceholder="Value"
+              onAdd={addEnvVar}
+              onUpdate={updateEnvVar}
+              onRemove={removeEnvVar}
+              ariaLabelBase="Environment variable"
+            />
           )}
 
           {(formData.transport === TransportType.TransportSSE ||
             formData.transport === TransportType.TransportStreamableHTTP) && (
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
-                  HTTP Headers
-                </label>
-                <LoadingButton
-                  type="button"
-                  onClick={addHeader}
-                  variant="secondary"
-                  size="sm"
-                  className="text-xs px-1.5 py-0.5 h-5"
-                >
-                  <PlusIcon className="h-2.5 w-2.5 inline-block" />
-                  Add
-                </LoadingButton>
-              </div>
-              <div className="space-y-1.5">
-                {Object.entries(formData.headers || {}).map(([key, value], index) => (
-                  <div key={key} className="flex items-center gap-1.5">
-                    <input
-                      type="text"
-                      value={key}
-                      onChange={e => updateHeader(key, e.target.value, value)}
-                      className="w-1/3 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
-                      placeholder="Header name"
-                      aria-label={`HTTP header name ${index + 1}`}
-                    />
-                    <input
-                      type="text"
-                      value={value}
-                      onChange={e => updateHeader(key, key, e.target.value)}
-                      className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
-                      placeholder="Value"
-                      aria-label={`HTTP header value ${index + 1}`}
-                    />
-                    <LoadingButton
-                      type="button"
-                      onClick={() => removeHeader(key)}
-                      variant="danger"
-                      size="sm"
-                      className="p-1.5"
-                      aria-label={`Remove HTTP header ${key}`}
-                    >
-                      <TrashIcon className="h-3 w-3" />
-                    </LoadingButton>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <KeyValueList
+              label="HTTP Headers"
+              items={formData.headers || {}}
+              keyPlaceholder="Header name"
+              valuePlaceholder="Value"
+              onAdd={addHeader}
+              onUpdate={updateHeader}
+              onRemove={removeHeader}
+              ariaLabelBase="HTTP header"
+            />
           )}
 
           <div className="pt-1">
