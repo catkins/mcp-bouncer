@@ -1,13 +1,14 @@
 import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { act } from 'react';
 import { TabSwitcher } from './TabSwitcher';
 
 function render(el: React.ReactElement) {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
-  root.render(el);
+  act(() => root.render(el));
   return { container, root };
 }
 
@@ -24,4 +25,3 @@ describe('TabSwitcher', () => {
     expect(onChange).toHaveBeenCalledWith('clients');
   });
 });
-

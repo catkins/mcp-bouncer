@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { act } from 'react';
 import { ServerCard } from './ServerCard';
 import { TransportType, type MCPServerConfig, type ClientStatus } from '../tauri/bridge';
 
@@ -8,7 +9,7 @@ function render(el: React.ReactElement) {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
-  root.render(el);
+  act(() => root.render(el));
   return { container, root };
 }
 
@@ -67,4 +68,3 @@ describe('ServerCard', () => {
     expect(btn).toBeTruthy();
   });
 });
-

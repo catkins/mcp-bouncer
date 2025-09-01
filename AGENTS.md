@@ -16,7 +16,12 @@ Tip: From the repository root, prefer passing `--manifest-path` for Rust backend
 ### Frontend
 - Dev server: `npm run dev`
 - Build: `npm run build`
+- Tests: `npm run test:run` (Vitest)
 - Format: `npm run format` / `npm run format:check`
+
+#### Verify Changes (required)
+- Run `npm run build` to catch type errors and bundling issues.
+- Run `npm run test:run` to execute the frontend test suite.
 
 ## Architecture Overview
 
@@ -58,7 +63,8 @@ This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the of
 
 #### Running Tests
 
-- Rust backend tests: `cd src-tauri && cargo test --lib --tests`
+- Rust backend: `cd src-tauri && cargo test --lib --tests`
+- Frontend: `npm run test:run`
 
 ### Frontend (React)
 - Uses `@tauri-apps/api` with `src/tauri/bridge.ts`

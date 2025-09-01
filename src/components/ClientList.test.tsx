@@ -1,13 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { act } from 'react';
 import { ClientList } from './ClientList';
 
 function render(el: React.ReactElement) {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
-  root.render(el);
+  act(() => root.render(el));
   return { container, root };
 }
 
@@ -30,4 +31,3 @@ describe('ClientList', () => {
     expect(container.textContent).toContain('c2');
   });
 });
-

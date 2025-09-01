@@ -19,7 +19,7 @@ describe('ServerForm', () => {
     const { container } = render(
       <ServerForm
         existingServers={[]}
-        onSave={async (cfg: MCPServerConfig) => calls.push(cfg)}
+        onSave={async (cfg: MCPServerConfig) => { calls.push(cfg); }}
         onCancel={() => {}}
       />,
     );

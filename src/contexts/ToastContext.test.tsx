@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { act } from 'react';
 import { ToastProvider, useToast } from './ToastContext';
 
 function Harness() {
@@ -15,25 +15,32 @@ function Harness() {
 }
 
 describe('ToastContext', () => {
-  it('adds and removes toasts', () => {
+  it('adds and removes toasts', async () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
     const root = createRoot(container);
 
-    root.render(
-      <ToastProvider>
-        <Harness />
-      </ToastProvider>,
+    act(() =>
+      root.render(
+        <ToastProvider>
+          <Harness />
+        </ToastProvider>,
+      ),
     );
 
     const add = container.querySelector('#add') as HTMLButtonElement;
     const rm = container.querySelector('#rm') as HTMLButtonElement;
     const count = () => container.querySelector('#count')!.textContent;
 
-    add.click();
+    await act(async () => {
+      add.click();
+      await new Promise(r => setTimeout(r, 0));
+    });
     expect(count()).toBe('1');
-    rm.click();
+    await act(async () => {
+      rm.click();
+      await new Promise(r => setTimeout(r, 0));
+    });
     expect(count()).toBe('0');
   });
 });
-

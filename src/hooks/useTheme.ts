@@ -10,8 +10,12 @@ export function useTheme() {
       return savedTheme;
     }
 
-    // Check system preference
-    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    // Check system preference (guard for non-browser environments)
+    const prefersDark =
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (prefersDark) {
       return 'dark';
     }
 

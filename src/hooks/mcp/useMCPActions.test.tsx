@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { act } from 'react';
 
 vi.mock('../../tauri/bridge', async () => {
   const actual = await vi.importActual<Record<string, any>>('../../tauri/bridge');
@@ -45,21 +46,26 @@ describe('useMCPActions', () => {
     document.body.appendChild(container);
     const root = createRoot(container);
     let st: any;
-    root.render(
-      <Harness
-        servers={[{ name: 'svc', description: '', transport: 'stdio', command: 'cmd', enabled: false }]}
-        onState={(s: any) => (st = s)}
-      />,
-    );
+    await act(async () => {
+      root.render(
+        <Harness
+          servers={[
+            { name: 'svc', description: '', transport: 'stdio', command: 'cmd', enabled: false },
+          ]}
+          onState={(s: any) => (st = s)}
+        />,
+      );
+    });
 
     // Cause backend to fail
     (MCPService.UpdateMCPServer as any).mockImplementationOnce(async () => {
       throw new Error('boom');
     });
 
-    await st.actions.toggleServer('svc', true).catch(() => {});
+    await act(async () => {
+      await st.actions.toggleServer('svc', true).catch(() => {});
+    });
     // Reverted to false
     expect(st.list.find((s: any) => s.name === 'svc').enabled).toBe(false);
   });
 });
-
