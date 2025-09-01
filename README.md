@@ -34,6 +34,11 @@ MCP Bouncer acts as a centralized hub for managing Model Context Protocol server
 - Toast notifications for user feedback
 - Compact, efficient layout design
 
+### 👀 Incoming Clients
+- As MCP clients connect to the built‑in Streamable HTTP server, they appear in the Incoming Clients list.
+- Shows reported client `name`, `version`, and optional `title` (when provided by the client during Initialize).
+- Connection time `connected_at` is in RFC3339 (ISO 8601) format for reliable display in the UI.
+
 ### ⚙️ Configuration Management
 - Automatic settings persistence in platform-specific locations
 - JSON-based configuration format
@@ -156,6 +161,7 @@ mcp-bouncer/
 │       ├── status.rs         # Client status aggregation logic
 │       ├── events.rs         # Event emission abstraction + helpers
 │       ├── app_logic.rs      # Thin orchestration adapters (e.g., settings update)
+│       ├── incoming.rs       # In‑memory registry for incoming clients (Initialize)
 │       └── main.rs           # App entry; thin Tauri commands wiring
 └── settings.example.json     # Example configuration
 ```
@@ -185,7 +191,8 @@ mcp-bouncer/
 - **Backend**: Rust (Tauri v2). Hosts an rmcp Streamable HTTP server at `http://127.0.0.1:8091/mcp`.
   - Aggregates and proxies to configured upstream MCP servers (Streamable HTTP, STDIO) via rmcp clients.
   - Tool names are prefixed `server::tool` to disambiguate across servers.
-  - Emits UI events (servers_updated, settings:updated, client_status_changed, client_error).
+  - Emits UI events (servers_updated, settings:updated, client_status_changed, client_error, incoming_clients_updated).
+  - Tracks incoming clients on rmcp Initialize; timestamps are RFC3339 for easy JS parsing.
   - Code is split into focused modules (config, client, status, events) for testability; `main.rs` stays thin.
 - **Frontend**: React 19 + TypeScript + Tailwind CSS 4 + Vite.
   - Uses `@tauri-apps/api` and a small adapter at `src/tauri/bridge.ts` for commands and events.

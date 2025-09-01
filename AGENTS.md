@@ -31,6 +31,7 @@ This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the of
 - `src-tauri/src/status.rs`: Client status aggregation logic
 - `src-tauri/src/events.rs`: Event emission abstraction and helpers
 - `src-tauri/src/app_logic.rs`: Thin adapters (e.g., settings update) using config + events
+- `src-tauri/src/incoming.rs`: In-memory registry of incoming clients recorded on rmcp Initialize
 - `src-tauri/tauri.conf.json`: Tauri config (build hooks and frontendDist)
 - `src-tauri/capabilities/events.json`: grants `event.listen` to the main window/webview
 - `src/tauri/bridge.ts`: minimal adapter for Tauri `invoke` + `listen`
@@ -45,6 +46,7 @@ This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the of
 - Emits events consumed by UI:
   - `mcp:servers_updated`, `settings:updated`, `mcp:client_status_changed`, `mcp:client_error`, `mcp:incoming_clients_updated`
 - Settings JSON: `$XDG_CONFIG_HOME/mcp-bouncer/settings.json`
+- Incoming clients: recorded when rmcp Initialize is received; `connected_at` uses RFC3339 (ISO 8601) strings for robust JS parsing.
 
 #### Testability Notes (backend)
 
@@ -52,6 +54,7 @@ This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the of
 - Filesystem: accept a `&dyn ConfigProvider` when adding persistence so tests can redirect IO.
 - Events: use `events::EventEmitter` and helper functions (`servers_updated`, `client_status_changed`, etc.). In Tauri commands, wrap `AppHandle` with `TauriEventEmitter`. In tests, use `MockEventEmitter`.
 - Status: prefer `status::compute_client_status_map_with(cp, registry, lister)` for unit tests; production code uses `compute_client_status_map` which defaults to the OS provider.
+- Incoming: use `incoming::record_connect(name, version, title)` within rmcp Initialize handler. Client info extraction in `main.rs` looks under both `clientInfo.*` and `params.client_info.*` shapes.
 
 #### Running Tests
 
