@@ -150,7 +150,13 @@ mcp-bouncer/
 │   ├── capabilities/
 │   │   └── events.json       # Grants event.listen to main window
 │   └── src/
-│       └── main.rs           # App entry, rmcp server/clients, Tauri commands
+│       ├── lib.rs            # Backend library exposing modules for tests/commands
+│       ├── config.rs         # Settings + client-state persistence and shared types
+│       ├── client.rs         # RMCP client lifecycle and registry helpers
+│       ├── status.rs         # Client status aggregation logic
+│       ├── events.rs         # Event emission abstraction + helpers
+│       ├── app_logic.rs      # Thin orchestration adapters (e.g., settings update)
+│       └── main.rs           # App entry; thin Tauri commands wiring
 └── settings.example.json     # Example configuration
 ```
 
@@ -180,6 +186,7 @@ mcp-bouncer/
   - Aggregates and proxies to configured upstream MCP servers (Streamable HTTP, STDIO) via rmcp clients.
   - Tool names are prefixed `server::tool` to disambiguate across servers.
   - Emits UI events (servers_updated, settings:updated, client_status_changed, client_error).
+  - Code is split into focused modules (config, client, status, events) for testability; `main.rs` stays thin.
 - **Frontend**: React 19 + TypeScript + Tailwind CSS 4 + Vite.
   - Uses `@tauri-apps/api` and a small adapter at `src/tauri/bridge.ts` for commands and events.
 - **Settings**: JSON at `$XDG_CONFIG_HOME/mcp-bouncer/settings.json`.
@@ -189,6 +196,19 @@ mcp-bouncer/
 - Build app: `cargo tauri build`
 - Just backend: `cargo build --manifest-path src-tauri/Cargo.toml`
 - Just frontend: `npm run dev` / `npm run build`
+
+From the repository root, pass `--manifest-path` for Rust backend workflows:
+
+```bash
+# Type-check backend from root
+cargo check --manifest-path src-tauri/Cargo.toml
+
+# Run backend tests from root
+cargo test --manifest-path src-tauri/Cargo.toml --lib --tests
+
+# Build backend only from root
+cargo build --manifest-path src-tauri/Cargo.toml
+```
 
 ## Contributing
 

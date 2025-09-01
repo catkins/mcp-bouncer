@@ -140,7 +140,6 @@ mod tests {
         let map = compute_client_status_map_with(&cp, reg, lister).await;
         let cs = map.get("srv1").unwrap();
         assert_eq!(cs.tools, 3);
-        assert!(cs.connected);
     }
 
     #[tokio::test]

@@ -7,6 +7,12 @@ This file provides guidance to coding agents when working with code in this repo
 - Build app: `cargo tauri build`
 - Backend only: `cargo build --manifest-path src-tauri/Cargo.toml`
 
+Tip: From the repository root, prefer passing `--manifest-path` for Rust backend tasks:
+
+- Run tests: `cargo test --manifest-path src-tauri/Cargo.toml`
+- Type-check: `cargo check --manifest-path src-tauri/Cargo.toml`
+- Build (debug): `cargo build --manifest-path src-tauri/Cargo.toml`
+
 ### Frontend
 - Dev server: `npm run dev`
 - Build: `npm run build`
