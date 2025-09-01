@@ -13,7 +13,46 @@ use mcp_bouncer::config::{
     save_settings, ClientStatus, IncomingClient, MCPServerConfig, Settings,
 };
 use mcp_bouncer::events::{client_error, client_status_changed, incoming_clients_updated, servers_updated, TauriEventEmitter};
+use mcp_bouncer::incoming::{list_incoming, record_connect};
 use mcp_bouncer::app_logic;
+
+// Helper: JSON path extraction for InitializeRequest params
+fn extract_str<'a>(val: &'a serde_json::Value, paths: &[&str]) -> Option<&'a str> {
+    for path in paths {
+        let mut cur = val;
+        let mut ok = true;
+        for seg in path.split('.') {
+            if let Some(obj) = cur.as_object() {
+                if let Some(next) = obj.get(seg) { cur = next; } else { ok = false; break; }
+            } else { ok = false; break; }
+        }
+        if ok { if let Some(s) = cur.as_str() { return Some(s); } }
+    }
+    None
+}
+
+#[cfg(test)]
+mod extract_tests {
+    use super::extract_str;
+    use serde_json::json;
+
+    #[test]
+    fn extracts_from_top_level_and_params() {
+        let a = json!({
+            "clientInfo": { "name": "TopClient", "version": "1.2.3", "title": "Top" }
+        });
+        assert_eq!(extract_str(&a, &["clientInfo.name"]).unwrap(), "TopClient");
+        assert_eq!(extract_str(&a, &["clientInfo.version"]).unwrap(), "1.2.3");
+        assert_eq!(extract_str(&a, &["clientInfo.title"]).unwrap(), "Top");
+
+        let b = json!({
+            "params": { "client_info": { "name": "ParamClient", "version": "9.9.9" } }
+        });
+        assert_eq!(extract_str(&b, &["params.client_info.name"]).unwrap(), "ParamClient");
+        assert_eq!(extract_str(&b, &["params.client_info.version"]).unwrap(), "9.9.9");
+        assert!(extract_str(&b, &["params.client_info.title"]).is_none());
+    }
+}
 
 // Types moved to config.rs
 
@@ -81,7 +120,7 @@ impl McpService<RoleServer> for BouncerService {
         _context: rmcp::service::RequestContext<RoleServer>,
     ) -> Result<mcp::ServerResult, mcp::ErrorData> {
         match request {
-            mcp::ClientRequest::InitializeRequest(_req) => {
+            mcp::ClientRequest::InitializeRequest(req) => {
                 let capabilities = mcp::ServerCapabilities::builder()
                     .enable_logging()
                     .enable_tools()
@@ -96,6 +135,25 @@ impl McpService<RoleServer> for BouncerService {
                     },
                     instructions: None,
                 };
+                // Best-effort extraction of client info to track incoming connections.
+                // We avoid relying on private struct fields by serializing.
+                if let Ok(val) = serde_json::to_value(&req) {
+                    // Try both top-level and params.* locations to be robust across rmcp versions
+                    let name = extract_str(&val, &[
+                        "clientInfo.name", "client_info.name", "client.name",
+                        "params.clientInfo.name", "params.client_info.name", "params.client.name",
+                    ]).unwrap_or("unknown");
+                    let version = extract_str(&val, &[
+                        "clientInfo.version", "client_info.version", "client.version",
+                        "params.clientInfo.version", "params.client_info.version", "params.client.version",
+                    ]).unwrap_or("");
+                    let title = extract_str(&val, &[
+                        "clientInfo.title", "client_info.title", "title",
+                        "params.clientInfo.title", "params.client_info.title", "params.title",
+                    ]).map(|s| s.to_string());
+                    record_connect(name.to_string(), version.to_string(), title).await;
+                    incoming_clients_updated(&TauriEventEmitter(self._app.clone()), "connect");
+                }
                 Ok(mcp::ServerResult::InitializeResult(result))
             }
             mcp::ClientRequest::ListToolsRequest(_req) => {
@@ -252,7 +310,7 @@ async fn mcp_get_client_status() -> Result<HashMap<String, ClientStatus>, String
 
 #[tauri::command]
 async fn mcp_get_incoming_clients() -> Result<Vec<IncomingClient>, String> {
-    Ok(Vec::new())
+    Ok(list_incoming().await)
 }
 
 #[tauri::command]
