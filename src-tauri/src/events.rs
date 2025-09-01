@@ -11,6 +11,7 @@ pub trait EventEmitter {
     fn emit(&self, event: &str, payload: &serde_json::Value);
 }
 
+#[derive(Clone)]
 pub struct TauriEventEmitter(pub tauri::AppHandle);
 
 impl EventEmitter for TauriEventEmitter {

@@ -1,119 +1,21 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
-use rmcp::model as mcp;
-use rmcp::transport::streamable_http_server::{
-    session::local::LocalSessionManager, StreamableHttpServerConfig, StreamableHttpService,
-};
-use rmcp::{RoleServer, Service as McpService};
-use futures::future::join_all;
 use std::{collections::HashMap, fs, sync::OnceLock};
 use tauri::Manager;
 
-use mcp_bouncer::client::{ensure_rmcp_client, fetch_tools_for_cfg, registry_names, remove_rmcp_client};
-use mcp_bouncer::config::{
-    config_dir, default_settings, load_clients_state, load_settings, save_clients_state,
-    save_settings, ClientStatus, IncomingClient, MCPServerConfig, Settings,
-};
-use mcp_bouncer::events::{client_error, client_status_changed, incoming_clients_updated, servers_updated, TauriEventEmitter};
-use mcp_bouncer::incoming::{list_incoming, record_connect};
 use mcp_bouncer::app_logic;
-
-// Helper: JSON path extraction for InitializeRequest params
-fn extract_str<'a>(val: &'a serde_json::Value, paths: &[&str]) -> Option<&'a str> {
-    for path in paths {
-        let mut cur = val;
-        let mut ok = true;
-        for seg in path.split('.') {
-            if let Some(obj) = cur.as_object() {
-                if let Some(next) = obj.get(seg) { cur = next; } else { ok = false; break; }
-            } else { ok = false; break; }
-        }
-        if ok { if let Some(s) = cur.as_str() { return Some(s); } }
-    }
-    None
-}
-
-#[cfg(test)]
-mod extract_tests {
-    use super::extract_str;
-    use serde_json::json;
-
-    #[test]
-    fn extracts_from_top_level_and_params() {
-        let a = json!({
-            "clientInfo": { "name": "TopClient", "version": "1.2.3", "title": "Top" }
-        });
-        assert_eq!(extract_str(&a, &["clientInfo.name"]).unwrap(), "TopClient");
-        assert_eq!(extract_str(&a, &["clientInfo.version"]).unwrap(), "1.2.3");
-        assert_eq!(extract_str(&a, &["clientInfo.title"]).unwrap(), "Top");
-
-        let b = json!({
-            "params": { "client_info": { "name": "ParamClient", "version": "9.9.9" } }
-        });
-        assert_eq!(extract_str(&b, &["params.client_info.name"]).unwrap(), "ParamClient");
-        assert_eq!(extract_str(&b, &["params.client_info.version"]).unwrap(), "9.9.9");
-        assert!(extract_str(&b, &["params.client_info.title"]).is_none());
-    }
-}
-
-#[cfg(test)]
-mod list_tools_tests {
-    use super::aggregate_tools_with;
-    use mcp_bouncer::config::{MCPServerConfig, TransportType};
-    use serde_json::json;
-
-    fn cfg(name: &str) -> MCPServerConfig {
-        MCPServerConfig {
-            name: name.into(),
-            description: String::new(),
-            transport: Some(TransportType::TransportStreamableHTTP),
-            command: String::new(),
-            args: None,
-            env: None,
-            endpoint: Some("http://127.0.0.1".into()),
-            headers: None,
-            requires_auth: Some(false),
-            enabled: true,
-        }
-    }
-
-    #[tokio::test]
-    async fn partial_results_when_one_times_out() {
-        let servers = vec![cfg("fast"), cfg("slow")];
-        let lister = |c: MCPServerConfig| async move {
-            if c.name == "fast" {
-                Ok(vec![json!({"name":"alpha","description":"d"})])
-            } else {
-                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-                Ok(vec![json!({"name":"beta","description":"d"})])
-            }
-        };
-        let tools = aggregate_tools_with(servers, lister, std::time::Duration::from_millis(50)).await;
-        let names: Vec<String> = tools.into_iter().map(|t| t.name.to_string()).collect();
-        assert!(names.contains(&"fast::alpha".to_string()));
-        assert!(!names.iter().any(|n| n.contains("slow::beta")));
-    }
-
-    #[tokio::test]
-    async fn errors_do_not_block_others() {
-        let servers = vec![cfg("ok"), cfg("err")];
-        let lister = |c: MCPServerConfig| async move {
-            if c.name == "ok" {
-                Ok(vec![json!({"name":"x"})])
-            } else {
-                Err("boom".into())
-            }
-        };
-        let tools = aggregate_tools_with(servers, lister, std::time::Duration::from_millis(100)).await;
-        let names: Vec<String> = tools.into_iter().map(|t| t.name.to_string()).collect();
-        assert_eq!(names, vec!["ok::x".to_string()]);
-    }
-}
-
-// Types moved to config.rs
-
-// ---------- Commands (initial stubs) ----------
-
-// Config and client-state helpers moved to config.rs
+use mcp_bouncer::client::{
+    ensure_rmcp_client, fetch_tools_for_cfg, registry_names, remove_rmcp_client,
+};
+use mcp_bouncer::config::{
+    ClientStatus, IncomingClient, MCPServerConfig, Settings, config_dir, default_settings,
+    load_clients_state, load_settings, save_clients_state, save_settings,
+};
+use mcp_bouncer::events::{
+    TauriEventEmitter, client_error, client_status_changed, incoming_clients_updated,
+    servers_updated,
+};
+use mcp_bouncer::incoming::list_incoming;
+use mcp_bouncer::server::start_http_server;
 
 // ---------- Streamable HTTP MCP proxy (basic) ----------
 
@@ -125,29 +27,13 @@ fn spawn_mcp_proxy(app: &tauri::AppHandle) {
     }
     let app_handle = app.clone();
     tauri::async_runtime::spawn(async move {
-        use axum::Router;
-        // RMCP Streamable HTTP service bound at /mcp
-        let service: StreamableHttpService<BouncerService, LocalSessionManager> =
-            StreamableHttpService::new(
-                move || {
-                    Ok(BouncerService {
-                        _app: app_handle.clone(),
-                    })
-                },
-                Default::default(),
-                StreamableHttpServerConfig {
-                    stateful_mode: true,
-                    sse_keep_alive: Some(std::time::Duration::from_secs(15)),
-                },
-            );
-        let router = Router::new().nest_service("/mcp", service);
         let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 8091));
-        let listener = tokio::net::TcpListener::bind(addr)
-            .await
-            .expect("bind 8091");
-        if let Err(e) = axum::serve(listener, router).await {
-            eprintln!("MCP server error: {e}");
-        }
+        let _ = start_http_server(
+            mcp_bouncer::events::TauriEventEmitter(app_handle.clone()),
+            mcp_bouncer::config::OsConfigProvider,
+            addr,
+        )
+        .await;
     });
 }
 
@@ -162,232 +48,6 @@ fn get_server_by_name(name: &str) -> Option<MCPServerConfig> {
 }
 
 // ---------------- RMCP Service Implementation ----------------
-
-#[derive(Clone)]
-struct BouncerService {
-    _app: tauri::AppHandle,
-}
-
-impl McpService<RoleServer> for BouncerService {
-    async fn handle_request(
-        &self,
-        request: mcp::ClientRequest,
-        _context: rmcp::service::RequestContext<RoleServer>,
-    ) -> Result<mcp::ServerResult, mcp::ErrorData> {
-        match request {
-            mcp::ClientRequest::InitializeRequest(req) => {
-                let capabilities = mcp::ServerCapabilities::builder()
-                    .enable_logging()
-                    .enable_tools()
-                    .enable_tool_list_changed()
-                    .build();
-                let result = mcp::InitializeResult {
-                    protocol_version: mcp::ProtocolVersion::V_2025_03_26,
-                    capabilities,
-                    server_info: mcp::Implementation {
-                        name: "MCP Bouncer".into(),
-                        version: env!("CARGO_PKG_VERSION").into(),
-                    },
-                    instructions: None,
-                };
-                // Best-effort extraction of client info to track incoming connections.
-                // We avoid relying on private struct fields by serializing.
-                if let Ok(val) = serde_json::to_value(&req) {
-                    // Try both top-level and params.* locations to be robust across rmcp versions
-                    let name = extract_str(&val, &[
-                        "clientInfo.name", "client_info.name", "client.name",
-                        "params.clientInfo.name", "params.client_info.name", "params.client.name",
-                    ]).unwrap_or("unknown");
-                    let version = extract_str(&val, &[
-                        "clientInfo.version", "client_info.version", "client.version",
-                        "params.clientInfo.version", "params.client_info.version", "params.client.version",
-                    ]).unwrap_or("");
-                    let title = extract_str(&val, &[
-                        "clientInfo.title", "client_info.title", "title",
-                        "params.clientInfo.title", "params.client_info.title", "params.title",
-                    ]).map(|s| s.to_string());
-                    record_connect(name.to_string(), version.to_string(), title).await;
-                    incoming_clients_updated(&TauriEventEmitter(self._app.clone()), "connect");
-                }
-                Ok(mcp::ServerResult::InitializeResult(result))
-            }
-            mcp::ClientRequest::ListToolsRequest(_req) => {
-                // Fetch tools from all enabled servers concurrently with a timeout per server
-                let s = load_settings();
-                let servers: Vec<_> = s.mcp_servers.into_iter().filter(|c| c.enabled).collect();
-                let tools = aggregate_tools(servers, std::time::Duration::from_secs(6)).await;
-                Ok(mcp::ServerResult::ListToolsResult(mcp::ListToolsResult { tools, next_cursor: None }))
-            }
-            mcp::ClientRequest::CallToolRequest(req) => {
-                // Expect tool name like "server::tool"
-                let name = req.params.name.to_string();
-                let (server_name, tool_name) = name
-                    .split_once("::")
-                    .map(|(a, b)| (a.to_string(), b.to_string()))
-                    .unwrap_or((String::new(), name.clone()));
-                let args_obj = req
-                    .params
-                    .arguments
-                    .clone()
-                    .map(serde_json::Value::Object)
-                    .and_then(|v| v.as_object().cloned());
-                let cfg_opt = if !server_name.is_empty() {
-                    get_server_by_name(&server_name)
-                } else {
-                    // default to first enabled HTTP/stdio server
-                    load_settings().mcp_servers.into_iter().find(|c| c.enabled)
-                };
-                if let Some(cfg) = cfg_opt {
-                    match ensure_rmcp_client(&cfg.name, &cfg).await {
-                        Ok(client) => {
-                            match client
-                                .call_tool(mcp::CallToolRequestParam {
-                                    name: tool_name.into(),
-                                    arguments: args_obj,
-                                })
-                                .await
-                            {
-                                Ok(res) => Ok(mcp::ServerResult::CallToolResult(res)),
-                                Err(e) => {
-                                    Ok(mcp::ServerResult::CallToolResult(mcp::CallToolResult {
-                                        content: vec![mcp::Content::text(format!("error: {e}"))],
-                                        structured_content: None,
-                                        is_error: Some(true),
-                                    }))
-                                }
-                            }
-                        }
-                        Err(e) => Ok(mcp::ServerResult::CallToolResult(mcp::CallToolResult {
-                            content: vec![mcp::Content::text(format!("error: {e}"))],
-                            structured_content: None,
-                            is_error: Some(true),
-                        })),
-                    }
-                } else {
-                    Ok(mcp::ServerResult::CallToolResult(mcp::CallToolResult {
-                        content: vec![mcp::Content::text("no server".to_string())],
-                        structured_content: None,
-                        is_error: Some(true),
-                    }))
-                }
-            }
-            other => {
-                // For unhandled requests, return empty
-                let _ = other; // silence
-                Ok(mcp::ServerResult::empty(()))
-            }
-        }
-    }
-
-    async fn handle_notification(
-        &self,
-        _notification: mcp::ClientNotification,
-        _context: rmcp::service::NotificationContext<RoleServer>,
-    ) -> Result<(), mcp::ErrorData> {
-        Ok(())
-    }
-
-    fn get_info(&self) -> mcp::ServerInfo {
-        mcp::ServerInfo {
-            protocol_version: mcp::ProtocolVersion::V_2025_03_26,
-            capabilities: mcp::ServerCapabilities::builder()
-                .enable_logging()
-                .enable_tools()
-                .enable_tool_list_changed()
-                .build(),
-            server_info: mcp::Implementation {
-                name: "MCP Bouncer".into(),
-                version: env!("CARGO_PKG_VERSION").into(),
-            },
-            instructions: None,
-        }
-    }
-}
-
-fn to_mcp_tool(server: &str, v: &serde_json::Value) -> Option<mcp::Tool> {
-    let name = v.get("name")?.as_str()?.to_string();
-    let description = v
-        .get("description")
-        .and_then(|d| d.as_str())
-        .map(|s| s.to_string());
-    // input schema: try inputSchema or input_schema object
-    let schema_obj = v
-        .get("inputSchema")
-        .or_else(|| v.get("input_schema"))
-        .and_then(|s| s.as_object().cloned())
-        .unwrap_or_default();
-    let mut fullname = String::new();
-    fullname.push_str(server);
-    fullname.push_str("::");
-    fullname.push_str(&name);
-    Some(mcp::Tool::new(
-        fullname,
-        description.unwrap_or_default(),
-        schema_obj,
-    ))
-}
-
-// Helper used by the ListToolsRequest path, extracted for testing
-#[cfg(test)]
-async fn aggregate_tools_with<F, Fut>(
-    servers: Vec<mcp_bouncer::config::MCPServerConfig>,
-    lister: F,
-    timeout: std::time::Duration,
-) -> Vec<mcp::Tool>
-where
-    F: Fn(mcp_bouncer::config::MCPServerConfig) -> Fut + Clone + Send + Sync + 'static,
-    Fut: std::future::Future<Output = Result<Vec<serde_json::Value>, String>> + Send,
-{
-    let tasks = servers.into_iter().map(|cfg| {
-        let lister = lister.clone();
-        async move {
-            let name = cfg.name.clone();
-            match tokio::time::timeout(timeout, lister(cfg)).await {
-                Ok(Ok(list)) => Some((name, list)),
-                _ => None,
-            }
-        }
-    });
-    let mut tools: Vec<mcp::Tool> = Vec::new();
-    for res in join_all(tasks).await.into_iter().flatten() {
-        let (server_name, list) = res;
-        for item in list {
-            if let Some(t) = to_mcp_tool(&server_name, &item) {
-                tools.push(t);
-            }
-        }
-    }
-    tools
-}
-
-// Production helper used by handler, avoids lifetime hassles for fetch_tools_for_cfg
-async fn aggregate_tools(
-    servers: Vec<mcp_bouncer::config::MCPServerConfig>,
-    timeout: std::time::Duration,
-) -> Vec<mcp::Tool> {
-    let tasks = servers.into_iter().map(|cfg| async move {
-        let name = cfg.name.clone();
-        // Own the config inside the future to satisfy 'static
-        let fut = async move {
-            let boxed = Box::new(cfg);
-            fetch_tools_for_cfg(&boxed).await
-        };
-        match tokio::time::timeout(timeout, fut).await {
-            Ok(Ok(list)) => Some((name, list)),
-            _ => None,
-        }
-    });
-    let mut tools: Vec<mcp::Tool> = Vec::new();
-    for res in join_all(tasks).await.into_iter().flatten() {
-        let (server_name, list) = res;
-        for item in list {
-            if let Some(t) = to_mcp_tool(&server_name, &item) {
-                tools.push(t);
-            }
-        }
-    }
-    tools
-}
 
 #[tauri::command]
 async fn mcp_list() -> Result<Vec<MCPServerConfig>, String> {
@@ -408,9 +68,10 @@ async fn mcp_is_active() -> Result<bool, String> {
 #[tauri::command]
 async fn mcp_get_client_status() -> Result<HashMap<String, ClientStatus>, String> {
     let reg_names = registry_names().await;
-    let map = mcp_bouncer::status::compute_client_status_map(reg_names, |cfg: mcp_bouncer::config::MCPServerConfig| async move {
-        fetch_tools_for_cfg(&cfg).await
-    })
+    let map = mcp_bouncer::status::compute_client_status_map(
+        reg_names,
+        |cfg: mcp_bouncer::config::MCPServerConfig| async move { fetch_tools_for_cfg(&cfg).await },
+    )
     .await;
     Ok(map)
 }
@@ -478,7 +139,11 @@ async fn mcp_update_server(
                 match ensure_rmcp_client(&server_name, &cfg).await {
                     Ok(_) => {
                         update_client_overlay_connected(&server_name, true)?;
-                        client_status_changed(&TauriEventEmitter(app.clone()), &server_name, "enable");
+                        client_status_changed(
+                            &TauriEventEmitter(app.clone()),
+                            &server_name,
+                            "enable",
+                        );
                     }
                     Err(e) => {
                         set_client_overlay_error(&server_name, &e)?;
@@ -528,7 +193,11 @@ async fn mcp_toggle_server_enabled(
                 match ensure_rmcp_client(&server_name, &cfg).await {
                     Ok(_) => {
                         update_client_overlay_connected(&server_name, true)?;
-                        client_status_changed(&TauriEventEmitter(app.clone()), &server_name, "enable");
+                        client_status_changed(
+                            &TauriEventEmitter(app.clone()),
+                            &server_name,
+                            "enable",
+                        );
                     }
                     Err(e) => {
                         set_client_overlay_error(&server_name, &e)?;
@@ -556,11 +225,21 @@ async fn mcp_restart_client(app: tauri::AppHandle, name: String) -> Result<(), S
     let srv = s.mcp_servers.iter().find(|c| c.name == name).cloned();
     match srv {
         None => {
-            client_error(&TauriEventEmitter(app.clone()), &name, "restart", "server not found");
+            client_error(
+                &TauriEventEmitter(app.clone()),
+                &name,
+                "restart",
+                "server not found",
+            );
             return Err("server not found".into());
         }
         Some(cfg) if !cfg.enabled => {
-            client_error(&TauriEventEmitter(app.clone()), &name, "restart", "server is disabled");
+            client_error(
+                &TauriEventEmitter(app.clone()),
+                &name,
+                "restart",
+                "server is disabled",
+            );
             return Err("server is disabled".into());
         }
         _ => {}
@@ -629,7 +308,12 @@ async fn mcp_toggle_tool(
     tool_name: String,
     enabled: bool,
 ) -> Result<(), String> {
-    mcp_bouncer::config::save_tools_toggle_with(&mcp_bouncer::config::OsConfigProvider, &client_name, &tool_name, enabled)
+    mcp_bouncer::config::save_tools_toggle_with(
+        &mcp_bouncer::config::OsConfigProvider,
+        &client_name,
+        &tool_name,
+        enabled,
+    )
 }
 
 #[tauri::command]
@@ -651,7 +335,11 @@ async fn settings_update_settings(
     settings: Option<Settings>,
 ) -> Result<(), String> {
     let s = settings.unwrap_or_else(default_settings);
-    app_logic::update_settings(&mcp_bouncer::config::OsConfigProvider, &TauriEventEmitter(app), s)
+    app_logic::update_settings(
+        &mcp_bouncer::config::OsConfigProvider,
+        &TauriEventEmitter(app),
+        s,
+    )
 }
 
 fn main() {
