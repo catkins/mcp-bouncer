@@ -4,6 +4,7 @@ use rmcp::service::RoleClient;
 use rmcp::transport::{
     streamable_http_client::StreamableHttpClientTransportConfig,
     StreamableHttpClientTransport,
+    SseClientTransport,
     TokioChildProcess,
     auth::{AuthClient, OAuthState},
 };
@@ -67,6 +68,16 @@ pub async fn ensure_rmcp_client(
                     .await
                     .map_err(|e| format!("rmcp serve: {e}"))?
             }
+        }
+        Some(TransportType::TransportSSE) => {
+            let endpoint = cfg.endpoint.clone().unwrap_or_default();
+            if endpoint.is_empty() { return Err("no endpoint".into()); }
+            let transport = SseClientTransport::start(endpoint)
+                .await
+                .map_err(|e| format!("sse start: {e}"))?;
+            ().serve(transport)
+                .await
+                .map_err(|e| format!("rmcp serve: {e}"))?
         }
         Some(TransportType::TransportStdio) => {
             let cmd = cfg.command.clone();
