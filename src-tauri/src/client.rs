@@ -5,6 +5,7 @@ use rmcp::transport::{
     streamable_http_client::StreamableHttpClientTransportConfig,
     StreamableHttpClientTransport,
     TokioChildProcess,
+    auth::{AuthClient, OAuthState, OAuthTokenResponse},
 };
 use rmcp::ServiceExt;
 
@@ -31,17 +32,53 @@ pub async fn ensure_rmcp_client(
         Some(TransportType::TransportStreamableHTTP) => {
             let endpoint = cfg.endpoint.clone().unwrap_or_default();
             if endpoint.is_empty() { return Err("no endpoint".into()); }
-            let mut conf = StreamableHttpClientTransportConfig::with_uri(endpoint);
+
             if let Some(hmap) = &cfg.headers {
                 if let Some(auth) = hmap.get("Authorization").cloned() {
-                    let token = auth.strip_prefix("Bearer ").unwrap_or(&auth).to_string();
-                    conf = conf.auth_header(token);
+                    // derive base url for oauth state machine
+                    let url = reqwest::Url::parse(&endpoint)
+                        .map_err(|e| format!("url parse: {e}"))?;
+                    let mut base = url.clone();
+                    base.set_path("");
+
+                    let mut state = OAuthState::new(base.as_str(), None)
+                        .await
+                        .map_err(|e| format!("oauth init: {e}"))?;
+                    let token = auth.strip_prefix("Bearer ").unwrap_or(&auth);
+                    let credentials: OAuthTokenResponse = serde_json::from_value(
+                        serde_json::json!({
+                            "access_token": token,
+                            "token_type": "Bearer",
+                        }),
+                    )
+                    .map_err(|e| format!("token parse: {e}"))?;
+                    state
+                        .set_credentials("mcp-bouncer", credentials)
+                        .await
+                        .map_err(|e| format!("oauth set: {e}"))?;
+                    let manager = state
+                        .into_authorization_manager()
+                        .ok_or_else(|| "oauth state".to_string())?;
+                    let client = AuthClient::new(reqwest::Client::default(), manager);
+                    let transport = StreamableHttpClientTransport::with_client(
+                        client,
+                        StreamableHttpClientTransportConfig::with_uri(endpoint),
+                    );
+                    ().serve(transport)
+                        .await
+                        .map_err(|e| format!("rmcp serve: {e}"))?
+                } else {
+                    let transport = StreamableHttpClientTransport::from_uri(endpoint);
+                    ().serve(transport)
+                        .await
+                        .map_err(|e| format!("rmcp serve: {e}"))?
                 }
+            } else {
+                let transport = StreamableHttpClientTransport::from_uri(endpoint);
+                ().serve(transport)
+                    .await
+                    .map_err(|e| format!("rmcp serve: {e}"))?
             }
-            let transport = StreamableHttpClientTransport::from_config(conf);
-            ().serve(transport)
-                .await
-                .map_err(|e| format!("rmcp serve: {e}"))?
         }
         Some(TransportType::TransportStdio) => {
             let cmd = cfg.command.clone();
