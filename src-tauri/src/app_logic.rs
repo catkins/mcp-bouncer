@@ -17,7 +17,6 @@ pub fn update_settings<E: EventEmitter>(
     Ok(())
 }
 
-// No authorize helper — OAuth is handled entirely via start_oauth_for_server
 
 #[cfg(test)]
 mod tests {
