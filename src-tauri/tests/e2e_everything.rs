@@ -36,11 +36,6 @@ impl ConfigProvider for TempConfigProvider {
 // This test requires Node/npm and network access to install @modelcontextprotocol/server-everything.
 #[tokio::test]
 async fn e2e_list_and_echo_with_everything_server() {
-    // // Opt-in gate to avoid accidental network/process usage on CI without Node/npm
-    // if std::env::var("E2E_ALLOW_NETWORK").ok().as_deref() != Some("1") {
-    //     eprintln!("Skipping e2e_everything: set E2E_ALLOW_NETWORK=1 to run");
-    //     return;
-    // }
     // Require npx to be available
     assert!(
         std::process::Command::new("npx")
