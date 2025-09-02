@@ -48,7 +48,8 @@ pub fn save_credentials_for(
 #[derive(Debug, serde::Deserialize)]
 struct CallbackQuery {
     code: String,
-    state: Option<String>,
+    #[serde(rename = "state")]
+    _state: Option<String>,
 }
 
 /// Start an OAuth flow for a server. Spawns a temporary callback server on localhost, opens the browser,
@@ -68,7 +69,7 @@ pub async fn start_oauth_for_server<E: EventEmitter>(
         .await
         .map_err(|e| e.to_string())?;
     let addr = listener.local_addr().map_err(|e| e.to_string())?;
-    let redirect_uri = format!("http://{}/callback", addr);
+    let redirect_uri = format!("http://{addr}/callback");
 
     // Initialize OAuth state machine
     let mut state = OAuthState::new(base.as_str(), None)
@@ -104,10 +105,10 @@ pub async fn start_oauth_for_server<E: EventEmitter>(
     );
     let server = tokio::spawn(async move {
         if let Err(e) = axum::serve(listener, app).await {
-            eprintln!("callback server error: {}", e);
+            eprintln!("callback server error: {e}");
         }
     });
-    let _ = server; // detached
+    drop(server); // detach task
 
     // Open system browser to authorization URL
     let _ = open::that_detached(auth_url.clone());
@@ -124,10 +125,8 @@ pub async fn start_oauth_for_server<E: EventEmitter>(
         .map_err(|e| format!("oauth exchange: {e}"))?;
 
     // Try to export credentials for persistence if supported
-    if let Ok((_, maybe_creds)) = state.get_credentials().await {
-        if let Some(creds) = maybe_creds {
-            let _ = save_credentials_for(&OsConfigProvider, name, creds);
-        }
+    if let Ok((_, Some(creds))) = state.get_credentials().await {
+        let _ = save_credentials_for(&OsConfigProvider, name, creds);
     }
 
     // Update overlay state: authorized, no auth required, clear error (in-memory only)

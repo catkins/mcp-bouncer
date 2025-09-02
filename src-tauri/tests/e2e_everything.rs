@@ -123,7 +123,6 @@ async fn e2e_list_and_echo_with_everything_server() {
         .join("\n");
     assert!(
         text.contains("hello"),
-        "echo response should contain 'hello' but was: {}",
-        text
+        "echo response should contain 'hello' but was: {text}",
     );
 }

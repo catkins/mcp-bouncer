@@ -131,7 +131,7 @@ mod tests {
         let cs = map.values().find(|v| v.name == "srv1").expect("srv1 present");
         assert_eq!(cs.state, ClientConnectionState::Errored); // overlay wins
         assert_eq!(cs.last_error.as_deref(), Some("no token"));
-        assert_eq!(cs.authorization_required, true);
-        assert_eq!(cs.oauth_authenticated, true);
+        assert!(cs.authorization_required);
+        assert!(cs.oauth_authenticated);
     }
 }

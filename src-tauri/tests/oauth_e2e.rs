@@ -7,13 +7,11 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use rmcp::transport::{
-    auth::{OAuthState, OAuthTokenResponse},
-    streamable_http_client::StreamableHttpClient,
-};
+use rmcp::transport::{auth::OAuthState, streamable_http_client::StreamableHttpClient};
 use serde::Deserialize;
 use serde_json::json;
 use tokio::sync::mpsc;
+use tokio::time::{timeout, Duration};
 
 #[derive(Deserialize)]
 struct AuthQuery {
@@ -27,15 +25,27 @@ async fn end_to_end_oauth_flow_with_streamable_http() {
     let (tx, mut rx) = mpsc::channel::<String>(1);
 
     // In-process OAuth + MCP server
+    // Bind listener first so we can build absolute metadata URLs
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let base = format!("http://{addr}");
+
     let app = Router::new()
         // metadata discovery
         .route(
             "/.well-known/oauth-authorization-server",
-            get(|| async {
-                Json(json!({
-                    "authorization_endpoint": "/oauth/authorize",
-                    "token_endpoint": "/oauth/token",
-                }))
+            get({
+                let base = base.clone();
+                move || {
+                    let base = base.clone();
+                    async move {
+                        Json(json!({
+                            "authorization_endpoint": format!("{}/oauth/authorize", base),
+                            "token_endpoint": format!("{}/oauth/token", base),
+                            "registration_endpoint": format!("{}/oauth/register", base),
+                        }))
+                    }
+                }
             }),
         )
         // authorization endpoint -> redirect back with code
@@ -57,6 +67,17 @@ async fn end_to_end_oauth_flow_with_streamable_http() {
                     "access_token": "e2e-token",
                     "token_type": "Bearer",
                     "refresh_token": "e2e-refresh"
+                }))
+            }),
+        )
+        // dynamic client registration endpoint
+        .route(
+            "/oauth/register",
+            post(|| async move {
+                Json(json!({
+                    "client_id": "test-client",
+                    "client_name": "test-client",
+                    "redirect_uris": ["http://127.0.0.1/callback"],
                 }))
             }),
         )
@@ -84,38 +105,42 @@ async fn end_to_end_oauth_flow_with_streamable_http() {
             }),
         );
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let addr = listener.local_addr().unwrap();
     tokio::spawn(async move {
         axum::serve(listener, app).await.unwrap();
     });
 
     // Build OAuth state and callback server
-    let base = format!("http://{}", addr);
-    let mut state = OAuthState::new(&base, None).await.unwrap();
+    let mut state = timeout(Duration::from_secs(5), OAuthState::new(&base, None))
+        .await
+        .expect("OAuthState::new timed out")
+        .unwrap();
 
     // callback listener
     let cb_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let cb_addr = cb_listener.local_addr().unwrap();
-    let redirect_uri = format!("http://{}/callback", cb_addr);
+    let redirect_uri = format!("http://{cb_addr}/callback");
 
-    state
-        .start_authorization(&["mcp"], &redirect_uri)
+    timeout(
+        Duration::from_secs(5),
+        state.start_authorization(&["mcp"], &redirect_uri),
+    )
+    .await
+    .expect("start_authorization timed out")
+    .unwrap();
+    let auth_url = timeout(Duration::from_secs(5), state.get_authorization_url())
         .await
+        .expect("get_authorization_url timed out")
         .unwrap();
-    let auth_url = state.get_authorization_url().await.unwrap();
 
-    // Minimal callback server to capture code and complete flow
-    let (done_tx, done_rx) = tokio::sync::oneshot::channel::<()>();
+    // Minimal callback server to capture code; run detached for the duration of the test
     tokio::spawn(async move {
         let app = Router::new().route(
             "/callback",
             get(|Query(params): Query<std::collections::HashMap<String, String>>| async move {
-                (StatusCode::OK, format!("ok: {:?}", params))
+                (StatusCode::OK, format!("ok: {params:?}"))
             }),
         );
-        axum::serve(cb_listener, app).await.unwrap();
-        let _ = done_tx.send(());
+        let _ = axum::serve(cb_listener, app).await;
     });
 
     // Simulate browser: GET auth URL to follow redirect into our callback server
@@ -123,12 +148,23 @@ async fn end_to_end_oauth_flow_with_streamable_http() {
         .redirect(reqwest::redirect::Policy::none())
         .build()
         .unwrap();
-    let resp = client.get(&format!("{}{}", base, auth_url)).send().await.unwrap();
+    let full_auth_url = if auth_url.starts_with("http://") || auth_url.starts_with("https://") {
+        auth_url
+    } else {
+        format!("{base}{auth_url}")
+    };
+    let resp = timeout(Duration::from_secs(5), client.get(&full_auth_url).send())
+        .await
+        .expect("auth request timed out")
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::FOUND);
     let loc = resp.headers().get("Location").unwrap().to_str().unwrap();
     // Call the redirected URL (our callback)
-    let _ = reqwest::get(loc).await.unwrap();
-    let _ = done_rx.await;
+    let _ = timeout(Duration::from_secs(5), reqwest::get(loc))
+        .await
+        .expect("callback GET timed out")
+        .unwrap();
+    // Do not wait for server shutdown; continue once callback responds
 
     // Extract code from callback URL
     let url = reqwest::Url::parse(loc).unwrap();
@@ -138,8 +174,14 @@ async fn end_to_end_oauth_flow_with_streamable_http() {
         .map(|(_, v)| v.to_string())
         .unwrap();
 
-    state.handle_callback(&code).await.unwrap();
-    let _ = state.get_credentials().await.unwrap();
+    timeout(Duration::from_secs(5), state.handle_callback(&code))
+        .await
+        .expect("handle_callback timed out")
+        .unwrap();
+    let _ = timeout(Duration::from_secs(5), state.get_credentials())
+        .await
+        .expect("get_credentials timed out")
+        .unwrap();
 
     // Use authorized client to post a message to /mcp
     use rmcp::model::{
@@ -152,14 +194,18 @@ async fn end_to_end_oauth_flow_with_streamable_http() {
         extensions: Default::default(),
     });
     let msg = ClientJsonRpcMessage::request(req, NumberOrString::Number(1));
-    let uri: Arc<str> = format!("{}/mcp", base).into();
+    let uri: Arc<str> = format!("{base}/mcp").into();
 
     // Convert state into manager + client
     let manager = state.into_authorization_manager().unwrap();
     let auth_client = rmcp::transport::auth::AuthClient::new(reqwest::Client::new(), manager);
-    StreamableHttpClient::post_message(&auth_client, uri, msg, None, None)
-        .await
-        .unwrap();
+    timeout(
+        Duration::from_secs(5),
+        StreamableHttpClient::post_message(&auth_client, uri, msg, None, None),
+    )
+    .await
+    .expect("post_message timed out")
+    .unwrap();
 
     // Server observed bearer header
     let received = rx.recv().await.unwrap();

@@ -55,7 +55,7 @@ async fn auth_client_attaches_bearer_header() {
         axum::serve(listener, app).await.unwrap();
     });
 
-    let base = format!("http://{}", addr);
+    let base = format!("http://{addr}");
     let mut state = OAuthState::new(&base, None).await.unwrap();
     let credentials: OAuthTokenResponse = serde_json::from_value(json!({
         "access_token": "secret",
@@ -79,7 +79,7 @@ async fn auth_client_attaches_bearer_header() {
         extensions: Default::default(),
     });
     let msg = ClientJsonRpcMessage::request(req, NumberOrString::Number(1));
-    let uri: Arc<str> = format!("{}/mcp", base).into();
+    let uri: Arc<str> = format!("{base}/mcp").into();
     StreamableHttpClient::post_message(&client, uri, msg, None, None)
         .await
         .unwrap();

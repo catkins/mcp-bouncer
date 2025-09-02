@@ -181,7 +181,7 @@ fn to_mcp_tool(server: &str, v: &serde_json::Value) -> Option<mcp::Tool> {
         .or_else(|| v.get("input_schema"))
         .and_then(|s| s.as_object().cloned())
         .unwrap_or_default();
-    let fullname = format!("{}::{}", server, name);
+    let fullname = format!("{server}::{name}");
     Some(mcp::Tool::new(fullname, description.unwrap_or_default(), schema_obj))
 }
 

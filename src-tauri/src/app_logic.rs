@@ -1,11 +1,5 @@
-use crate::config::{
-    load_settings_with,
-    save_settings_with,
-    ConfigProvider,
-    Settings,
-};
+use crate::config::{save_settings_with, ConfigProvider, Settings};
 use crate::events::{settings_updated, EventEmitter};
-use std::collections::HashMap;
 
 pub fn update_settings<E: EventEmitter>(
     cp: &dyn ConfigProvider,
