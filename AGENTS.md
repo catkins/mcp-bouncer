@@ -111,3 +111,12 @@ This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the of
 
 ## Git Commits
 Only create git commits when explicitly asked by the user. Do not automatically commit changes unless requested. Before committing, always run both Rust and frontend tests locally and ensure they pass cleanly with zero warnings.
+
+## CI/CD
+
+- This project uses Buildkite for CI/CD at https://buildkite.com/catkins-test/mcp-bouncer
+- Pipeline is defined in `.buildkite/pipeline.yml` using the Docker compose plugin
+- Ensure dependencies for CI are updated in `.buildkite/Dockerfile`
+- Pipeline info:
+  - `org_slug`: `catkins-test`
+  - `repo_slug`: `mcp-bouncer`
