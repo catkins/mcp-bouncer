@@ -9,7 +9,7 @@ const mockServerConfig: MCPServerConfig = {
   description: 'fetch things',
   command: 'uvx',
   args: ['mcp-server-fetch'],
-  transport: TransportType.TransportStdio,
+  transport: TransportType.Stdio,
   enabled: true,
   env: {
     API_KEY: 'your-api-key',
@@ -132,7 +132,7 @@ export const HttpServer: Story = {
     server: {
       name: 'buildkite',
       description: 'CI/CD pipeline integration',
-      transport: TransportType.TransportStreamableHTTP,
+      transport: TransportType.StreamableHttp,
       endpoint: 'http://localhost:7700/mcp',
       enabled: true,
       command: '',
@@ -156,7 +156,7 @@ export const SseServer: Story = {
     server: {
       name: 'Context7',
       description: 'SSE server for real-time updates',
-      transport: TransportType.TransportSSE,
+      transport: TransportType.Sse,
       endpoint: 'https://mcp.context7.com/sse',
       enabled: true,
       command: '',

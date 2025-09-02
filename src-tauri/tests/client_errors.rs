@@ -24,7 +24,7 @@ async fn missing_command_for_stdio_errors() {
     let cfg = MCPServerConfig{
         name: "x".into(),
         description: "d".into(),
-        transport: Some(TransportType::TransportStdio),
+        transport: Some(TransportType::Stdio),
         command: String::new(),
         args: None,
         env: None,
@@ -36,4 +36,3 @@ async fn missing_command_for_stdio_errors() {
     let err = ensure_rmcp_client(&cfg.name, &cfg).await.err().unwrap();
     assert!(err.contains("missing command"));
 }
-

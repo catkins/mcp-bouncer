@@ -33,7 +33,7 @@ describe('ServerForm', () => {
       <ServerForm existingServers={[]} onSave={async () => {}} onCancel={() => {}} />,
     );
     const select = screen.getByRole('combobox') as HTMLSelectElement;
-    await userEvent.selectOptions(select, TransportType.TransportSSE);
+    await userEvent.selectOptions(select, TransportType.Sse);
     expect(screen.getByLabelText(/Endpoint/i)).toBeInTheDocument();
   });
 });

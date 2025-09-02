@@ -10,7 +10,7 @@ afterEach(() => cleanup());
 const baseServer: MCPServerConfig = {
   name: 'svc',
   description: 'desc',
-  transport: TransportType.TransportStdio,
+  transport: TransportType.Stdio,
   command: 'cmd',
   args: [],
   env: {},

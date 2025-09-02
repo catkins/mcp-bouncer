@@ -52,7 +52,7 @@ async fn e2e_list_and_echo_with_everything_server() {
     s.mcp_servers.push(MCPServerConfig {
         name: "everything".into(),
         description: "test".into(),
-        transport: Some(TransportType::TransportStdio),
+        transport: Some(TransportType::Stdio),
         command: "npx".into(),
         args: Some(vec![
             "-y".into(),

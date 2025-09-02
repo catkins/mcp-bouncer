@@ -61,7 +61,7 @@ async fn sse_client_can_connect_list_tools_and_send_headers() {
     let cfg = MCPServerConfig {
         name: "sse-upstream".into(),
         description: "test".into(),
-        transport: Some(TransportType::TransportSSE),
+        transport: Some(TransportType::Sse),
         command: String::new(),
         args: None,
         env: None,

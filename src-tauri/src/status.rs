@@ -84,7 +84,7 @@ mod tests {
         s.mcp_servers.push(MCPServerConfig {
             name: "srv1".into(),
             description: "d".into(),
-            transport: Some(TransportType::TransportStreamableHTTP),
+            transport: Some(TransportType::StreamableHttp),
             command: String::new(),
             args: None,
             env: None,
@@ -111,7 +111,7 @@ mod tests {
         s.mcp_servers.push(MCPServerConfig {
             name: "srv1".into(),
             description: "d".into(),
-            transport: Some(TransportType::TransportStreamableHTTP),
+            transport: Some(TransportType::StreamableHttp),
             command: String::new(),
             args: None,
             env: None,

@@ -4,9 +4,9 @@ import { invoke } from '@tauri-apps/api/core';
 
 // Shared types for frontend-backend communication
 export enum TransportType {
-  TransportStdio = 'stdio',
-  TransportSSE = 'sse',
-  TransportStreamableHTTP = 'streamable_http',
+  Stdio = 'stdio',
+  Sse = 'sse',
+  StreamableHttp = 'streamable_http',
 }
 
 export interface MCPServerConfig {

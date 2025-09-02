@@ -7,11 +7,11 @@ use std::{collections::HashMap, fs, path::PathBuf};
 #[serde(rename_all = "snake_case")]
 pub enum TransportType {
     #[serde(rename = "stdio")]
-    TransportStdio,
+    Stdio,
     #[serde(rename = "sse")]
-    TransportSSE,
+    Sse,
     #[serde(rename = "streamable_http")]
-    TransportStreamableHTTP,
+    StreamableHttp,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -145,7 +145,7 @@ mod tests {
     fn settings_roundtrip() {
         let cp = TempConfigProvider::new();
         let mut s = default_settings();
-        s.mcp_servers.push(MCPServerConfig{ name: "srv".into(), description: "d".into(), transport: Some(TransportType::TransportStreamableHTTP), command: "".into(), args: None, env: None, endpoint: Some("http://127.0.0.1".into()), headers: None, requires_auth: Some(false), enabled: true });
+        s.mcp_servers.push(MCPServerConfig{ name: "srv".into(), description: "d".into(), transport: Some(TransportType::StreamableHttp), command: "".into(), args: None, env: None, endpoint: Some("http://127.0.0.1".into()), headers: None, requires_auth: Some(false), enabled: true });
         save_settings_with(&cp, &s).unwrap();
         let loaded = load_settings_with(&cp);
         assert_eq!(loaded.mcp_servers.len(), 1);

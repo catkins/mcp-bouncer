@@ -33,7 +33,7 @@ pub async fn ensure_rmcp_client(
     let mut guard = reg.lock().await;
     if let Some(c) = guard.get(name) { return Ok(c.clone()); }
     let service = match cfg.transport {
-        Some(TransportType::TransportStreamableHTTP) => {
+        Some(TransportType::StreamableHttp) => {
             let endpoint = cfg.endpoint.clone().unwrap_or_default();
             if endpoint.is_empty() { return Err("no endpoint".into()); }
 
@@ -70,7 +70,7 @@ pub async fn ensure_rmcp_client(
                     .map_err(|e| format!("rmcp serve: {e}"))?
             }
         }
-        Some(TransportType::TransportSSE) => {
+        Some(TransportType::Sse) => {
             let endpoint = cfg.endpoint.clone().unwrap_or_default();
             if endpoint.is_empty() { return Err("no endpoint".into()); }
             // Build reqwest client with default headers if provided
@@ -100,7 +100,7 @@ pub async fn ensure_rmcp_client(
                 .await
                 .map_err(|e| format!("rmcp serve: {e}"))?
         }
-        Some(TransportType::TransportStdio) => {
+        Some(TransportType::Stdio) => {
             let cmd = cfg.command.clone();
             if cmd.is_empty() { return Err("missing command".into()); }
             let mut command = tokio::process::Command::new(cmd);
