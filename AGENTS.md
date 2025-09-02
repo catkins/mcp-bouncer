@@ -104,6 +104,7 @@ This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the of
 - MCP server routing: keep tool names `server::tool` to avoid collisions across upstreams.
 - Settings shape: keep fields stable; UI relies on them. Extend carefully and emit `settings:updated` after writes.
 - Events: match existing event names; the UI hooks already listen for them.
+- Rust `format!` style: prefer inlined capture syntax (e.g., `format!("{var}")`, `format!("{base}/path")`) over placeholder form (`format!("{}", var)`). This satisfies clippy (`uninlined_format_args`) and keeps code concise.
 
 ### Code Hygiene (for agents)
 - When removing or replacing code, do not leave stale comments behind — delete them together with the code. Keep diffs focused and free of dead commentary.
