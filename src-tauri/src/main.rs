@@ -3,7 +3,7 @@ use std::{collections::HashMap, fs, sync::OnceLock};
 use tauri::Manager;
 
 use mcp_bouncer::app_logic;
-use mcp_bouncer::client::{ ensure_rmcp_client, remove_rmcp_client };
+use mcp_bouncer::client::{ ensure_rmcp_client, remove_rmcp_client, fetch_tools_for_cfg };
 use mcp_bouncer::config::{
     ClientStatus, ClientConnectionState, IncomingClient, MCPServerConfig, Settings, config_dir, default_settings,
     load_settings, save_settings,
@@ -233,16 +233,7 @@ async fn mcp_start_oauth(app: tauri::AppHandle, name: String) -> Result<(), Stri
 #[tauri::command]
 async fn mcp_get_client_tools(client_name: String) -> Result<Vec<serde_json::Value>, String> {
     if let Some(cfg) = get_server_by_name(&client_name) {
-        let client = ensure_rmcp_client(&cfg.name, &cfg).await?;
-        let tools = client
-            .list_all_tools()
-            .await
-            .map_err(|e| format!("rmcp list tools: {e}"))?;
-        let vals: Vec<serde_json::Value> = tools
-            .into_iter()
-            .map(|t| serde_json::to_value(t).unwrap_or(serde_json::json!({})))
-            .collect();
-        return Ok(vals);
+        return fetch_tools_for_cfg(&cfg).await;
     }
     Ok(Vec::new())
 }
