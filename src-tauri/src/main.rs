@@ -339,7 +339,10 @@ fn main() {
             tauri::async_runtime::spawn(async move {
                 let settings = mcp_bouncer::config::load_settings();
                 for cfg in settings.mcp_servers.into_iter().filter(|c| c.enabled) {
-                    connect_and_initialize(&TauriEventEmitter(app_handle.clone()), &cfg.name, &cfg).await;
+                    let emitter = TauriEventEmitter(app_handle.clone());
+                    tauri::async_runtime::spawn(async move {
+                        connect_and_initialize(&emitter, &cfg.name, &cfg).await;
+                    });
                 }
             });
             Ok(())
