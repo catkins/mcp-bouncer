@@ -4,6 +4,7 @@ use rmcp::service::RoleClient;
 use rmcp::transport::{
     streamable_http_client::StreamableHttpClientTransportConfig,
     StreamableHttpClientTransport,
+    sse_client::SseClientConfig,
     SseClientTransport,
     TokioChildProcess,
     auth::{AuthClient, OAuthState},
@@ -72,9 +73,29 @@ pub async fn ensure_rmcp_client(
         Some(TransportType::TransportSSE) => {
             let endpoint = cfg.endpoint.clone().unwrap_or_default();
             if endpoint.is_empty() { return Err("no endpoint".into()); }
-            let transport = SseClientTransport::start(endpoint)
-                .await
-                .map_err(|e| format!("sse start: {e}"))?;
+            // Build reqwest client with default headers if provided
+            let client = if let Some(hdrs) = &cfg.headers {
+                let mut map = reqwest::header::HeaderMap::new();
+                for (k, v) in hdrs {
+                    let name = reqwest::header::HeaderName::from_bytes(k.as_bytes())
+                        .map_err(|e| format!("invalid header name {k}: {e}"))?;
+                    let val = reqwest::header::HeaderValue::from_str(v)
+                        .map_err(|e| format!("invalid header value for {k}: {e}"))?;
+                    map.insert(name, val);
+                }
+                reqwest::Client::builder()
+                    .default_headers(map)
+                    .build()
+                    .map_err(|e| format!("sse client build: {e}"))?
+            } else {
+                reqwest::Client::default()
+            };
+            let transport = SseClientTransport::start_with_client(
+                client,
+                SseClientConfig { sse_endpoint: endpoint.into(), ..Default::default() },
+            )
+            .await
+            .map_err(|e| format!("sse start: {e}"))?;
             ().serve(transport)
                 .await
                 .map_err(|e| format!("rmcp serve: {e}"))?

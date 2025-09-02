@@ -19,6 +19,7 @@ rmcp = { version = "0.6.1", features = [
   "client",
   "transport-streamable-http-client-reqwest",
   "transport-sse-client-reqwest",
+  "transport-sse-server",
   "transport-child-process",
   "transport-streamable-http-server",
   "transport-worker",
