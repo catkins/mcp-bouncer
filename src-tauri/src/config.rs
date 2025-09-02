@@ -35,10 +35,19 @@ pub struct Settings {
     pub auto_start: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ClientConnectionState {
+    Disconnected,
+    Connecting,
+    Errored,
+    Connected,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClientStatus {
     pub name: String,
-    pub connected: bool,
+    pub state: ClientConnectionState,
     pub tools: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_error: Option<String>,
@@ -57,18 +66,7 @@ pub struct IncomingClient {
     pub connected_at: Option<String>,
 }
 
-// Client overlay state persisted on disk
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct ClientState {
-    pub connected: Option<bool>,
-    pub last_error: Option<String>,
-    pub authorization_required: Option<bool>,
-    pub oauth_authenticated: Option<bool>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct ClientsState(pub HashMap<String, ClientState>);
+// Deprecated persisted client state removed; runtime overlay is in-memory only
 
 // Config paths abstraction to make IO testable
 pub trait ConfigProvider: Send + Sync {
@@ -106,23 +104,9 @@ pub fn save_settings_with(cp: &dyn ConfigProvider, settings: &Settings) -> Resul
     fs::write(&path, content).map_err(|e| format!("write settings: {e}"))
 }
 
-pub fn clients_state_path(cp: &dyn ConfigProvider) -> PathBuf { cp.base_dir().join("clients_state.json") }
-
-pub fn load_clients_state_with(cp: &dyn ConfigProvider) -> ClientsState {
-    fs::read_to_string(clients_state_path(cp)).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
-}
-
-pub fn save_clients_state_with(cp: &dyn ConfigProvider, state: &ClientsState) -> Result<(), String> {
-    fs::create_dir_all(cp.base_dir()).map_err(|e| format!("create dir: {e}"))?;
-    let content = serde_json::to_string_pretty(state).map_err(|e| format!("to json: {e}"))?;
-    fs::write(clients_state_path(cp), content).map_err(|e| format!("write clients state: {e}"))
-}
-
 // Convenience OS-backed wrappers for production code
 pub fn load_settings() -> Settings { load_settings_with(&OsConfigProvider) }
 pub fn save_settings(settings: &Settings) -> Result<(), String> { save_settings_with(&OsConfigProvider, settings) }
-pub fn load_clients_state() -> ClientsState { load_clients_state_with(&OsConfigProvider) }
-pub fn save_clients_state(state: &ClientsState) -> Result<(), String> { save_clients_state_with(&OsConfigProvider, state) }
 pub fn config_dir() -> PathBuf { OsConfigProvider.base_dir() }
 
 // Tools toggle persisted map helpers

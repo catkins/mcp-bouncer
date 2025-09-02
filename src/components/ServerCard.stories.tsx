@@ -19,7 +19,7 @@ const mockServerConfig: MCPServerConfig = {
 
 const mockConnectedStatus: ClientStatus = {
   name: 'fetch',
-  connected: true,
+  state: 'connected',
   tools: 11,
   last_error: undefined,
   authorization_required: false,
@@ -28,7 +28,7 @@ const mockConnectedStatus: ClientStatus = {
 
 const mockDisconnectedStatus: ClientStatus = {
   name: 'fetch',
-  connected: false,
+  state: 'disconnected',
   tools: 0,
   last_error: 'Connection timeout',
   authorization_required: false,
@@ -37,7 +37,7 @@ const mockDisconnectedStatus: ClientStatus = {
 
 const mockAuthRequiredStatus: ClientStatus = {
   name: 'fetch',
-  connected: false,
+  state: 'disconnected',
   tools: 0,
   last_error: undefined,
   authorization_required: true,
@@ -123,10 +123,7 @@ export const DisabledServer: Story = {
       ...mockServerConfig,
       enabled: false,
     },
-    clientStatus: {
-      ...mockDisconnectedStatus,
-      connected: false,
-    },
+    clientStatus: mockDisconnectedStatus,
   },
 };
 
@@ -146,7 +143,7 @@ export const HttpServer: Story = {
     },
     clientStatus: {
       name: 'buildkite',
-      connected: true,
+      state: 'connected',
       tools: 27,
       authorization_required: false,
       oauth_authenticated: false,
@@ -166,7 +163,7 @@ export const SseServer: Story = {
     },
     clientStatus: {
       name: 'Context7',
-      connected: true,
+      state: 'connected',
       tools: 2,
       authorization_required: false,
       oauth_authenticated: true,

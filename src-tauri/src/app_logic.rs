@@ -1,13 +1,10 @@
 use crate::config::{
-    load_clients_state_with,
     load_settings_with,
-    save_clients_state_with,
     save_settings_with,
     ConfigProvider,
     Settings,
 };
-use crate::events::{client_status_changed, settings_updated, EventEmitter};
-use crate::client::remove_rmcp_client;
+use crate::events::{settings_updated, EventEmitter};
 use std::collections::HashMap;
 
 pub fn update_settings<E: EventEmitter>(
@@ -20,32 +17,7 @@ pub fn update_settings<E: EventEmitter>(
     Ok(())
 }
 
-pub async fn authorize_client<E: EventEmitter>(
-    cp: &dyn ConfigProvider,
-    emitter: &E,
-    name: &str,
-    token: &str,
-) -> Result<(), String> {
-    let mut s = load_settings_with(cp);
-    let srv = s
-        .mcp_servers
-        .iter_mut()
-        .find(|c| c.name == name)
-        .ok_or_else(|| "server not found".to_string())?;
-    let headers = srv.headers.get_or_insert_with(HashMap::new);
-    headers.insert("Authorization".into(), format!("Bearer {}", token));
-    save_settings_with(cp, &s)?;
-
-    let mut st = load_clients_state_with(cp);
-    let entry = st.0.entry(name.to_string()).or_default();
-    entry.oauth_authenticated = Some(true);
-    entry.authorization_required = Some(false);
-    save_clients_state_with(cp, &st)?;
-
-    remove_rmcp_client(name).await?;
-    client_status_changed(emitter, name, "authorize");
-    Ok(())
-}
+// No authorize helper — OAuth is handled entirely via start_oauth_for_server
 
 #[cfg(test)]
 mod tests {
@@ -73,4 +45,3 @@ mod tests {
         assert_eq!(events.len(), 1);
     }
 }
-

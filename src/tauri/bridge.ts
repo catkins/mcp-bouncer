@@ -30,7 +30,7 @@ export interface Settings {
 
 export interface ClientStatus {
   name: string;
-  connected: boolean;
+  state: 'disconnected' | 'connecting' | 'errored' | 'connected';
   tools: number;
   last_error?: string;
   authorization_required: boolean;
@@ -76,8 +76,8 @@ export const MCPService = {
   async RestartClient(name: string): Promise<void> {
     return invoke('mcp_restart_client', { name });
   },
-  async AuthorizeClient(name: string, token?: string): Promise<void> {
-    return invoke('mcp_authorize_client', { name, token: token ?? '' });
+  async StartOAuth(name: string): Promise<void> {
+    return invoke('mcp_start_oauth', { name });
   },
   async GetClientTools(clientName: string): Promise<any[]> {
     return invoke('mcp_get_client_tools', { clientName });
