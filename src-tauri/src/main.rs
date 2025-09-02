@@ -3,18 +3,17 @@ use std::{collections::HashMap, fs, sync::OnceLock};
 use tauri::Manager;
 
 use mcp_bouncer::app_logic;
-use mcp_bouncer::client::{
-    ensure_rmcp_client, fetch_tools_for_cfg, registry_names, remove_rmcp_client,
-};
+use mcp_bouncer::client::{ ensure_rmcp_client, remove_rmcp_client };
 use mcp_bouncer::config::{
-    ClientStatus, IncomingClient, MCPServerConfig, Settings, config_dir, default_settings,
-    load_clients_state, load_settings, save_clients_state, save_settings,
+    ClientStatus, ClientConnectionState, IncomingClient, MCPServerConfig, Settings, config_dir, default_settings,
+    load_settings, save_settings,
 };
 use mcp_bouncer::events::{
     TauriEventEmitter, client_error, client_status_changed, incoming_clients_updated,
     servers_updated,
 };
 use mcp_bouncer::incoming::list_incoming;
+use mcp_bouncer::oauth::start_oauth_for_server;
 use mcp_bouncer::server::start_http_server;
 
 // ---------- Streamable HTTP MCP proxy (basic) ----------
@@ -67,12 +66,7 @@ async fn mcp_is_active() -> Result<bool, String> {
 
 #[tauri::command]
 async fn mcp_get_client_status() -> Result<HashMap<String, ClientStatus>, String> {
-    let reg_names = registry_names().await;
-    let map = mcp_bouncer::status::compute_client_status_map(
-        reg_names,
-        |cfg: mcp_bouncer::config::MCPServerConfig| async move { fetch_tools_for_cfg(&cfg).await },
-    )
-    .await;
+    let map = mcp_bouncer::status::compute_client_status_map().await;
     Ok(map)
 }
 
@@ -106,22 +100,18 @@ async fn mcp_update_server(
         let requires_auth = config.requires_auth.unwrap_or(false);
         let is_enabling = config.enabled;
         if requires_auth && is_enabling {
-            let clients = load_clients_state();
-            let oauth_ok = clients
-                .0
+            let oauth_ok = mcp_bouncer::overlay::snapshot().await
                 .get(&name)
-                .and_then(|st| st.oauth_authenticated)
+                .map(|e| e.oauth_authenticated)
                 .unwrap_or(false);
             if !oauth_ok {
                 let err = "Authorization required".to_string();
                 // emit client error
                 client_error(&TauriEventEmitter(app.clone()), &name, "enable", &err);
                 // update client state with last_error and auth_required
-                let mut st = load_clients_state();
-                let entry = st.0.entry(name.clone()).or_default();
-                entry.last_error = Some("Authorization required".into());
-                entry.authorization_required = Some(true);
-                save_clients_state(&st)?;
+                mcp_bouncer::overlay::set_error(&name, Some("Authorization required".into())).await;
+                mcp_bouncer::overlay::set_auth_required(&name, true).await;
+                mcp_bouncer::overlay::set_oauth_authenticated(&name, false).await;
                 return Err("authorization required".into());
             }
         }
@@ -136,20 +126,7 @@ async fn mcp_update_server(
         // try to connect if enabling
         if enabling {
             if let Some(cfg) = get_server_by_name(&server_name) {
-                match ensure_rmcp_client(&server_name, &cfg).await {
-                    Ok(_) => {
-                        update_client_overlay_connected(&server_name, true)?;
-                        client_status_changed(
-                            &TauriEventEmitter(app.clone()),
-                            &server_name,
-                            "enable",
-                        );
-                    }
-                    Err(e) => {
-                        set_client_overlay_error(&server_name, &e)?;
-                        client_error(&TauriEventEmitter(app.clone()), &server_name, "enable", &e);
-                    }
-                }
+                connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg).await;
             }
         }
         incoming_clients_updated(&TauriEventEmitter(app.clone()), "servers_changed");
@@ -190,24 +167,12 @@ async fn mcp_toggle_server_enabled(
         servers_updated(&TauriEventEmitter(app.clone()), "toggle");
         if enabled {
             if let Some(cfg) = get_server_by_name(&server_name) {
-                match ensure_rmcp_client(&server_name, &cfg).await {
-                    Ok(_) => {
-                        update_client_overlay_connected(&server_name, true)?;
-                        client_status_changed(
-                            &TauriEventEmitter(app.clone()),
-                            &server_name,
-                            "enable",
-                        );
-                    }
-                    Err(e) => {
-                        set_client_overlay_error(&server_name, &e)?;
-                        client_error(&TauriEventEmitter(app.clone()), &server_name, "enable", &e);
-                    }
-                }
+                connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg).await;
             }
         } else {
             let _ = remove_rmcp_client(&server_name).await;
-            update_client_overlay_connected(&server_name, false)?;
+            mcp_bouncer::overlay::set_state(&server_name, ClientConnectionState::Disconnected).await;
+            mcp_bouncer::overlay::set_error(&server_name, None).await;
             client_status_changed(&TauriEventEmitter(app.clone()), &server_name, "disable");
         }
         servers_updated(&TauriEventEmitter(app.clone()), "toggle");
@@ -247,23 +212,22 @@ async fn mcp_restart_client(app: tauri::AppHandle, name: String) -> Result<(), S
 
     // Ensure client exists; mark connected
     if let Some(cfg) = get_server_by_name(&name) {
-        let _ = ensure_rmcp_client(&name, &cfg).await;
+        connect_and_initialize(&TauriEventEmitter(app.clone()), &name, &cfg).await;
     }
-    update_client_overlay_connected(&name, true)?;
     client_status_changed(&TauriEventEmitter(app.clone()), &name, "restart");
     Ok(())
 }
 
 #[tauri::command]
-async fn mcp_authorize_client(app: tauri::AppHandle, name: String) -> Result<(), String> {
-    // Simulate successful OAuth: set oauth_authenticated=true and authorization_required=false
-    let mut state = load_clients_state();
-    let entry = state.0.entry(name.clone()).or_default();
-    entry.oauth_authenticated = Some(true);
-    entry.authorization_required = Some(false);
-    save_clients_state(&state)?;
-    client_status_changed(&TauriEventEmitter(app.clone()), &name, "authorize");
-    Ok(())
+async fn mcp_start_oauth(app: tauri::AppHandle, name: String) -> Result<(), String> {
+    // Find server and ensure endpoint available
+    let cfg = get_server_by_name(&name).ok_or_else(|| "server not found".to_string())?;
+    let endpoint = cfg
+        .endpoint
+        .clone()
+        .ok_or_else(|| "missing endpoint".to_string())?;
+    // Kick off OAuth flow (opens browser, waits for callback)
+    start_oauth_for_server(&TauriEventEmitter(app.clone()), &name, &endpoint).await
 }
 
 #[tauri::command]
@@ -283,24 +247,45 @@ async fn mcp_get_client_tools(client_name: String) -> Result<Vec<serde_json::Val
     Ok(Vec::new())
 }
 
-fn update_client_overlay_connected(name: &str, connected: bool) -> Result<(), String> {
-    let mut state = load_clients_state();
-    let entry = state.0.entry(name.to_string()).or_default();
-    entry.connected = Some(connected);
-    if connected {
-        entry.last_error = None;
+async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
+    emitter: &E,
+    name: &str,
+    cfg: &MCPServerConfig,
+) {
+    use mcp_bouncer::overlay as ov;
+    ov::set_state(name, ClientConnectionState::Connecting).await;
+    ov::set_error(name, None).await;
+    client_status_changed(emitter, name, "connecting");
+    match ensure_rmcp_client(name, cfg).await {
+        Ok(client) => {
+            // list tools (forces initialize + verifies connection)
+            match client.list_all_tools().await {
+                Ok(tools) => {
+                    ov::set_tools(name, tools.len() as u32).await;
+                    ov::set_state(name, ClientConnectionState::Connected).await;
+                    client_status_changed(emitter, name, "connected");
+                }
+                Err(e) => {
+                    let msg = e.to_string();
+                    let lower = msg.to_ascii_lowercase();
+                    if lower.contains("401") || lower.contains("unauthorized") {
+                        ov::set_auth_required(name, true).await;
+                        ov::set_oauth_authenticated(name, false).await;
+                    }
+                    ov::set_error(name, Some(msg)).await;
+                    ov::set_state(name, ClientConnectionState::Errored).await;
+                    client_status_changed(emitter, name, "error");
+                }
+            }
+        }
+        Err(e) => {
+            ov::set_error(name, Some(e.clone())).await;
+            ov::set_state(name, ClientConnectionState::Errored).await;
+            client_error(emitter, name, "enable", &e);
+            client_status_changed(emitter, name, "error");
+        }
     }
-    save_clients_state(&state)
 }
-
-fn set_client_overlay_error(name: &str, err: &str) -> Result<(), String> {
-    let mut state = load_clients_state();
-    let entry = state.0.entry(name.to_string()).or_default();
-    entry.last_error = Some(err.to_string());
-    save_clients_state(&state)
-}
-
-// No legacy mcp_rpc/mcp_proxy_request commands; HTTP path handled by rmcp client where needed.
 
 #[tauri::command]
 async fn mcp_toggle_tool(
@@ -349,6 +334,17 @@ fn main() {
         .setup(|app| {
             // start the proxy server (idempotent)
             spawn_mcp_proxy(app.app_handle());
+            // Auto-connect all enabled servers on startup
+            let app_handle = app.app_handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let settings = mcp_bouncer::config::load_settings();
+                for cfg in settings.mcp_servers.into_iter().filter(|c| c.enabled) {
+                    let emitter = TauriEventEmitter(app_handle.clone());
+                    tauri::async_runtime::spawn(async move {
+                        connect_and_initialize(&emitter, &cfg.name, &cfg).await;
+                    });
+                }
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -362,7 +358,7 @@ fn main() {
             mcp_remove_server,
             mcp_toggle_server_enabled,
             mcp_restart_client,
-            mcp_authorize_client,
+            mcp_start_oauth,
             mcp_get_client_tools,
             mcp_toggle_tool,
             settings_get_settings,

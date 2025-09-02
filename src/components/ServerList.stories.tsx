@@ -42,7 +42,7 @@ const mockServers: MCPServerConfig[] = [
 const mockClientStatus: Record<string, ClientStatus> = {
   fetch: {
     name: 'fetch',
-    connected: true,
+    state: 'connected',
     tools: 11,
     last_error: undefined,
     authorization_required: false,
@@ -50,7 +50,7 @@ const mockClientStatus: Record<string, ClientStatus> = {
   },
   buildkite: {
     name: 'buildkite',
-    connected: true,
+    state: 'connected',
     tools: 27,
     last_error: undefined,
     authorization_required: false,
@@ -58,7 +58,7 @@ const mockClientStatus: Record<string, ClientStatus> = {
   },
   'disabled-server': {
     name: 'disabled-server',
-    connected: false,
+    state: 'disconnected',
     tools: 0,
     last_error: undefined,
     authorization_required: false,
@@ -69,7 +69,7 @@ const mockClientStatus: Record<string, ClientStatus> = {
 const mockClientStatusWithErrors: Record<string, ClientStatus> = {
   fetch: {
     name: 'fetch',
-    connected: false,
+    state: 'errored',
     tools: 0,
     last_error: 'Connection timeout',
     authorization_required: false,
@@ -77,7 +77,7 @@ const mockClientStatusWithErrors: Record<string, ClientStatus> = {
   },
   buildkite: {
     name: 'buildkite',
-    connected: false,
+    state: 'errored',
     tools: 0,
     last_error: 'Authentication failed',
     authorization_required: true,
@@ -85,7 +85,7 @@ const mockClientStatusWithErrors: Record<string, ClientStatus> = {
   },
   'disabled-server': {
     name: 'disabled-server',
-    connected: false,
+    state: 'disconnected',
     tools: 0,
     last_error: undefined,
     authorization_required: false,
@@ -247,7 +247,7 @@ export const MixedTransports: Story = {
       ...mockClientStatus,
       'sse-server': {
         name: 'sse-server',
-        connected: true,
+        state: 'connected',
         tools: 5,
         authorization_required: false,
         oauth_authenticated: true,
@@ -262,14 +262,14 @@ export const AuthenticationRequired: Story = {
     clientStatus: {
       fetch: {
         name: 'fetch',
-        connected: false,
+        state: 'disconnected',
         tools: 0,
         authorization_required: true,
         oauth_authenticated: false,
       },
       buildkite: {
         name: 'buildkite',
-        connected: true,
+        state: 'connected',
         tools: 27,
         authorization_required: false,
         oauth_authenticated: true,
@@ -314,21 +314,21 @@ export const LargeList: Story = {
       ...mockClientStatus,
       'server-4': {
         name: 'server-4',
-        connected: true,
+        state: 'connected',
         tools: 3,
         authorization_required: false,
         oauth_authenticated: false,
       },
       'server-5': {
         name: 'server-5',
-        connected: false,
+        state: 'disconnected',
         tools: 0,
         authorization_required: false,
         oauth_authenticated: false,
       },
       'server-6': {
         name: 'server-6',
-        connected: true,
+        state: 'connected',
         tools: 15,
         authorization_required: false,
         oauth_authenticated: true,

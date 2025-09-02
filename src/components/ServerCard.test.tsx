@@ -21,7 +21,7 @@ describe('ServerCard', () => {
   it('shows transport badge and connected state', () => {
     const clientStatus: ClientStatus = {
       name: 'svc',
-      connected: true,
+      state: 'connected',
       tools: 3,
       authorization_required: false,
       oauth_authenticated: false,
@@ -42,7 +42,7 @@ describe('ServerCard', () => {
   it('shows authorize when required', () => {
     const status: ClientStatus = {
       name: 'svc',
-      connected: false,
+      state: 'disconnected',
       tools: 0,
       authorization_required: true,
       oauth_authenticated: false,

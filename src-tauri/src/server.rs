@@ -116,11 +116,19 @@ where
                             .await
                         {
                             Ok(res) => Ok(mcp::ServerResult::CallToolResult(res)),
-                            Err(e) => Ok(mcp::ServerResult::CallToolResult(mcp::CallToolResult {
-                                content: vec![mcp::Content::text(format!("error: {e}"))],
-                                structured_content: None,
-                                is_error: Some(true),
-                            })),
+                            Err(e) => {
+                                let msg = e.to_string();
+                                let lower = msg.to_ascii_lowercase();
+                                if lower.contains("401") || lower.contains("unauthorized") {
+                                    crate::overlay::set_auth_required(&cfg.name, true).await;
+                                    crate::overlay::set_oauth_authenticated(&cfg.name, false).await;
+                                }
+                                Ok(mcp::ServerResult::CallToolResult(mcp::CallToolResult {
+                                    content: vec![mcp::Content::text(format!("error: {e}"))],
+                                    structured_content: None,
+                                    is_error: Some(true),
+                                }))
+                            }
                         },
                         Err(e) => Ok(mcp::ServerResult::CallToolResult(mcp::CallToolResult {
                             content: vec![mcp::Content::text(format!("error: {e}"))],
@@ -173,7 +181,7 @@ fn to_mcp_tool(server: &str, v: &serde_json::Value) -> Option<mcp::Tool> {
         .or_else(|| v.get("input_schema"))
         .and_then(|s| s.as_object().cloned())
         .unwrap_or_default();
-    let fullname = format!("{}::{}", server, name);
+    let fullname = format!("{server}::{name}");
     Some(mcp::Tool::new(fullname, description.unwrap_or_default(), schema_obj))
 }
 

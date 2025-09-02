@@ -18,9 +18,12 @@ futures = "0.3"
 rmcp = { version = "0.6.1", features = [
   "client",
   "transport-streamable-http-client-reqwest",
+  "transport-sse-client-reqwest",
+  "transport-sse-server",
   "transport-child-process",
   "transport-streamable-http-server",
-  "transport-worker"
+  "transport-worker",
+  "auth"
 ] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 
@@ -31,3 +34,6 @@ png = "0.17"
 
 [features]
 default = []
+
+[dev-dependencies]
+async-trait = "0.1"

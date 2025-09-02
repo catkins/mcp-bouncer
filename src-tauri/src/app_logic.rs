@@ -11,6 +11,7 @@ pub fn update_settings<E: EventEmitter>(
     Ok(())
 }
 
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -37,4 +38,3 @@ mod tests {
         assert_eq!(events.len(), 1);
     }
 }
-

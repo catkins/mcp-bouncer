@@ -1,81 +1,48 @@
-use futures::future::join_all;
 use std::collections::HashMap;
 
-use crate::config::{load_clients_state_with, load_settings_with, ClientStatus, ConfigProvider, MCPServerConfig, OsConfigProvider, TransportType};
+use crate::config::{load_settings_with, ClientStatus, ClientConnectionState, ConfigProvider, OsConfigProvider};
+use crate::overlay;
 
-pub async fn compute_client_status_map_with<E, Fut, LF>(
+pub async fn compute_client_status_map_with(
     cp: &dyn ConfigProvider,
-    registry_names: E,
-    lister: LF,
-) -> HashMap<String, ClientStatus>
-where
-    E: IntoIterator<Item = String>,
-    LF: Fn(MCPServerConfig) -> Fut + Clone + Send + Sync,
-    Fut: std::future::Future<Output = Result<Vec<serde_json::Value>, String>>,
-{
+) -> HashMap<String, ClientStatus> {
     let settings = load_settings_with(cp);
     let mut map: HashMap<String, ClientStatus> = HashMap::new();
-    let mut tasks = Vec::new();
     for server in settings.mcp_servers {
         let name = server.name.clone();
-        let transport = server.transport.clone();
-        let enabled = server.enabled;
         map.insert(
             name.clone(),
             ClientStatus {
                 name: name.clone(),
-                connected: false,
+                state: ClientConnectionState::Disconnected,
                 tools: 0,
                 last_error: None,
-                authorization_required: server.requires_auth.unwrap_or(false),
+                authorization_required: false,
                 oauth_authenticated: false,
             },
         );
-        if enabled && matches!(transport, Some(TransportType::TransportStreamableHTTP)) {
-            let list_fn = lister.clone();
-            tasks.push(async move {
-                if let Ok(tools) = list_fn(server).await {
-                    return Some((name, tools.len() as u32));
-                }
-                None
-            });
-        }
     }
-    for r in join_all(tasks).await.into_iter().flatten() {
-        if let Some(cs) = map.get_mut(&r.0) { cs.tools = r.1; }
-    }
-    for n in registry_names { if let Some(cs) = map.get_mut(&n) { cs.connected = true; } }
-    let overlay = load_clients_state_with(cp);
-    for (name, state) in overlay.0.into_iter() {
+    let overlay = overlay::snapshot().await;
+    for (name, entry) in overlay.into_iter() {
         if let Some(cs) = map.get_mut(&name) {
-            if let Some(v) = state.connected { cs.connected = v; }
-            if state.last_error.is_some() { cs.last_error = state.last_error; }
-            if let Some(v) = state.authorization_required { cs.authorization_required = v; }
-            if let Some(v) = state.oauth_authenticated { cs.oauth_authenticated = v; }
+            cs.state = entry.state;
+            cs.last_error = entry.last_error;
+            cs.authorization_required = entry.authorization_required;
+            cs.oauth_authenticated = entry.oauth_authenticated;
+            cs.tools = entry.tools;
         }
     }
     map
 }
 
-pub async fn compute_client_status_map<E, Fut, LF>(
-    registry_names: E,
-    lister: LF,
-) -> HashMap<String, ClientStatus>
-where
-    E: IntoIterator<Item = String>,
-    LF: Fn(MCPServerConfig) -> Fut + Clone + Send + Sync,
-    Fut: std::future::Future<Output = Result<Vec<serde_json::Value>, String>>,
-{
-    compute_client_status_map_with(&OsConfigProvider, registry_names, lister).await
+pub async fn compute_client_status_map() -> HashMap<String, ClientStatus> {
+    compute_client_status_map_with(&OsConfigProvider).await
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{
-        default_settings, save_clients_state_with, save_settings_with, ClientState, ClientsState,
-        ConfigProvider, MCPServerConfig, TransportType,
-    };
+    use crate::config::{ default_settings, save_settings_with, ConfigProvider, MCPServerConfig, TransportType, ClientConnectionState};
     use std::fs;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -129,17 +96,9 @@ mod tests {
         save_settings_with(&cp, &s).unwrap();
 
         // registry indicates a running client
-        let reg = vec!["srv1".to_string()];
-        // lister returns 3 tools
-        let lister = |_cfg: MCPServerConfig| async move {
-            Ok(vec![
-                serde_json::json!({"name":"a"}),
-                serde_json::json!({"name":"b"}),
-                serde_json::json!({"name":"c"}),
-            ])
-        };
-
-        let map = compute_client_status_map_with(&cp, reg, lister).await;
+        crate::overlay::set_state("srv1", ClientConnectionState::Connected).await;
+        crate::overlay::set_tools("srv1", 3).await;
+        let map = compute_client_status_map_with(&cp).await;
         assert!(!map.is_empty());
         let cs = map.values().find(|v| v.name == "srv1").expect("srv1 present");
         assert_eq!(cs.tools, 3);
@@ -163,26 +122,16 @@ mod tests {
         });
         save_settings_with(&cp, &s).unwrap();
 
-        // Overlay marks connected=false even if registry claims connected
-        let mut overlay = ClientsState::default();
-        overlay.0.insert(
-            "srv1".into(),
-            ClientState {
-                connected: Some(false),
-                last_error: Some("no token".into()),
-                authorization_required: Some(true),
-                oauth_authenticated: Some(true),
-            },
-        );
-        save_clients_state_with(&cp, &overlay).unwrap();
+        crate::overlay::set_state("srv1", ClientConnectionState::Errored).await;
+        crate::overlay::set_error("srv1", Some("no token".into())).await;
+        crate::overlay::set_auth_required("srv1", true).await;
+        crate::overlay::set_oauth_authenticated("srv1", true).await;
 
-        let reg = vec!["srv1".to_string()];
-        let lister = |_cfg: MCPServerConfig| async move { Ok::<_, String>(vec![]) };
-        let map = compute_client_status_map_with(&cp, reg, lister).await;
+        let map = compute_client_status_map_with(&cp).await;
         let cs = map.values().find(|v| v.name == "srv1").expect("srv1 present");
-        assert_eq!(cs.connected, false); // overlay wins
+        assert_eq!(cs.state, ClientConnectionState::Errored); // overlay wins
         assert_eq!(cs.last_error.as_deref(), Some("no token"));
-        assert_eq!(cs.authorization_required, true);
-        assert_eq!(cs.oauth_authenticated, true);
+        assert!(cs.authorization_required);
+        assert!(cs.oauth_authenticated);
     }
 }

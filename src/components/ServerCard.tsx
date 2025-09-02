@@ -48,7 +48,7 @@ export function ServerCard({
   toggleError,
 }: ServerCardProps) {
   const handleToolsClick = () => {
-    if (clientStatus?.connected && clientStatus.tools > 0 && onOpenTools) {
+    if (clientStatus?.state === 'connected' && clientStatus.tools > 0 && onOpenTools) {
       onOpenTools(server.name);
     }
   };
@@ -91,25 +91,35 @@ export function ServerCard({
           </h3>
           {clientStatus && (
             <div className="flex items-center gap-2">
-              <span
-                className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full transition-all duration-200 ${
-                  clientStatus.connected
-                    ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-400'
-                    : 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-400'
-                } ${toggleLoading ? 'animate-pulse' : ''}`}
-              >
-                {clientStatus.connected ? (
+              {clientStatus.state === 'connected' && (
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full transition-all duration-200 bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-400 ${toggleLoading ? 'animate-pulse' : ''}`}>
                   <CheckCircleIcon className="w-3 h-3" />
-                ) : (
+                  Connected
+                </span>
+              )}
+              {clientStatus.state === 'connecting' && (
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full transition-all duration-200 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-400 ${toggleLoading ? 'animate-pulse' : ''}`}>
+                  <ArrowPathIcon className="w-3 h-3 animate-spin" />
+                  Connecting
+                </span>
+              )}
+              {clientStatus.state === 'errored' && (
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full transition-all duration-200 bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-400 ${toggleLoading ? 'animate-pulse' : ''}`}>
                   <XCircleIcon className="w-3 h-3" />
-                )}
-                {clientStatus.connected ? 'Connected' : 'Disconnected'}
-              </span>
+                  Error
+                </span>
+              )}
+              {clientStatus.state === 'disconnected' && (
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full transition-all duration-200 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-300 ${toggleLoading ? 'animate-pulse' : ''}`}>
+                  <NoSymbolIcon className="w-3 h-3" />
+                  Disconnected
+                </span>
+              )}
               <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-400 rounded-full text-xs font-medium">
                 {getTransportIcon()}
                 {server.transport || 'stdio'}
               </span>
-              {clientStatus.connected && clientStatus.tools > 0 && (
+              {clientStatus.state === 'connected' && clientStatus.tools > 0 && (
                 <button
                   onClick={handleToolsClick}
                   className={`inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-400 rounded-full text-xs font-medium transition-all duration-200 hover:bg-blue-200 dark:hover:bg-blue-800/70 hover:scale-105 active:scale-95 cursor-pointer ${
@@ -122,7 +132,7 @@ export function ServerCard({
                   {clientStatus.tools}
                 </button>
               )}
-              {!clientStatus.connected && clientStatus.authorization_required && (
+              {clientStatus.state !== 'connected' && clientStatus.authorization_required && (
                 <button
                   onClick={() => onAuthorize && onAuthorize(server.name)}
                   className={`inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-400 rounded-full text-xs font-medium transition-all duration-200 hover:bg-amber-200 dark:hover:bg-amber-800/70 hover:scale-105 active:scale-95 cursor-pointer ${

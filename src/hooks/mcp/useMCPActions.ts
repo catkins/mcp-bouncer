@@ -159,7 +159,7 @@ export function useMCPActions(
   const authorizeServer = useCallback(
     async (serverName: string) => {
       try {
-        await MCPService.AuthorizeClient(serverName);
+        await MCPService.StartOAuth(serverName);
         await deps.loadClientStatus();
       } catch (error) {
         console.error('Failed to authorize server:', error);
@@ -189,4 +189,3 @@ export function useMCPActions(
     openConfigDirectory,
   };
 }
-
