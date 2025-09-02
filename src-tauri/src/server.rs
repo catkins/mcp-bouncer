@@ -191,10 +191,7 @@ async fn aggregate_tools(
 ) -> Vec<mcp::Tool> {
     let tasks = servers.into_iter().map(|cfg| async move {
         let name = cfg.name.clone();
-        let fut = async move {
-            let boxed = Box::new(cfg);
-            fetch_tools_for_cfg(&boxed).await
-        };
+        let fut = async move { fetch_tools_for_cfg(&cfg).await };
         match tokio::time::timeout(timeout, fut).await {
             Ok(Ok(list)) => Some((name, list)),
             _ => None,
