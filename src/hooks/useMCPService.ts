@@ -66,6 +66,16 @@ export function useMCPService() {
     loadMcpUrl,
     loadClientStatus,
     setToggleError,
+    clearToggleLoading: (serverName: string) =>
+      setLoadingStates(prev => ({
+        ...prev,
+        toggleServer: { ...prev.toggleServer, [serverName]: false },
+      })),
+    clearRestartLoading: (serverName: string) =>
+      setLoadingStates(prev => ({
+        ...prev,
+        restartServer: { ...prev.restartServer, [serverName]: false },
+      })),
   });
 
   useEffect(() => {

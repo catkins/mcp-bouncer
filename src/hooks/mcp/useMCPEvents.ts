@@ -10,6 +10,8 @@ export function useMCPEvents(
     loadMcpUrl: () => Promise<void>;
     loadClientStatus: () => Promise<void>;
     setToggleError: (serverName: string, error?: string) => void;
+    clearToggleLoading?: (serverName: string) => void;
+    clearRestartLoading?: (serverName: string) => void;
   },
 ) {
   useEffect(() => {
@@ -34,6 +36,13 @@ export function useMCPEvents(
     listen(EventsMap.ClientStatusChanged, async (event) => {
       if (import.meta.env.DEV) console.log('Received mcp:client_status_changed event:', event);
       await deps.loadClientStatus();
+      const payload = (event?.payload || {}) as { server_name?: string; action?: string };
+      const server = payload.server_name;
+      const action = (payload.action || '').toLowerCase();
+      if (server && (action === 'connected' || action === 'disable' || action === 'error')) {
+        deps.clearToggleLoading?.(server);
+        deps.clearRestartLoading?.(server);
+      }
     }).then(u => (cancelled ? u() : unsubs.push(u)));
 
     listen<ClientErrorPayload>(EventsMap.ClientError, async (event) => {
