@@ -32,6 +32,9 @@ export function useIncomingClients() {
   useEffect(() => {
     reload();
 
+    let cancelled = false;
+    const unsubs: Array<() => void> = [];
+
     const unsub1Promise = listen<IncomingClientConnectedPayload>(EventsMap.IncomingClientConnected, async (e) => {
       const data = e.payload;
       setClients(prev => {
@@ -58,11 +61,21 @@ export function useIncomingClients() {
       await reload();
     });
 
+    // capture unsubs when ready; if already cancelled, unlisten immediately
+    unsub1Promise.then(u => (cancelled ? (void (safeUnlisten(u))) : unsubs.push(u))).catch(() => {});
+    unsub2Promise.then(u => (cancelled ? (void (safeUnlisten(u))) : unsubs.push(u))).catch(() => {});
+    unsub3Promise.then(u => (cancelled ? (void (safeUnlisten(u))) : unsubs.push(u))).catch(() => {});
+
+    function safeUnlisten(u: () => void) {
+      try { u(); } catch { /* noop */ }
+    }
+
     return () => {
-      // Best-effort unsubscribe once listeners are registered
-      unsub1Promise.then(u => u()).catch(() => {});
-      unsub2Promise.then(u => u()).catch(() => {});
-      unsub3Promise.then(u => u()).catch(() => {});
+      cancelled = true;
+      while (unsubs.length) {
+        const u = unsubs.pop();
+        if (u) safeUnlisten(u);
+      }
     };
   }, []);
 

@@ -30,7 +30,15 @@ export function useMCPEvents({
       await loadServers();
       await loadActive();
       await loadClientStatus();
-    }).then(u => (cancelled ? u() : unsubs.push(u)));
+    })
+      .then(u => {
+        if (cancelled) {
+          try { u(); } catch { /* noop */ }
+        } else {
+          unsubs.push(u);
+        }
+      })
+      .catch(() => {});
 
     listen(EventsMap.SettingsUpdated, async (event) => {
       if (import.meta.env.DEV) console.log('Received settings:updated event:', event);
@@ -38,7 +46,15 @@ export function useMCPEvents({
       await loadMcpUrl();
       await loadServers();
       await loadClientStatus();
-    }).then(u => (cancelled ? u() : unsubs.push(u)));
+    })
+      .then(u => {
+        if (cancelled) {
+          try { u(); } catch { /* noop */ }
+        } else {
+          unsubs.push(u);
+        }
+      })
+      .catch(() => {});
 
     listen(EventsMap.ClientStatusChanged, async (event) => {
       if (import.meta.env.DEV) console.log('Received mcp:client_status_changed event:', event);
@@ -50,7 +66,15 @@ export function useMCPEvents({
         clearToggleLoading?.(server);
         clearRestartLoading?.(server);
       }
-    }).then(u => (cancelled ? u() : unsubs.push(u)));
+    })
+      .then(u => {
+        if (cancelled) {
+          try { u(); } catch { /* noop */ }
+        } else {
+          unsubs.push(u);
+        }
+      })
+      .catch(() => {});
 
     listen<ClientErrorPayload>(EventsMap.ClientError, async (event) => {
       if (import.meta.env.DEV) console.log('Received mcp:client_error event:', event);
@@ -59,7 +83,15 @@ export function useMCPEvents({
         setToggleError(data.server_name, `${data.action} failed: ${data.error}`);
         await loadClientStatus();
       }
-    }).then(u => (cancelled ? u() : unsubs.push(u)));
+    })
+      .then(u => {
+        if (cancelled) {
+          try { u(); } catch { /* noop */ }
+        } else {
+          unsubs.push(u);
+        }
+      })
+      .catch(() => {});
 
     // Poll client status every 5s as a safety net
     let ticking = false;
@@ -77,7 +109,11 @@ export function useMCPEvents({
 
     return () => {
       cancelled = true;
-      unsubs.forEach(u => u());
+      // drain and unlisten safely
+      while (unsubs.length) {
+        const u = unsubs.pop();
+        try { u && u(); } catch { /* noop */ }
+      }
       clearInterval(intervalId);
     };
   }, [
