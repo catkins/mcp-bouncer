@@ -62,16 +62,31 @@ pub async fn ensure_rmcp_client(
                 let client = AuthClient::new(reqwest::Client::default(), manager);
                 let transport = StreamableHttpClientTransport::with_client(
                     client,
-                    StreamableHttpClientTransportConfig::with_uri(endpoint),
+                    StreamableHttpClientTransportConfig::with_uri(endpoint.clone()),
                 );
-                ().serve(transport)
-                    .await
-                    .map_err(|e| format!("rmcp serve: {e}"))?
+                match ().serve(transport).await {
+                    Ok(svc) => svc,
+                    Err(e) => {
+                        let msg = format!("rmcp serve: {e}");
+                        // Fallback probe for 401 to mark unauthorized (some servers close on initialize without explicit 401 in error text)
+                        if let Ok(resp) = reqwest::Client::default().get(endpoint.clone()).send().await {
+                            if resp.status().as_u16() == 401 { overlay::mark_unauthorized(&cfg.name).await; }
+                        }
+                        return Err(msg);
+                    }
+                }
             } else {
-                let transport = StreamableHttpClientTransport::from_uri(endpoint);
-                ().serve(transport)
-                    .await
-                    .map_err(|e| format!("rmcp serve: {e}"))?
+                let transport = StreamableHttpClientTransport::from_uri(endpoint.clone());
+                match ().serve(transport).await {
+                    Ok(svc) => svc,
+                    Err(e) => {
+                        let msg = format!("rmcp serve: {e}");
+                        if let Ok(resp) = reqwest::Client::default().get(endpoint.clone()).send().await {
+                            if resp.status().as_u16() == 401 { overlay::mark_unauthorized(&cfg.name).await; }
+                        }
+                        return Err(msg);
+                    }
+                }
             }
         }
         Some(TransportType::Sse) => {
