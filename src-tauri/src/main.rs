@@ -109,12 +109,23 @@ async fn mcp_update_server(
                 .unwrap_or(false);
             if !oauth_ok {
                 let err = "Authorization required".to_string();
-                // emit client error
-                client_error(&TauriEventEmitter(app.clone()), &name, "enable", &err);
                 // update client state with last_error and auth_required
                 mcp_bouncer::overlay::set_error(&name, Some("Authorization required".into())).await;
                 mcp_bouncer::overlay::mark_unauthorized(&name).await;
-                return Err("authorization required".into());
+                // emit events so UI can show authorize pill; do not hard-fail the toggle
+                client_error(&TauriEventEmitter(app.clone()), &name, "enable", &err);
+                client_status_changed(&TauriEventEmitter(app.clone()), &name, "authorization_required");
+                // Skip auto-connect below
+                let enabling = false;
+                let server_name = item.name.clone();
+                *item = config;
+                let _ = item;
+                save_settings(&s)?;
+                servers_updated(&TauriEventEmitter(app.clone()), "update");
+                incoming_clients_updated(&TauriEventEmitter(app.clone()), "servers_changed");
+                let _ = enabling;
+                let _ = server_name;
+                return Ok(());
             }
         }
 
@@ -244,6 +255,7 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
     cfg: &MCPServerConfig,
 ) {
     use mcp_bouncer::overlay as ov;
+    println!("[lifecycle] connect_and_initialize -> '{}'", name);
     ov::set_state(name, ClientConnectionState::Connecting).await;
     ov::set_error(name, None).await;
     client_status_changed(emitter, name, "connecting");
@@ -254,6 +266,7 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
                 Ok(tools) => {
                     ov::set_tools(name, tools.len() as u32).await;
                     ov::set_state(name, ClientConnectionState::Connected).await;
+                    println!("[lifecycle] '{}' connected ({} tools)", name, tools.len());
                     client_status_changed(emitter, name, "connected");
                 }
                 Err(e) => {
@@ -264,6 +277,7 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
                     }
                     ov::set_error(name, Some(msg)).await;
                     ov::set_state(name, ClientConnectionState::Errored).await;
+                    println!("[lifecycle] '{}' error during initialize", name);
                     client_status_changed(emitter, name, "error");
                 }
             }
@@ -272,6 +286,7 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
             ov::set_error(name, Some(e.clone())).await;
             ov::set_state(name, ClientConnectionState::Errored).await;
             client_error(emitter, name, "enable", &e);
+            println!("[lifecycle] '{}' failed to start: {}", name, e);
             client_status_changed(emitter, name, "error");
         }
     }
