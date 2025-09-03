@@ -415,21 +415,8 @@ fn main() {
         .pretty()
         .try_init();
     tauri::Builder::default()
-        .plugin(tauri_plugin_log::Builder::new().build())
         // Shell plugin is commonly needed to open links, etc.
         .plugin(tauri_plugin_shell::init())
-        .plugin(
-            tauri_plugin_log::Builder::default()
-                .level(log::LevelFilter::Info)
-                .level_for("mcp_bouncer", log::LevelFilter::Debug)
-                .targets([
-                    tauri_plugin_log::Target::new(
-                        tauri_plugin_log::TargetKind::LogDir { file_name: Some("mcp-bouncer.log".into()) },
-                    ),
-                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
-                ])
-                .build(),
-        )
         .setup(|app| {
             // start the proxy server (idempotent)
             spawn_mcp_proxy(app.app_handle());

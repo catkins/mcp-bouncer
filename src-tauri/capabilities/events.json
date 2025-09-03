@@ -10,7 +10,6 @@
   ],
   "permissions": [
     "core:event:default",
-    "core:event:allow-listen",
-    "log:default"
+    "core:event:allow-listen"
   ]
 }
