@@ -459,7 +459,10 @@ mod tests {
                 assert_eq!(payload["reason"], "connect");
             }
         }
-        assert_eq!(incoming, 1, "should emit exactly one incoming_clients_updated");
+        assert_eq!(
+            incoming, 1,
+            "should emit exactly one incoming_clients_updated"
+        );
         crate::incoming::clear_incoming().await;
     }
 

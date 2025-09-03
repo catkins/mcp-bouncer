@@ -69,7 +69,27 @@ pub async fn ensure_rmcp_client(name: &str, cfg: &MCPServerConfig) -> Result<Arc
                     }
                 }
             } else {
-                let transport = StreamableHttpClientTransport::from_uri(endpoint.clone());
+                // Build reqwest client with default headers if provided
+                let client = if let Some(hdrs) = &cfg.headers {
+                    let mut map = reqwest::header::HeaderMap::new();
+                    for (k, v) in hdrs {
+                        let name = reqwest::header::HeaderName::from_bytes(k.as_bytes())
+                            .with_context(|| format!("invalid header name {k}"))?;
+                        let val = reqwest::header::HeaderValue::from_str(v)
+                            .with_context(|| format!("invalid header value for {k}"))?;
+                        map.insert(name, val);
+                    }
+                    reqwest::Client::builder()
+                        .default_headers(map)
+                        .build()
+                        .context("http client build")?
+                } else {
+                    reqwest::Client::default()
+                };
+                let transport = StreamableHttpClientTransport::with_client(
+                    client,
+                    StreamableHttpClientTransportConfig::with_uri(endpoint.clone()),
+                );
                 match ().serve(transport).await {
                     Ok(svc) => svc,
                     Err(e) => {

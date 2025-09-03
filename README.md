@@ -26,7 +26,7 @@ MCP Bouncer acts as a centralized hub for managing Model Context Protocol server
 ### 🔧 Transport Protocol Support
 - **stdio**: Process‑based transport for local MCP servers (via rmcp TokioChildProcess)
 - **Streamable HTTP**: HTTP transport with streaming capabilities (via rmcp client/server)
-- SSE support is planned; the UI already models it
+- SSE transport is supported; the UI models it and the backend includes an integration test validating header forwarding and tool listing.
 
 ### 🎨 Modern UI
 - Clean, responsive interface built with React and Tailwind CSS
@@ -131,6 +131,11 @@ The application automatically manages settings in platform-specific locations:
 | `name` | string | Yes | Unique identifier for the server |
 | `description` | string | No | Human-readable description |
 | `transport` | string | Yes | Transport type: `stdio`, `sse`, or `streamable_http` |
+
+### SSE Transport
+- Endpoint: set `endpoint` to your server's SSE base (e.g., `http://127.0.0.1:8080/sse`).
+- Headers: optional `headers` object attaches static HTTP headers to SSE requests (useful for API keys).
+- Behavior: the app lists tools and forwards headers on tool calls; see `src-tauri/tests/sse_integration.rs` for an example.
 | `command` | string | For `stdio` | Command to execute |
 | `args` | array | For `stdio` | Command-line arguments |
 | `env` | object | No | Environment variables |
