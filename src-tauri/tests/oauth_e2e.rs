@@ -1,17 +1,17 @@
 use std::sync::Arc;
 
 use axum::{
+    Json, Router,
     extract::Query,
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
     routing::{get, post},
-    Json, Router,
 };
 use rmcp::transport::{auth::OAuthState, streamable_http_client::StreamableHttpClient};
 use serde::Deserialize;
 use serde_json::json;
 use tokio::sync::mpsc;
-use tokio::time::{timeout, Duration};
+use tokio::time::{Duration, timeout};
 
 #[derive(Deserialize)]
 struct AuthQuery {
@@ -96,7 +96,7 @@ async fn end_to_end_oauth_flow_with_streamable_http() {
                                     StatusCode::OK,
                                     Json(json!({"jsonrpc":"2.0","id":1,"result":{}})),
                                 )
-                                .into_response()
+                                    .into_response()
                             }
                             _ => (StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
                         }
@@ -136,9 +136,11 @@ async fn end_to_end_oauth_flow_with_streamable_http() {
     tokio::spawn(async move {
         let app = Router::new().route(
             "/callback",
-            get(|Query(params): Query<std::collections::HashMap<String, String>>| async move {
-                (StatusCode::OK, format!("ok: {params:?}"))
-            }),
+            get(
+                |Query(params): Query<std::collections::HashMap<String, String>>| async move {
+                    (StatusCode::OK, format!("ok: {params:?}"))
+                },
+            ),
         );
         let _ = axum::serve(cb_listener, app).await;
     });

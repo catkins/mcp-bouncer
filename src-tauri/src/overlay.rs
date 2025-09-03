@@ -85,4 +85,5 @@ pub async fn mark_unauthorized(name: &str) {
     e.oauth_authenticated = false;
     e.state = ClientConnectionState::RequiresAuthorization;
     e.last_error = None;
+    tracing::info!(target = "auth", server=%name, state=?ClientConnectionState::RequiresAuthorization, "mark_unauthorized");
 }

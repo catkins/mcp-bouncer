@@ -1,5 +1,5 @@
-use tauri::Emitter;
 use serde_json::json;
+use tauri::Emitter;
 
 pub const EVENT_SERVERS_UPDATED: &str = "mcp:servers_updated";
 pub const EVENT_SETTINGS_UPDATED: &str = "settings:updated";
@@ -23,11 +23,16 @@ impl EventEmitter for TauriEventEmitter {
 // A simple, threadsafe emitter for integration tests that want to assert
 // event sequencing or payloads without Tauri. Stores events in a Vec.
 #[derive(Default, Clone)]
-pub struct BufferingEventEmitter(pub std::sync::Arc<std::sync::Mutex<Vec<(String, serde_json::Value)>>>);
+pub struct BufferingEventEmitter(
+    pub std::sync::Arc<std::sync::Mutex<Vec<(String, serde_json::Value)>>>,
+);
 
 impl EventEmitter for BufferingEventEmitter {
     fn emit(&self, event: &str, payload: &serde_json::Value) {
-        self.0.lock().unwrap().push((event.to_string(), payload.clone()));
+        self.0
+            .lock()
+            .unwrap()
+            .push((event.to_string(), payload.clone()));
     }
 }
 
@@ -62,12 +67,19 @@ pub fn settings_updated<E: EventEmitter>(emitter: &E) {
 pub struct MockEventEmitter(pub std::sync::Mutex<Vec<(String, serde_json::Value)>>);
 
 #[cfg(test)]
-impl Default for MockEventEmitter { fn default() -> Self { Self(std::sync::Mutex::new(vec![])) } }
+impl Default for MockEventEmitter {
+    fn default() -> Self {
+        Self(std::sync::Mutex::new(vec![]))
+    }
+}
 
 #[cfg(test)]
 impl EventEmitter for MockEventEmitter {
     fn emit(&self, event: &str, payload: &serde_json::Value) {
-        self.0.lock().unwrap().push((event.to_string(), payload.clone()));
+        self.0
+            .lock()
+            .unwrap()
+            .push((event.to_string(), payload.clone()));
     }
 }
 

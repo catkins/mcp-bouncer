@@ -9,6 +9,8 @@ async fn recorded_clients_are_listed() {
     // At least 2 entries present and includes our names
     assert!(list.len() >= 2);
     assert!(list.iter().any(|c| c.name == "tester-a"));
-    assert!(list.iter().any(|c| c.name == "tester-b" && c.title.as_deref() == Some("Unit")));
+    assert!(
+        list.iter()
+            .any(|c| c.name == "tester-b" && c.title.as_deref() == Some("Unit"))
+    );
 }
-

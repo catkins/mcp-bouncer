@@ -85,15 +85,22 @@ impl ConfigProvider for OsConfigProvider {
 }
 
 pub fn default_settings() -> Settings {
-    Settings { mcp_servers: Vec::new(), listen_addr: "http://localhost:8091/mcp".to_string() }
+    Settings {
+        mcp_servers: Vec::new(),
+        listen_addr: "http://localhost:8091/mcp".to_string(),
+    }
 }
 
-pub fn settings_path(cp: &dyn ConfigProvider) -> PathBuf { cp.base_dir().join("settings.json") }
+pub fn settings_path(cp: &dyn ConfigProvider) -> PathBuf {
+    cp.base_dir().join("settings.json")
+}
 
 pub fn load_settings_with(cp: &dyn ConfigProvider) -> Settings {
     let path = settings_path(cp);
     if let Ok(content) = fs::read_to_string(&path) {
-        if let Ok(s) = serde_json::from_str::<Settings>(&content) { return s; }
+        if let Ok(s) = serde_json::from_str::<Settings>(&content) {
+            return s;
+        }
     }
     default_settings()
 }
@@ -106,20 +113,30 @@ pub fn save_settings_with(cp: &dyn ConfigProvider, settings: &Settings) -> Resul
 }
 
 // Convenience OS-backed wrappers for production code
-pub fn load_settings() -> Settings { load_settings_with(&OsConfigProvider) }
-pub fn save_settings(settings: &Settings) -> Result<(), String> { save_settings_with(&OsConfigProvider, settings) }
-pub fn config_dir() -> PathBuf { OsConfigProvider.base_dir() }
+pub fn load_settings() -> Settings {
+    load_settings_with(&OsConfigProvider)
+}
+pub fn save_settings(settings: &Settings) -> Result<(), String> {
+    save_settings_with(&OsConfigProvider, settings)
+}
+pub fn config_dir() -> PathBuf {
+    OsConfigProvider.base_dir()
+}
 
 // Tools toggle persisted map helpers
 #[derive(Serialize, Deserialize, Default)]
 pub struct ToolsState(pub HashMap<String, HashMap<String, bool>>);
 
-pub fn tools_state_path(cp: &dyn ConfigProvider) -> PathBuf { cp.base_dir().join("tools_state.json") }
+pub fn tools_state_path(cp: &dyn ConfigProvider) -> PathBuf {
+    cp.base_dir().join("tools_state.json")
+}
 
 pub fn load_tools_state_with(cp: &dyn ConfigProvider) -> ToolsState {
     let path = tools_state_path(cp);
     if let Ok(content) = fs::read_to_string(&path) {
-        if let Ok(s) = serde_json::from_str::<ToolsState>(&content) { return s; }
+        if let Ok(s) = serde_json::from_str::<ToolsState>(&content) {
+            return s;
+        }
     }
     ToolsState::default()
 }
@@ -141,8 +158,15 @@ pub fn save_tools_toggle_with(
     enabled: bool,
 ) -> Result<(), String> {
     let path = tools_state_path(cp);
-    let mut state: ToolsState = fs::read_to_string(&path).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
-    state.0.entry(client_name.to_string()).or_default().insert(tool_name.to_string(), enabled);
+    let mut state: ToolsState = fs::read_to_string(&path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default();
+    state
+        .0
+        .entry(client_name.to_string())
+        .or_default()
+        .insert(tool_name.to_string(), enabled);
     let content = serde_json::to_string_pretty(&state).map_err(|e| format!("to json: {e}"))?;
     fs::create_dir_all(cp.base_dir()).map_err(|e| format!("create dir: {e}"))?;
     fs::write(&path, content).map_err(|e| format!("write tools state: {e}"))
@@ -154,17 +178,50 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[derive(Clone)]
-    struct TempConfigProvider { base: PathBuf }
+    struct TempConfigProvider {
+        base: PathBuf,
+    }
 
-    impl TempConfigProvider { fn new() -> Self { let stamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos(); let tid = format!("{:?}", std::thread::current().id()); let dir = std::env::temp_dir().join(format!("mcp-bouncer-test-{}-{}-{}", std::process::id(), tid, stamp)); fs::create_dir_all(&dir).unwrap(); Self { base: dir } } }
+    impl TempConfigProvider {
+        fn new() -> Self {
+            let stamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let tid = format!("{:?}", std::thread::current().id());
+            let dir = std::env::temp_dir().join(format!(
+                "mcp-bouncer-test-{}-{}-{}",
+                std::process::id(),
+                tid,
+                stamp
+            ));
+            fs::create_dir_all(&dir).unwrap();
+            Self { base: dir }
+        }
+    }
 
-    impl ConfigProvider for TempConfigProvider { fn base_dir(&self) -> PathBuf { self.base.clone() } }
+    impl ConfigProvider for TempConfigProvider {
+        fn base_dir(&self) -> PathBuf {
+            self.base.clone()
+        }
+    }
 
     #[test]
     fn settings_roundtrip() {
         let cp = TempConfigProvider::new();
         let mut s = default_settings();
-        s.mcp_servers.push(MCPServerConfig{ name: "srv".into(), description: "d".into(), transport: Some(TransportType::StreamableHttp), command: "".into(), args: None, env: None, endpoint: Some("http://127.0.0.1".into()), headers: None, requires_auth: Some(false), enabled: true });
+        s.mcp_servers.push(MCPServerConfig {
+            name: "srv".into(),
+            description: "d".into(),
+            transport: Some(TransportType::StreamableHttp),
+            command: "".into(),
+            args: None,
+            env: None,
+            endpoint: Some("http://127.0.0.1".into()),
+            headers: None,
+            requires_auth: Some(false),
+            enabled: true,
+        });
         save_settings_with(&cp, &s).unwrap();
         let loaded = load_settings_with(&cp);
         assert_eq!(loaded.mcp_servers.len(), 1);

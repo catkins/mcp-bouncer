@@ -1,4 +1,6 @@
-use mcp_bouncer::config::{default_settings, save_settings_with, ClientConnectionState, MCPServerConfig, TransportType};
+use mcp_bouncer::config::{
+    ClientConnectionState, MCPServerConfig, TransportType, default_settings, save_settings_with,
+};
 use mcp_bouncer::status::compute_client_status_map_with;
 mod common;
 use common::TestProvider;
@@ -29,7 +31,10 @@ async fn mark_unauthorized_sets_state_and_clears_error() {
     assert_eq!(cs.state, ClientConnectionState::RequiresAuthorization);
     assert!(cs.authorization_required);
     assert!(!cs.oauth_authenticated);
-    assert_eq!(cs.last_error, None, "last_error should be cleared after 401 inference");
+    assert_eq!(
+        cs.last_error, None,
+        "last_error should be cleared after 401 inference"
+    );
 }
 
 #[tokio::test]

@@ -1,5 +1,5 @@
-use crate::config::{save_settings_with, ConfigProvider, Settings};
-use crate::events::{settings_updated, servers_updated, EventEmitter};
+use crate::config::{ConfigProvider, Settings, save_settings_with};
+use crate::events::{EventEmitter, servers_updated, settings_updated};
 
 pub fn update_settings<E: EventEmitter>(
     cp: &dyn ConfigProvider,
@@ -17,7 +17,6 @@ pub fn notify_servers_changed<E: EventEmitter>(emitter: &E, reason: &str) {
     servers_updated(emitter, reason);
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -28,9 +27,29 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[derive(Clone)]
-    struct TestProvider { base: PathBuf }
-    impl crate::config::ConfigProvider for TestProvider { fn base_dir(&self) -> PathBuf { self.base.clone() } }
-    impl TestProvider { fn new() -> Self { let stamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis(); let dir = std::env::temp_dir().join(format!("mcp-bouncer-logic-{}-{}", std::process::id(), stamp)); fs::create_dir_all(&dir).unwrap(); Self{ base: dir } } }
+    struct TestProvider {
+        base: PathBuf,
+    }
+    impl crate::config::ConfigProvider for TestProvider {
+        fn base_dir(&self) -> PathBuf {
+            self.base.clone()
+        }
+    }
+    impl TestProvider {
+        fn new() -> Self {
+            let stamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis();
+            let dir = std::env::temp_dir().join(format!(
+                "mcp-bouncer-logic-{}-{}",
+                std::process::id(),
+                stamp
+            ));
+            fs::create_dir_all(&dir).unwrap();
+            Self { base: dir }
+        }
+    }
 
     #[test]
     fn update_settings_saves_and_emits() {

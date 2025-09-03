@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use axum::{extract::Query, http::StatusCode, routing::get, Router};
+use axum::{Router, extract::Query, http::StatusCode, routing::get};
 use rmcp::transport::auth::{OAuthState, OAuthTokenResponse};
 
 use crate::client::ensure_rmcp_client;
-use crate::config::{ ConfigProvider, OsConfigProvider, load_settings_with, ClientConnectionState };
-use crate::events::{client_status_changed, client_error, EventEmitter};
+use crate::config::{ClientConnectionState, ConfigProvider, OsConfigProvider, load_settings_with};
+use crate::events::{EventEmitter, client_error, client_status_changed};
 use crate::overlay;
 use anyhow::{Context, Result};
 
@@ -43,8 +43,11 @@ pub fn save_credentials_for(
     if let Some(dir) = p.parent() {
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     }
-    std::fs::write(&p, serde_json::to_vec_pretty(&map).map_err(|e| e.to_string())?)
-        .map_err(|e| e.to_string())
+    std::fs::write(
+        &p,
+        serde_json::to_vec_pretty(&map).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -82,10 +85,7 @@ pub async fn start_oauth_for_server<E: EventEmitter>(
         .start_authorization(&["mcp"], &redirect_uri)
         .await
         .context("oauth start")?;
-    let auth_url = state
-        .get_authorization_url()
-        .await
-        .context("oauth url")?;
+    let auth_url = state.get_authorization_url().await.context("oauth url")?;
 
     // Spawn callback server to capture auth code
     let (tx, rx) = tokio::sync::oneshot::channel::<CallbackQuery>();
@@ -100,7 +100,10 @@ pub async fn start_oauth_for_server<E: EventEmitter>(
                     if let Some(sender) = tx_shared.lock().unwrap().take() {
                         let _ = sender.send(q);
                     }
-                    (StatusCode::OK, "Authorization complete. You can close this window.")
+                    (
+                        StatusCode::OK,
+                        "Authorization complete. You can close this window.",
+                    )
                 }
             }
         }),
@@ -116,9 +119,7 @@ pub async fn start_oauth_for_server<E: EventEmitter>(
     let _ = open::that_detached(auth_url.clone());
 
     // Wait for callback
-    let q = rx
-        .await
-        .context("callback wait")?;
+    let q = rx.await.context("callback wait")?;
 
     // Complete the code exchange
     state
@@ -138,7 +139,11 @@ pub async fn start_oauth_for_server<E: EventEmitter>(
 
     // Attempt to (re)start the client automatically if the server is enabled
     let settings = load_settings_with(&OsConfigProvider);
-    if let Some(cfg) = settings.mcp_servers.into_iter().find(|c| c.name == name && c.enabled) {
+    if let Some(cfg) = settings
+        .mcp_servers
+        .into_iter()
+        .find(|c| c.name == name && c.enabled)
+    {
         overlay::set_error(name, None).await;
         overlay::set_oauth_authenticated(name, true).await;
         overlay::set_auth_required(name, false).await;

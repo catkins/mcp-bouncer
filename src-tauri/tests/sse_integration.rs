@@ -15,7 +15,10 @@ impl rmcp::handler::server::ServerHandler for TestSseService {
                 .enable_tools()
                 .enable_tool_list_changed()
                 .build(),
-            server_info: mcp::Implementation { name: "sse-test".into(), version: "0.0.1".into() },
+            server_info: mcp::Implementation {
+                name: "sse-test".into(),
+                version: "0.0.1".into(),
+            },
             instructions: None,
         }
     }
@@ -24,24 +27,37 @@ impl rmcp::handler::server::ServerHandler for TestSseService {
         &self,
         _request: Option<mcp::PaginatedRequestParam>,
         _context: rmcp::service::RequestContext<rmcp::RoleServer>,
-    ) -> impl core::future::Future<Output = Result<mcp::ListToolsResult, mcp::ErrorData>> + Send + '_ {
+    ) -> impl core::future::Future<Output = Result<mcp::ListToolsResult, mcp::ErrorData>> + Send + '_
+    {
         let schema: mcp::JsonObject = Default::default();
-        std::future::ready(Ok(mcp::ListToolsResult { tools: vec![mcp::Tool::new("echo", "echo", schema)], next_cursor: None }))
+        std::future::ready(Ok(mcp::ListToolsResult {
+            tools: vec![mcp::Tool::new("echo", "echo", schema)],
+            next_cursor: None,
+        }))
     }
 
     fn call_tool(
         &self,
         _request: mcp::CallToolRequestParam,
         context: rmcp::service::RequestContext<rmcp::RoleServer>,
-    ) -> impl core::future::Future<Output = Result<mcp::CallToolResult, mcp::ErrorData>> + Send + '_ {
+    ) -> impl core::future::Future<Output = Result<mcp::CallToolResult, mcp::ErrorData>> + Send + '_
+    {
         let mut observed = String::new();
         if let Some(parts) = context.extensions.get::<axum::http::request::Parts>() {
             if let Some(v) = parts.headers.get("x-test").and_then(|v| v.to_str().ok()) {
                 observed = v.to_string();
             }
         }
-        let text = if observed.is_empty() { "no-header".to_string() } else { format!("x-test:{observed}") };
-        std::future::ready(Ok(mcp::CallToolResult { content: vec![mcp::Content::text(text)], structured_content: None, is_error: None }))
+        let text = if observed.is_empty() {
+            "no-header".to_string()
+        } else {
+            format!("x-test:{observed}")
+        };
+        std::future::ready(Ok(mcp::CallToolResult {
+            content: vec![mcp::Content::text(text)],
+            structured_content: None,
+            is_error: None,
+        }))
     }
 }
 
@@ -52,7 +68,9 @@ async fn sse_client_can_connect_list_tools_and_send_headers() {
     let probe = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = probe.local_addr().unwrap();
     drop(probe);
-    let server = rmcp::transport::SseServer::serve(addr).await.expect("start sse server");
+    let server = rmcp::transport::SseServer::serve(addr)
+        .await
+        .expect("start sse server");
     let _ct = server.with_service(|| TestSseService);
 
     // Configure SSE client with custom headers
@@ -71,7 +89,9 @@ async fn sse_client_can_connect_list_tools_and_send_headers() {
         enabled: true,
     };
 
-    let client = ensure_rmcp_client(&cfg.name, &cfg).await.expect("ensure sse client");
+    let client = ensure_rmcp_client(&cfg.name, &cfg)
+        .await
+        .expect("ensure sse client");
     // list tools
     let tools = client.list_all_tools().await.expect("list tools");
     let names: Vec<_> = tools.into_iter().map(|t| t.name.to_string()).collect();
@@ -79,7 +99,10 @@ async fn sse_client_can_connect_list_tools_and_send_headers() {
 
     // call a tool and verify header observed by server
     let res = client
-        .call_tool(mcp::CallToolRequestParam { name: "echo".into(), arguments: None })
+        .call_tool(mcp::CallToolRequestParam {
+            name: "echo".into(),
+            arguments: None,
+        })
         .await
         .expect("call echo");
     let text = res
@@ -88,5 +111,8 @@ async fn sse_client_can_connect_list_tools_and_send_headers() {
         .filter_map(|c| c.as_text().map(|t| t.text.clone()))
         .collect::<Vec<_>>()
         .join("\n");
-    assert!(text.contains("x-test:yes"), "expected header value, got: {text}");
+    assert!(
+        text.contains("x-test:yes"),
+        "expected header value, got: {text}"
+    );
 }

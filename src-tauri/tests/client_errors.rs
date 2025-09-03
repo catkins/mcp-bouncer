@@ -3,7 +3,7 @@ use mcp_bouncer::config::{MCPServerConfig, TransportType};
 
 #[tokio::test]
 async fn unsupported_transport_errors() {
-    let cfg = MCPServerConfig{
+    let cfg = MCPServerConfig {
         name: "x".into(),
         description: "d".into(),
         transport: None,
@@ -21,7 +21,7 @@ async fn unsupported_transport_errors() {
 
 #[tokio::test]
 async fn missing_command_for_stdio_errors() {
-    let cfg = MCPServerConfig{
+    let cfg = MCPServerConfig {
         name: "x".into(),
         description: "d".into(),
         transport: Some(TransportType::Stdio),

@@ -2,16 +2,14 @@ use axum::Router;
 use futures::future::join_all;
 use rmcp::model as mcp;
 use rmcp::transport::streamable_http_server::{
-    session::local::LocalSessionManager, StreamableHttpServerConfig, StreamableHttpService,
+    StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
 };
 use rmcp::{RoleServer, Service as McpService};
 
 use crate::client::{ensure_rmcp_client, fetch_tools_for_cfg};
-use crate::config::{
-    load_settings_with, ConfigProvider, MCPServerConfig,
-};
-use crate::events::{incoming_clients_updated, client_status_changed};
-use crate::events::{EventEmitter};
+use crate::config::{ConfigProvider, MCPServerConfig, load_settings_with};
+use crate::events::EventEmitter;
+use crate::events::{client_status_changed, incoming_clients_updated};
 use crate::incoming::record_connect;
 use crate::unauthorized;
 
@@ -33,10 +31,22 @@ fn extract_str<'a>(val: &'a serde_json::Value, paths: &[&str]) -> Option<&'a str
         let mut ok = true;
         for seg in path.split('.') {
             if let Some(obj) = cur.as_object() {
-                if let Some(next) = obj.get(seg) { cur = next; } else { ok = false; break; }
-            } else { ok = false; break; }
+                if let Some(next) = obj.get(seg) {
+                    cur = next;
+                } else {
+                    ok = false;
+                    break;
+                }
+            } else {
+                ok = false;
+                break;
+            }
         }
-        if ok { if let Some(s) = cur.as_str() { return Some(s); } }
+        if ok {
+            if let Some(s) = cur.as_str() {
+                return Some(s);
+            }
+        }
     }
     None
 }
@@ -78,18 +88,42 @@ where
                     instructions: None,
                 };
                 if let Ok(val) = serde_json::to_value(&req) {
-                    let name = extract_str(&val, &[
-                        "clientInfo.name", "client_info.name", "client.name",
-                        "params.clientInfo.name", "params.client_info.name", "params.client.name",
-                    ]).unwrap_or("unknown");
-                    let version = extract_str(&val, &[
-                        "clientInfo.version", "client_info.version", "client.version",
-                        "params.clientInfo.version", "params.client_info.version", "params.client.version",
-                    ]).unwrap_or("");
-                    let title = extract_str(&val, &[
-                        "clientInfo.title", "client_info.title", "title",
-                        "params.clientInfo.title", "params.client_info.title", "params.title",
-                    ]).map(|s| s.to_string());
+                    let name = extract_str(
+                        &val,
+                        &[
+                            "clientInfo.name",
+                            "client_info.name",
+                            "client.name",
+                            "params.clientInfo.name",
+                            "params.client_info.name",
+                            "params.client.name",
+                        ],
+                    )
+                    .unwrap_or("unknown");
+                    let version = extract_str(
+                        &val,
+                        &[
+                            "clientInfo.version",
+                            "client_info.version",
+                            "client.version",
+                            "params.clientInfo.version",
+                            "params.client_info.version",
+                            "params.client.version",
+                        ],
+                    )
+                    .unwrap_or("");
+                    let title = extract_str(
+                        &val,
+                        &[
+                            "clientInfo.title",
+                            "client_info.title",
+                            "title",
+                            "params.clientInfo.title",
+                            "params.client_info.title",
+                            "params.title",
+                        ],
+                    )
+                    .map(|s| s.to_string());
                     record_connect(name.to_string(), version.to_string(), title).await;
                     incoming_clients_updated(&self.emitter, "connect");
                 }
@@ -99,17 +133,29 @@ where
                 let s = load_settings_with(&self.cp);
                 let servers: Vec<_> = s.mcp_servers.into_iter().filter(|c| c.enabled).collect();
                 const TOOL_LIST_TIMEOUT_SECS: u64 = 6;
-                let mut tools = aggregate_tools(servers, std::time::Duration::from_secs(TOOL_LIST_TIMEOUT_SECS)).await;
+                let mut tools = aggregate_tools(
+                    servers,
+                    std::time::Duration::from_secs(TOOL_LIST_TIMEOUT_SECS),
+                )
+                .await;
                 // Filter out disabled tools based on persisted toggles
                 let state = crate::config::load_tools_state_with(&self.cp);
                 tools.retain(|t| {
                     if let Some((server, tool)) = t.name.split_once("::") {
-                        state.0.get(server).and_then(|m| m.get(tool)).copied().unwrap_or(true)
+                        state
+                            .0
+                            .get(server)
+                            .and_then(|m| m.get(tool))
+                            .copied()
+                            .unwrap_or(true)
                     } else {
                         true
                     }
                 });
-                Ok(mcp::ServerResult::ListToolsResult(mcp::ListToolsResult { tools, next_cursor: None }))
+                Ok(mcp::ServerResult::ListToolsResult(mcp::ListToolsResult {
+                    tools,
+                    next_cursor: None,
+                }))
             }
             mcp::ClientRequest::CallToolRequest(req) => {
                 let name = req.params.name.to_string();
@@ -136,15 +182,29 @@ where
                 if let Some(cfg) = cfg_opt {
                     match ensure_rmcp_client(&cfg.name, &cfg).await {
                         Ok(client) => match client
-                            .call_tool(mcp::CallToolRequestParam { name: tool_name.into(), arguments: args_obj })
+                            .call_tool(mcp::CallToolRequestParam {
+                                name: tool_name.into(),
+                                arguments: args_obj,
+                            })
                             .await
                         {
                             Ok(res) => Ok(mcp::ServerResult::CallToolResult(res)),
                             Err(e) => {
-                                if matches!(cfg.transport, Some(crate::config::TransportType::StreamableHttp)) {
-                                    unauthorized::on_possible_unauthorized(&cfg.name, cfg.endpoint.as_deref()).await;
+                                if matches!(
+                                    cfg.transport,
+                                    Some(crate::config::TransportType::StreamableHttp)
+                                ) {
+                                    unauthorized::on_possible_unauthorized(
+                                        &cfg.name,
+                                        cfg.endpoint.as_deref(),
+                                    )
+                                    .await;
                                     // Notify UI when auth is required
-                                    client_status_changed(&self.emitter, &cfg.name, "requires_authorization");
+                                    client_status_changed(
+                                        &self.emitter,
+                                        &cfg.name,
+                                        "requires_authorization",
+                                    );
                                 }
                                 Ok(mcp::ServerResult::CallToolResult(mcp::CallToolResult {
                                     content: vec![mcp::Content::text(format!("error: {e}"))],
@@ -190,7 +250,10 @@ where
                 .enable_tools()
                 .enable_tool_list_changed()
                 .build(),
-            server_info: mcp::Implementation { name: "MCP Bouncer".into(), version: env!("CARGO_PKG_VERSION").into() },
+            server_info: mcp::Implementation {
+                name: "MCP Bouncer".into(),
+                version: env!("CARGO_PKG_VERSION").into(),
+            },
             instructions: None,
         }
     }
@@ -198,17 +261,27 @@ where
 
 fn to_mcp_tool(server: &str, v: &serde_json::Value) -> Option<mcp::Tool> {
     let name = v.get("name")?.as_str()?.to_string();
-    let description = v.get("description").and_then(|d| d.as_str()).map(|s| s.to_string());
+    let description = v
+        .get("description")
+        .and_then(|d| d.as_str())
+        .map(|s| s.to_string());
     let schema_obj = v
         .get("inputSchema")
         .or_else(|| v.get("input_schema"))
         .and_then(|s| s.as_object().cloned())
         .unwrap_or_default();
     let fullname = format!("{server}::{name}");
-    Some(mcp::Tool::new(fullname, description.unwrap_or_default(), schema_obj))
+    Some(mcp::Tool::new(
+        fullname,
+        description.unwrap_or_default(),
+        schema_obj,
+    ))
 }
 
-fn select_target_server<CP: ConfigProvider>(cp: &CP, server_name: &str) -> Result<Option<MCPServerConfig>, String> {
+fn select_target_server<CP: ConfigProvider>(
+    cp: &CP,
+    server_name: &str,
+) -> Result<Option<MCPServerConfig>, String> {
     if !server_name.is_empty() {
         Ok(load_settings_with(cp)
             .mcp_servers
@@ -216,7 +289,11 @@ fn select_target_server<CP: ConfigProvider>(cp: &CP, server_name: &str) -> Resul
             .find(|c| c.name == server_name))
     } else {
         let settings = load_settings_with(cp);
-        let enabled: Vec<_> = settings.mcp_servers.into_iter().filter(|c| c.enabled).collect();
+        let enabled: Vec<_> = settings
+            .mcp_servers
+            .into_iter()
+            .filter(|c| c.enabled)
+            .collect();
         Ok(match enabled.len() {
             0 => None,
             1 => enabled.into_iter().next(),
@@ -252,23 +329,64 @@ async fn aggregate_tools(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{default_settings, save_settings_with, ConfigProvider};
-    use crate::events::MockEventEmitter;
+    use crate::config::{ConfigProvider, default_settings, save_settings_with};
     use std::fs;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[derive(Clone)]
-    struct TestProvider { base: PathBuf }
-    impl TestProvider { fn new() -> Self { let stamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos(); let dir = std::env::temp_dir().join(format!("mcp-bouncer-route-{}-{}", std::process::id(), stamp)); fs::create_dir_all(&dir).unwrap(); Self{ base: dir } } }
-    impl ConfigProvider for TestProvider { fn base_dir(&self) -> PathBuf { self.base.clone() } }
+    struct TestProvider {
+        base: PathBuf,
+    }
+    impl TestProvider {
+        fn new() -> Self {
+            let stamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let dir = std::env::temp_dir().join(format!(
+                "mcp-bouncer-route-{}-{}",
+                std::process::id(),
+                stamp
+            ));
+            fs::create_dir_all(&dir).unwrap();
+            Self { base: dir }
+        }
+    }
+    impl ConfigProvider for TestProvider {
+        fn base_dir(&self) -> PathBuf {
+            self.base.clone()
+        }
+    }
 
     #[test]
     fn unqualified_tool_errors_when_multiple_enabled() {
         let cp = TestProvider::new();
         let mut s = default_settings();
-        s.mcp_servers.push(MCPServerConfig{ name: "a".into(), description: "d".into(), transport: None, command: String::new(), args: None, env: None, endpoint: None, headers: None, requires_auth: None, enabled: true });
-        s.mcp_servers.push(MCPServerConfig{ name: "b".into(), description: "d".into(), transport: None, command: String::new(), args: None, env: None, endpoint: None, headers: None, requires_auth: None, enabled: true });
+        s.mcp_servers.push(MCPServerConfig {
+            name: "a".into(),
+            description: "d".into(),
+            transport: None,
+            command: String::new(),
+            args: None,
+            env: None,
+            endpoint: None,
+            headers: None,
+            requires_auth: None,
+            enabled: true,
+        });
+        s.mcp_servers.push(MCPServerConfig {
+            name: "b".into(),
+            description: "d".into(),
+            transport: None,
+            command: String::new(),
+            args: None,
+            env: None,
+            endpoint: None,
+            headers: None,
+            requires_auth: None,
+            enabled: true,
+        });
         save_settings_with(&cp, &s).unwrap();
         let sel = super::select_target_server(&cp, "");
         assert!(sel.is_err());
@@ -280,9 +398,18 @@ mod tests {
         let val = serde_json::json!({
             "params": { "client_info": { "name": "X", "version": "1", "title": "T" } }
         });
-        assert_eq!(super::extract_str(&val, &["clientInfo.name", "params.client_info.name"]), Some("X"));
-        assert_eq!(super::extract_str(&val, &["clientInfo.version", "params.client_info.version"]), Some("1"));
-        assert_eq!(super::extract_str(&val, &["clientInfo.title", "params.client_info.title"]), Some("T"));
+        assert_eq!(
+            super::extract_str(&val, &["clientInfo.name", "params.client_info.name"]),
+            Some("X")
+        );
+        assert_eq!(
+            super::extract_str(&val, &["clientInfo.version", "params.client_info.version"]),
+            Some("1")
+        );
+        assert_eq!(
+            super::extract_str(&val, &["clientInfo.title", "params.client_info.title"]),
+            Some("T")
+        );
     }
 
     #[test]
@@ -299,7 +426,10 @@ mod tests {
     async fn stop_server_aborts_task() {
         let emitter = crate::events::BufferingEventEmitter::default();
         let cp = TestProvider::new();
-        let (handle, _addr) = super::start_http_server(emitter.clone(), cp.clone(), "127.0.0.1:0".parse().unwrap()).await.unwrap();
+        let (handle, _addr) =
+            super::start_http_server(emitter.clone(), cp.clone(), "127.0.0.1:0".parse().unwrap())
+                .await
+                .unwrap();
         // Abort the server handle and ensure task finishes promptly
         super::stop_http_server(&handle);
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
@@ -316,17 +446,28 @@ where
     E: EventEmitter + Clone + Send + Sync + 'static,
     CP: ConfigProvider + Clone + Send + Sync + 'static,
 {
-    let service: StreamableHttpService<BouncerService<E, CP>, LocalSessionManager> = StreamableHttpService::new(
-        move || Ok(BouncerService { emitter: emitter.clone(), cp: cp.clone() }),
-        Default::default(),
-        StreamableHttpServerConfig { stateful_mode: true, sse_keep_alive: Some(std::time::Duration::from_secs(15)) },
-    );
+    let service: StreamableHttpService<BouncerService<E, CP>, LocalSessionManager> =
+        StreamableHttpService::new(
+            move || {
+                Ok(BouncerService {
+                    emitter: emitter.clone(),
+                    cp: cp.clone(),
+                })
+            },
+            Default::default(),
+            StreamableHttpServerConfig {
+                stateful_mode: true,
+                sse_keep_alive: Some(std::time::Duration::from_secs(15)),
+            },
+        );
     let router = Router::new().nest_service("/mcp", service);
-    let listener = tokio::net::TcpListener::bind(addr).await.map_err(|e| e.to_string())?;
+    let listener = tokio::net::TcpListener::bind(addr)
+        .await
+        .map_err(|e| e.to_string())?;
     let local = listener.local_addr().map_err(|e| e.to_string())?;
     // Record the runtime-bound address for UI/commands to query
     set_runtime_listen_addr(local);
-    tracing::info!(target = "server", "proxy listening on http://{}:{}/mcp", local.ip(), local.port());
+    tracing::info!(target = "server", ip=%local.ip(), port=local.port(), "proxy_listening");
     let handle = tokio::spawn(async move {
         let _ = axum::serve(listener, router).await;
     });

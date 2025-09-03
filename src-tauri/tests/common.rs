@@ -16,8 +16,12 @@ impl TestProvider {
             .unwrap()
             .as_nanos();
         let tid = format!("{:?}", std::thread::current().id());
-        let dir = std::env::temp_dir()
-            .join(format!("mcp-bouncer-tests-{}-{}-{}", std::process::id(), tid, stamp));
+        let dir = std::env::temp_dir().join(format!(
+            "mcp-bouncer-tests-{}-{}-{}",
+            std::process::id(),
+            tid,
+            stamp
+        ));
         fs::create_dir_all(&dir).unwrap();
         Self { base: dir }
     }
@@ -28,4 +32,3 @@ impl ConfigProvider for TestProvider {
         self.base.clone()
     }
 }
-

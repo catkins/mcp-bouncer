@@ -3,18 +3,15 @@ use std::{collections::HashMap, fs, sync::OnceLock};
 use tauri::Manager;
 
 use mcp_bouncer::app_logic;
-use mcp_bouncer::client::{ ensure_rmcp_client, remove_rmcp_client, fetch_tools_for_cfg };
+use mcp_bouncer::client::{ensure_rmcp_client, fetch_tools_for_cfg, remove_rmcp_client};
 use mcp_bouncer::config::{
-    ClientStatus, ClientConnectionState, IncomingClient, MCPServerConfig, Settings, config_dir, default_settings,
-    load_settings, save_settings,
+    ClientConnectionState, ClientStatus, IncomingClient, MCPServerConfig, Settings, config_dir,
+    default_settings, load_settings, save_settings,
 };
-use mcp_bouncer::events::{
-    TauriEventEmitter, client_error, client_status_changed, incoming_clients_updated,
-    servers_updated,
-};
+use mcp_bouncer::events::{TauriEventEmitter, client_error, client_status_changed};
 use mcp_bouncer::incoming::list_incoming;
 use mcp_bouncer::oauth::start_oauth_for_server;
-use mcp_bouncer::server::{start_http_server, get_runtime_listen_addr};
+use mcp_bouncer::server::{get_runtime_listen_addr, start_http_server};
 use mcp_bouncer::unauthorized;
 
 // ---------- Streamable HTTP MCP proxy (basic) ----------
@@ -35,7 +32,11 @@ fn spawn_mcp_proxy(app: &tauri::AppHandle) {
         )
         .await
         {
-            tracing::warn!("[server] bind {} failed: {}; falling back to ephemeral port", primary, e);
+            tracing::warn!(
+                "[server] bind {} failed: {}; falling back to ephemeral port",
+                primary,
+                e
+            );
             let _ = start_http_server(
                 mcp_bouncer::events::TauriEventEmitter(app_handle.clone()),
                 mcp_bouncer::config::OsConfigProvider,
@@ -118,14 +119,25 @@ async fn mcp_update_server(
         if enabling {
             if let Some(cfg) = get_server_by_name(&server_name) {
                 // If HTTP transport requires auth and no credentials, gate and mark unauthorized
-                if matches!(cfg.transport, Some(mcp_bouncer::config::TransportType::StreamableHttp))
-                    && cfg.requires_auth.unwrap_or(false)
-                    && mcp_bouncer::oauth::load_credentials_for(&mcp_bouncer::config::OsConfigProvider, &server_name).is_none()
+                if matches!(
+                    cfg.transport,
+                    Some(mcp_bouncer::config::TransportType::StreamableHttp)
+                ) && cfg.requires_auth.unwrap_or(false)
+                    && mcp_bouncer::oauth::load_credentials_for(
+                        &mcp_bouncer::config::OsConfigProvider,
+                        &server_name,
+                    )
+                    .is_none()
                 {
                     mcp_bouncer::overlay::mark_unauthorized(&server_name).await;
-                    client_status_changed(&TauriEventEmitter(app.clone()), &server_name, "requires_authorization");
+                    client_status_changed(
+                        &TauriEventEmitter(app.clone()),
+                        &server_name,
+                        "requires_authorization",
+                    );
                 } else {
-                    connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg).await;
+                    connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg)
+                        .await;
                 }
             }
         }
@@ -163,19 +175,31 @@ async fn mcp_toggle_server_enabled(
         save_settings(&s)?;
         if enabled {
             if let Some(cfg) = get_server_by_name(&server_name) {
-                if matches!(cfg.transport, Some(mcp_bouncer::config::TransportType::StreamableHttp))
-                    && cfg.requires_auth.unwrap_or(false)
-                    && mcp_bouncer::oauth::load_credentials_for(&mcp_bouncer::config::OsConfigProvider, &server_name).is_none()
+                if matches!(
+                    cfg.transport,
+                    Some(mcp_bouncer::config::TransportType::StreamableHttp)
+                ) && cfg.requires_auth.unwrap_or(false)
+                    && mcp_bouncer::oauth::load_credentials_for(
+                        &mcp_bouncer::config::OsConfigProvider,
+                        &server_name,
+                    )
+                    .is_none()
                 {
                     mcp_bouncer::overlay::mark_unauthorized(&server_name).await;
-                    client_status_changed(&TauriEventEmitter(app.clone()), &server_name, "requires_authorization");
+                    client_status_changed(
+                        &TauriEventEmitter(app.clone()),
+                        &server_name,
+                        "requires_authorization",
+                    );
                 } else {
-                    connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg).await;
+                    connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg)
+                        .await;
                 }
             }
         } else {
             let _ = remove_rmcp_client(&server_name).await;
-            mcp_bouncer::overlay::set_state(&server_name, ClientConnectionState::Disconnected).await;
+            mcp_bouncer::overlay::set_state(&server_name, ClientConnectionState::Disconnected)
+                .await;
             mcp_bouncer::overlay::set_error(&server_name, None).await;
             client_status_changed(&TauriEventEmitter(app.clone()), &server_name, "disable");
         }
@@ -242,11 +266,22 @@ async fn mcp_get_client_tools(client_name: String) -> Result<Vec<serde_json::Val
     if let Some(cfg) = get_server_by_name(&client_name) {
         let list = fetch_tools_for_cfg(&cfg).await.map_err(|e| e.to_string())?;
         // Filter based on toggles
-        let state = mcp_bouncer::config::load_tools_state_with(&mcp_bouncer::config::OsConfigProvider);
-        let filtered: Vec<_> = list.into_iter().filter(|v| {
-            let Some(tool_name) = v.get("name").and_then(|n| n.as_str()) else { return true; };
-            state.0.get(&client_name).and_then(|m| m.get(tool_name)).copied().unwrap_or(true)
-        }).collect();
+        let state =
+            mcp_bouncer::config::load_tools_state_with(&mcp_bouncer::config::OsConfigProvider);
+        let filtered: Vec<_> = list
+            .into_iter()
+            .filter(|v| {
+                let Some(tool_name) = v.get("name").and_then(|n| n.as_str()) else {
+                    return true;
+                };
+                state
+                    .0
+                    .get(&client_name)
+                    .and_then(|m| m.get(tool_name))
+                    .copied()
+                    .unwrap_or(true)
+            })
+            .collect();
         return Ok(filtered);
     }
     Ok(Vec::new())
@@ -258,7 +293,7 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
     cfg: &MCPServerConfig,
 ) {
     use mcp_bouncer::overlay as ov;
-    tracing::info!(target = "lifecycle", "connect_and_initialize -> '{}'", name);
+    tracing::info!(target = "lifecycle", server=%name, state=?ClientConnectionState::Connecting, "connect_start");
     ov::set_state(name, ClientConnectionState::Connecting).await;
     ov::set_error(name, None).await;
     client_status_changed(emitter, name, "connecting");
@@ -269,30 +304,41 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
                 Ok(tools) => {
                     ov::set_tools(name, tools.len() as u32).await;
                     ov::set_state(name, ClientConnectionState::Connected).await;
-                    // If we have stored OAuth credentials and this is HTTP, reflect authenticated badge
-                    if matches!(cfg.transport, Some(mcp_bouncer::config::TransportType::StreamableHttp)) {
-                        if mcp_bouncer::oauth::load_credentials_for(&mcp_bouncer::config::OsConfigProvider, name).is_some() {
-                            ov::set_oauth_authenticated(name, true).await;
-                            ov::set_auth_required(name, false).await;
-                        }
+                    // If HTTP and we have stored OAuth credentials, reflect authenticated badge
+                    if matches!(
+                        cfg.transport,
+                        Some(mcp_bouncer::config::TransportType::StreamableHttp)
+                    ) && mcp_bouncer::oauth::load_credentials_for(
+                        &mcp_bouncer::config::OsConfigProvider,
+                        name,
+                    )
+                    .is_some()
+                    {
+                        ov::set_oauth_authenticated(name, true).await;
+                        ov::set_auth_required(name, false).await;
                     }
-                    tracing::info!(target = "lifecycle", "'{}' connected ({} tools)", name, tools.len());
+                    tracing::info!(target = "lifecycle", server=%name, state=?ClientConnectionState::Connected, tools=tools.len(), "connected");
                     client_status_changed(emitter, name, "connected");
                 }
                 Err(e) => {
-                    if matches!(cfg.transport, Some(mcp_bouncer::config::TransportType::StreamableHttp)) {
+                    if matches!(
+                        cfg.transport,
+                        Some(mcp_bouncer::config::TransportType::StreamableHttp)
+                    ) {
                         unauthorized::on_possible_unauthorized(name, cfg.endpoint.as_deref()).await;
                     }
                     let snap = mcp_bouncer::overlay::snapshot().await;
                     if let Some(ent) = snap.get(name) {
-                        if ent.authorization_required || ent.state == ClientConnectionState::RequiresAuthorization {
+                        if ent.authorization_required
+                            || ent.state == ClientConnectionState::RequiresAuthorization
+                        {
                             client_status_changed(emitter, name, "requires_authorization");
                             return;
                         }
                     }
                     ov::set_error(name, Some(e.to_string())).await;
                     ov::set_state(name, ClientConnectionState::Errored).await;
-                    tracing::warn!(target = "lifecycle", "'{}' error during initialize", name);
+                    tracing::warn!(target = "lifecycle", server=%name, state=?ClientConnectionState::Errored, "initialize_error");
                     client_status_changed(emitter, name, "error");
                 }
             }
@@ -301,7 +347,9 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
             // If an unauthorized state was inferred (e.g., via HTTP probe), don't surface a noisy error.
             let snap = mcp_bouncer::overlay::snapshot().await;
             if let Some(ent) = snap.get(name) {
-                if ent.authorization_required || ent.state == ClientConnectionState::RequiresAuthorization {
+                if ent.authorization_required
+                    || ent.state == ClientConnectionState::RequiresAuthorization
+                {
                     client_status_changed(emitter, name, "requires_authorization");
                     return;
                 }
@@ -309,7 +357,7 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
             ov::set_error(name, Some(e.to_string())).await;
             ov::set_state(name, ClientConnectionState::Errored).await;
             client_error(emitter, name, "enable", &e.to_string());
-            tracing::error!(target = "lifecycle", "'{}' failed to start: {}", name, e);
+            tracing::error!(target = "lifecycle", server=%name, state=?ClientConnectionState::Errored, error=%e, "start_failed");
             client_status_changed(emitter, name, "error");
         }
     }
@@ -358,8 +406,13 @@ async fn settings_update_settings(
 fn main() {
     // Initialize structured logging via tracing with env filter.
     // Configure via RUST_LOG, e.g., RUST_LOG=info,mcp_bouncer=debug
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .or_else(|_| tracing_subscriber::EnvFilter::try_new("info,mcp_bouncer=debug"))
+        .unwrap();
     let _ = tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_env_filter(env_filter)
+        .with_target(true)
+        .pretty()
         .try_init();
     tauri::Builder::default()
         // Shell plugin is commonly needed to open links, etc.
