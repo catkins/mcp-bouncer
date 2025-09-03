@@ -10,7 +10,7 @@ use crate::client::{ensure_rmcp_client, fetch_tools_for_cfg};
 use crate::config::{
     load_settings_with, ConfigProvider, MCPServerConfig,
 };
-use crate::events::incoming_clients_updated;
+use crate::events::{incoming_clients_updated, client_status_changed};
 use crate::events::{EventEmitter};
 use crate::incoming::record_connect;
 
@@ -132,6 +132,7 @@ where
                                 let lower = msg.to_ascii_lowercase();
                                 if lower.contains("401") || lower.contains("unauthorized") {
                                     crate::overlay::mark_unauthorized(&cfg.name).await;
+                                    client_status_changed(&self.emitter, &cfg.name, "requires_authorization");
                                 }
                                 Ok(mcp::ServerResult::CallToolResult(mcp::CallToolResult {
                                     content: vec![mcp::Content::text(format!("error: {e}"))],

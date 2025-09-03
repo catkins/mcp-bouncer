@@ -78,4 +78,5 @@ pub async fn mark_unauthorized(name: &str) {
     let e = entry_mut(&mut g, name);
     e.authorization_required = true;
     e.oauth_authenticated = false;
+    e.state = ClientConnectionState::RequiresAuthorization;
 }

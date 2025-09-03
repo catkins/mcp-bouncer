@@ -207,6 +207,9 @@ async fn mcp_start_oauth(app: tauri::AppHandle, name: String) -> Result<(), Stri
         .endpoint
         .clone()
         .ok_or_else(|| "missing endpoint".to_string())?;
+    // Mark as authorizing for UI feedback
+    mcp_bouncer::overlay::set_state(&name, ClientConnectionState::Authorizing).await;
+    client_status_changed(&TauriEventEmitter(app.clone()), &name, "authorizing");
     // Kick off OAuth flow (opens browser, waits for callback)
     start_oauth_for_server(&TauriEventEmitter(app.clone()), &name, &endpoint).await
 }
@@ -251,6 +254,8 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
                     let lower = msg.to_ascii_lowercase();
                     if lower.contains("401") || lower.contains("unauthorized") {
                         ov::mark_unauthorized(name).await;
+                        client_status_changed(emitter, name, "requires_authorization");
+                        return;
                     }
                     ov::set_error(name, Some(msg)).await;
                     ov::set_state(name, ClientConnectionState::Errored).await;

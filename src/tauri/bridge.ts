@@ -30,7 +30,7 @@ export interface Settings {
 
 export interface ClientStatus {
   name: string;
-  state: 'disconnected' | 'connecting' | 'errored' | 'connected';
+  state: 'disconnected' | 'connecting' | 'errored' | 'connected' | 'requires_authorization' | 'authorizing';
   tools: number;
   last_error?: string;
   authorization_required: boolean;

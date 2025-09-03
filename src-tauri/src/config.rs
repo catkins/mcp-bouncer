@@ -42,6 +42,8 @@ pub enum ClientConnectionState {
     Connecting,
     Errored,
     Connected,
+    RequiresAuthorization,
+    Authorizing,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
