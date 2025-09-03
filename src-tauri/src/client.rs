@@ -13,7 +13,9 @@ use rmcp::ServiceExt;
 
 use crate::config::{MCPServerConfig, TransportType};
 use crate::oauth::load_credentials_for;
-use crate::overlay;
+use crate::unauthorized;
+
+use anyhow::{anyhow, Context, Result};
 
 pub type ClientService = rmcp::service::RunningService<RoleClient, ()>;
 pub type ClientRegistry = tokio::sync::Mutex<HashMap<String, Arc<ClientService>>>;
@@ -28,7 +30,7 @@ pub fn client_registry() -> &'static ClientRegistry {
 pub async fn ensure_rmcp_client(
     name: &str,
     cfg: &MCPServerConfig,
-) -> Result<Arc<ClientService>, String> {
+) -> Result<Arc<ClientService>> {
     let reg = client_registry();
     let mut guard = reg.lock().await;
     if let Some(c) = guard.get(name) { return Ok(c.clone()); }
@@ -39,26 +41,26 @@ pub async fn ensure_rmcp_client(
     let service = match cfg.transport {
         Some(TransportType::StreamableHttp) => {
             let endpoint = cfg.endpoint.clone().unwrap_or_default();
-            if endpoint.is_empty() { return Err("no endpoint".into()); }
+            if endpoint.is_empty() { return Err(anyhow!("no endpoint")); }
 
             // If credentials exist in secure store, build an authorized client; otherwise use plain client
             if let Some(creds) = load_credentials_for(&crate::config::OsConfigProvider, &cfg.name) {
                 // derive base url for oauth state machine
                 let url = reqwest::Url::parse(&endpoint)
-                    .map_err(|e| format!("url parse: {e}"))?;
+                    .context("url parse")?;
                 let mut base = url.clone();
                 base.set_path("");
 
                 let mut state = OAuthState::new(base.as_str(), None)
                     .await
-                    .map_err(|e| format!("oauth init: {e}"))?;
+                    .context("oauth init")?;
                 state
                     .set_credentials("mcp-bouncer", creds)
                     .await
-                    .map_err(|e| format!("oauth set: {e}"))?;
+                    .context("oauth set")?;
                 let manager = state
                     .into_authorization_manager()
-                    .ok_or_else(|| "oauth state".to_string())?;
+                    .ok_or_else(|| anyhow!("oauth state"))?;
                 let client = AuthClient::new(reqwest::Client::default(), manager);
                 let transport = StreamableHttpClientTransport::with_client(
                     client,
@@ -67,12 +69,8 @@ pub async fn ensure_rmcp_client(
                 match ().serve(transport).await {
                     Ok(svc) => svc,
                     Err(e) => {
-                        let msg = format!("rmcp serve: {e}");
-                        // Fallback probe for 401 to mark unauthorized (some servers close on initialize without explicit 401 in error text)
-                        if let Ok(resp) = reqwest::Client::default().get(endpoint.clone()).send().await {
-                            if resp.status().as_u16() == 401 { overlay::mark_unauthorized(&cfg.name).await; }
-                        }
-                        return Err(msg);
+                        unauthorized::on_possible_unauthorized(&cfg.name, Some(&endpoint)).await;
+                        return Err(anyhow!("rmcp serve").context(e));
                     }
                 }
             } else {
@@ -80,32 +78,29 @@ pub async fn ensure_rmcp_client(
                 match ().serve(transport).await {
                     Ok(svc) => svc,
                     Err(e) => {
-                        let msg = format!("rmcp serve: {e}");
-                        if let Ok(resp) = reqwest::Client::default().get(endpoint.clone()).send().await {
-                            if resp.status().as_u16() == 401 { overlay::mark_unauthorized(&cfg.name).await; }
-                        }
-                        return Err(msg);
+                        unauthorized::on_possible_unauthorized(&cfg.name, Some(&endpoint)).await;
+                        return Err(anyhow!("rmcp serve").context(e));
                     }
                 }
             }
         }
         Some(TransportType::Sse) => {
             let endpoint = cfg.endpoint.clone().unwrap_or_default();
-            if endpoint.is_empty() { return Err("no endpoint".into()); }
+            if endpoint.is_empty() { return Err(anyhow!("no endpoint")); }
             // Build reqwest client with default headers if provided
             let client = if let Some(hdrs) = &cfg.headers {
                 let mut map = reqwest::header::HeaderMap::new();
                 for (k, v) in hdrs {
                     let name = reqwest::header::HeaderName::from_bytes(k.as_bytes())
-                        .map_err(|e| format!("invalid header name {k}: {e}"))?;
+                        .with_context(|| format!("invalid header name {k}"))?;
                     let val = reqwest::header::HeaderValue::from_str(v)
-                        .map_err(|e| format!("invalid header value for {k}: {e}"))?;
+                        .with_context(|| format!("invalid header value for {k}"))?;
                     map.insert(name, val);
                 }
                 reqwest::Client::builder()
                     .default_headers(map)
                     .build()
-                    .map_err(|e| format!("sse client build: {e}"))?
+                    .context("sse client build")?
             } else {
                 reqwest::Client::default()
             };
@@ -114,21 +109,21 @@ pub async fn ensure_rmcp_client(
                 SseClientConfig { sse_endpoint: endpoint.into(), ..Default::default() },
             )
             .await
-            .map_err(|e| format!("sse start: {e}"))?;
+            .context("sse start")?;
             ().serve(transport)
                 .await
-                .map_err(|e| format!("rmcp serve: {e}"))?
+                .context("rmcp serve")?
         }
         Some(TransportType::Stdio) => {
             let cmd = cfg.command.clone();
-            if cmd.is_empty() { return Err("missing command".into()); }
+            if cmd.is_empty() { return Err(anyhow!("missing command")); }
             let mut command = tokio::process::Command::new(cmd);
             if let Some(args) = &cfg.args { command.args(args); }
             if let Some(envmap) = &cfg.env { for (k, v) in envmap { command.env(k, v); } }
-            let transport = TokioChildProcess::new(command).map_err(|e| format!("spawn: {e}"))?;
-            ().serve(transport).await.map_err(|e| format!("rmcp serve: {e}"))?
+            let transport = TokioChildProcess::new(command).context("spawn")?;
+            ().serve(transport).await.context("rmcp serve")?
         }
-        _ => return Err("unsupported transport".into()),
+        _ => return Err(anyhow!("unsupported transport")),
     };
     let arc = Arc::new(service);
     guard.insert(name.to_string(), arc.clone());
@@ -136,7 +131,7 @@ pub async fn ensure_rmcp_client(
     Ok(arc)
 }
 
-pub async fn remove_rmcp_client(name: &str) -> Result<(), String> {
+pub async fn remove_rmcp_client(name: &str) -> Result<()> {
     let reg = client_registry();
     let mut guard = reg.lock().await;
     if let Some(service) = guard.remove(name) {
@@ -146,18 +141,15 @@ pub async fn remove_rmcp_client(name: &str) -> Result<(), String> {
     Ok(())
 }
 
-pub async fn fetch_tools_for_cfg(cfg: &MCPServerConfig) -> Result<Vec<serde_json::Value>, String> {
+pub async fn fetch_tools_for_cfg(cfg: &MCPServerConfig) -> Result<Vec<serde_json::Value>> {
     let client = ensure_rmcp_client(&cfg.name, cfg).await?;
     let tools = match client.list_all_tools().await {
         Ok(t) => t,
         Err(e) => {
-            let msg = format!("rmcp list tools: {e}");
-            let lower = msg.to_ascii_lowercase();
-            if lower.contains("401") || lower.contains("unauthorized") {
-                // Force clear in overlay and show authorize pill
-                overlay::mark_unauthorized(&cfg.name).await;
+            if matches!(cfg.transport, Some(TransportType::StreamableHttp)) {
+                unauthorized::on_possible_unauthorized(&cfg.name, cfg.endpoint.as_deref()).await;
             }
-            return Err(msg);
+            return Err(anyhow!("rmcp list tools").context(e));
         }
     };
     let vals: Vec<serde_json::Value> = tools

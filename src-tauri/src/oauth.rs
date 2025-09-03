@@ -8,6 +8,7 @@ use crate::client::ensure_rmcp_client;
 use crate::config::{ ConfigProvider, OsConfigProvider, load_settings_with, ClientConnectionState };
 use crate::events::{client_status_changed, client_error, EventEmitter};
 use crate::overlay;
+use anyhow::{Context, Result};
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 struct OAuthFile(HashMap<String, OAuthTokenResponse>);
@@ -59,32 +60,32 @@ pub async fn start_oauth_for_server<E: EventEmitter>(
     emitter: &E,
     name: &str,
     endpoint: &str,
-) -> Result<(), String> {
+) -> Result<()> {
     // derive base URL from endpoint
-    let url = reqwest::Url::parse(endpoint).map_err(|e| format!("url parse: {e}"))?;
+    let url = reqwest::Url::parse(endpoint).context("url parse")?;
     let mut base = url.clone();
     base.set_path("");
 
     // local callback server at random port
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
-        .map_err(|e| e.to_string())?;
-    let addr = listener.local_addr().map_err(|e| e.to_string())?;
+        .context("bind oauth callback")?;
+    let addr = listener.local_addr().context("callback addr")?;
     let redirect_uri = format!("http://{addr}/callback");
 
     // Initialize OAuth state machine
     let mut state = OAuthState::new(base.as_str(), None)
         .await
-        .map_err(|e| format!("oauth init: {e}"))?;
+        .context("oauth init")?;
     // Scope set kept minimal; servers can ignore/accept
     state
         .start_authorization(&["mcp"], &redirect_uri)
         .await
-        .map_err(|e| format!("oauth start: {e}"))?;
+        .context("oauth start")?;
     let auth_url = state
         .get_authorization_url()
         .await
-        .map_err(|e| format!("oauth url: {e}"))?;
+        .context("oauth url")?;
 
     // Spawn callback server to capture auth code
     let (tx, rx) = tokio::sync::oneshot::channel::<CallbackQuery>();
@@ -117,13 +118,13 @@ pub async fn start_oauth_for_server<E: EventEmitter>(
     // Wait for callback
     let q = rx
         .await
-        .map_err(|e| format!("callback wait: {e}"))?;
+        .context("callback wait")?;
 
     // Complete the code exchange
     state
         .handle_callback(&q.code)
         .await
-        .map_err(|e| format!("oauth exchange: {e}"))?;
+        .context("oauth exchange")?;
 
     // Try to export credentials for persistence if supported
     if let Ok((_, Some(creds))) = state.get_credentials().await {
@@ -161,9 +162,9 @@ pub async fn start_oauth_for_server<E: EventEmitter>(
                 }
             },
             Err(e) => {
-                overlay::set_error(name, Some(e.clone())).await;
+                overlay::set_error(name, Some(e.to_string())).await;
                 overlay::set_state(name, ClientConnectionState::Errored).await;
-                client_error(emitter, name, "oauth_connect", &e);
+                client_error(emitter, name, "oauth_connect", &e.to_string());
                 client_status_changed(emitter, name, "error");
             }
         }

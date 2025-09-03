@@ -32,7 +32,6 @@ pub struct MCPServerConfig {
 pub struct Settings {
     pub mcp_servers: Vec<MCPServerConfig>,
     pub listen_addr: String,
-    pub auto_start: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -86,7 +85,7 @@ impl ConfigProvider for OsConfigProvider {
 }
 
 pub fn default_settings() -> Settings {
-    Settings { mcp_servers: Vec::new(), listen_addr: "http://localhost:8091/mcp".to_string(), auto_start: false }
+    Settings { mcp_servers: Vec::new(), listen_addr: "http://localhost:8091/mcp".to_string() }
 }
 
 pub fn settings_path(cp: &dyn ConfigProvider) -> PathBuf { cp.base_dir().join("settings.json") }
@@ -117,6 +116,24 @@ pub struct ToolsState(pub HashMap<String, HashMap<String, bool>>);
 
 pub fn tools_state_path(cp: &dyn ConfigProvider) -> PathBuf { cp.base_dir().join("tools_state.json") }
 
+pub fn load_tools_state_with(cp: &dyn ConfigProvider) -> ToolsState {
+    let path = tools_state_path(cp);
+    if let Ok(content) = fs::read_to_string(&path) {
+        if let Ok(s) = serde_json::from_str::<ToolsState>(&content) { return s; }
+    }
+    ToolsState::default()
+}
+
+pub fn is_tool_enabled_with(cp: &dyn ConfigProvider, client_name: &str, tool_name: &str) -> bool {
+    let state = load_tools_state_with(cp);
+    state
+        .0
+        .get(client_name)
+        .and_then(|m| m.get(tool_name))
+        .copied()
+        .unwrap_or(true)
+}
+
 pub fn save_tools_toggle_with(
     cp: &dyn ConfigProvider,
     client_name: &str,
@@ -139,7 +156,7 @@ mod tests {
     #[derive(Clone)]
     struct TempConfigProvider { base: PathBuf }
 
-    impl TempConfigProvider { fn new() -> Self { let stamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis(); let dir = std::env::temp_dir().join(format!("mcp-bouncer-test-{}-{}", std::process::id(), stamp)); fs::create_dir_all(&dir).unwrap(); Self { base: dir } } }
+    impl TempConfigProvider { fn new() -> Self { let stamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos(); let tid = format!("{:?}", std::thread::current().id()); let dir = std::env::temp_dir().join(format!("mcp-bouncer-test-{}-{}-{}", std::process::id(), tid, stamp)); fs::create_dir_all(&dir).unwrap(); Self { base: dir } } }
 
     impl ConfigProvider for TempConfigProvider { fn base_dir(&self) -> PathBuf { self.base.clone() } }
 
@@ -161,5 +178,16 @@ mod tests {
         let data = std::fs::read_to_string(tools_state_path(&cp)).unwrap();
         assert!(data.contains("clientA"));
         assert!(data.contains("tool1"));
+    }
+
+    #[test]
+    fn tools_toggle_is_read_and_defaults_true() {
+        let cp = TempConfigProvider::new();
+        // default true when no state
+        assert!(is_tool_enabled_with(&cp, "x", "y"));
+        save_tools_toggle_with(&cp, "clientA", "tool1", false).unwrap();
+        assert!(!is_tool_enabled_with(&cp, "clientA", "tool1"));
+        // unrelated tool defaults to true
+        assert!(is_tool_enabled_with(&cp, "clientA", "other"));
     }
 }

@@ -15,6 +15,7 @@ use mcp_bouncer::events::{
 use mcp_bouncer::incoming::list_incoming;
 use mcp_bouncer::oauth::start_oauth_for_server;
 use mcp_bouncer::server::{start_http_server, get_runtime_listen_addr};
+use mcp_bouncer::unauthorized;
 
 // ---------- Streamable HTTP MCP proxy (basic) ----------
 
@@ -26,13 +27,22 @@ fn spawn_mcp_proxy(app: &tauri::AppHandle) {
     }
     let app_handle = app.clone();
     tauri::async_runtime::spawn(async move {
-        let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 8091));
-        let _ = start_http_server(
+        let primary = std::net::SocketAddr::from(([127, 0, 0, 1], 8091));
+        if let Err(e) = start_http_server(
             mcp_bouncer::events::TauriEventEmitter(app_handle.clone()),
             mcp_bouncer::config::OsConfigProvider,
-            addr,
+            primary,
         )
-        .await;
+        .await
+        {
+            eprintln!("[server] bind {primary} failed: {e}; falling back to ephemeral port");
+            let _ = start_http_server(
+                mcp_bouncer::events::TauriEventEmitter(app_handle.clone()),
+                mcp_bouncer::config::OsConfigProvider,
+                std::net::SocketAddr::from(([127, 0, 0, 1], 0)),
+            )
+            .await;
+        }
     });
 }
 
@@ -102,14 +112,22 @@ async fn mcp_update_server(
         let enabling = config.enabled;
         let server_name = item.name.clone();
         *item = config;
-        let _ = item;
         save_settings(&s)?;
         // notify UI that servers changed first
         servers_updated(&TauriEventEmitter(app.clone()), "update");
         // try to connect if enabling
         if enabling {
             if let Some(cfg) = get_server_by_name(&server_name) {
-                connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg).await;
+                // If HTTP transport requires auth and no credentials, gate and mark unauthorized
+                if matches!(cfg.transport, Some(mcp_bouncer::config::TransportType::StreamableHttp))
+                    && cfg.requires_auth.unwrap_or(false)
+                    && mcp_bouncer::oauth::load_credentials_for(&mcp_bouncer::config::OsConfigProvider, &server_name).is_none()
+                {
+                    mcp_bouncer::overlay::mark_unauthorized(&server_name).await;
+                    client_status_changed(&TauriEventEmitter(app.clone()), &server_name, "requires_authorization");
+                } else {
+                    connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg).await;
+                }
             }
         }
         incoming_clients_updated(&TauriEventEmitter(app.clone()), "servers_changed");
@@ -129,6 +147,7 @@ async fn mcp_remove_server(app: tauri::AppHandle, name: String) -> Result<(), St
     }
     save_settings(&s)?;
     let _ = remove_rmcp_client(&name).await;
+    mcp_bouncer::overlay::remove(&name).await;
     servers_updated(&TauriEventEmitter(app.clone()), "remove");
     incoming_clients_updated(&TauriEventEmitter(app.clone()), "servers_changed");
     Ok(())
@@ -144,11 +163,18 @@ async fn mcp_toggle_server_enabled(
     if let Some(item) = s.mcp_servers.iter_mut().find(|c| c.name == name) {
         let server_name = item.name.clone();
         item.enabled = enabled;
-        let _ = item;
         save_settings(&s)?;
         if enabled {
             if let Some(cfg) = get_server_by_name(&server_name) {
-                connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg).await;
+                if matches!(cfg.transport, Some(mcp_bouncer::config::TransportType::StreamableHttp))
+                    && cfg.requires_auth.unwrap_or(false)
+                    && mcp_bouncer::oauth::load_credentials_for(&mcp_bouncer::config::OsConfigProvider, &server_name).is_none()
+                {
+                    mcp_bouncer::overlay::mark_unauthorized(&server_name).await;
+                    client_status_changed(&TauriEventEmitter(app.clone()), &server_name, "requires_authorization");
+                } else {
+                    connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg).await;
+                }
             }
         } else {
             let _ = remove_rmcp_client(&server_name).await;
@@ -191,11 +217,10 @@ async fn mcp_restart_client(app: tauri::AppHandle, name: String) -> Result<(), S
         _ => {}
     }
 
-    // Ensure client exists; mark connected
+    // Ensure client exists; connect_and_initialize will emit appropriate status events
     if let Some(cfg) = get_server_by_name(&name) {
         connect_and_initialize(&TauriEventEmitter(app.clone()), &name, &cfg).await;
     }
-    client_status_changed(&TauriEventEmitter(app.clone()), &name, "restart");
     Ok(())
 }
 
@@ -211,13 +236,22 @@ async fn mcp_start_oauth(app: tauri::AppHandle, name: String) -> Result<(), Stri
     mcp_bouncer::overlay::set_state(&name, ClientConnectionState::Authorizing).await;
     client_status_changed(&TauriEventEmitter(app.clone()), &name, "authorizing");
     // Kick off OAuth flow (opens browser, waits for callback)
-    start_oauth_for_server(&TauriEventEmitter(app.clone()), &name, &endpoint).await
+    start_oauth_for_server(&TauriEventEmitter(app.clone()), &name, &endpoint)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 async fn mcp_get_client_tools(client_name: String) -> Result<Vec<serde_json::Value>, String> {
     if let Some(cfg) = get_server_by_name(&client_name) {
-        return fetch_tools_for_cfg(&cfg).await;
+        let list = fetch_tools_for_cfg(&cfg).await.map_err(|e| e.to_string())?;
+        // Filter based on toggles
+        let state = mcp_bouncer::config::load_tools_state_with(&mcp_bouncer::config::OsConfigProvider);
+        let filtered: Vec<_> = list.into_iter().filter(|v| {
+            let Some(tool_name) = v.get("name").and_then(|n| n.as_str()) else { return true; };
+            state.0.get(&client_name).and_then(|m| m.get(tool_name)).copied().unwrap_or(true)
+        }).collect();
+        return Ok(filtered);
     }
     Ok(Vec::new())
 }
@@ -250,14 +284,17 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
                     client_status_changed(emitter, name, "connected");
                 }
                 Err(e) => {
-                    let msg = e.to_string();
-                    let lower = msg.to_ascii_lowercase();
-                    if lower.contains("401") || lower.contains("unauthorized") {
-                        ov::mark_unauthorized(name).await;
-                        client_status_changed(emitter, name, "requires_authorization");
-                        return;
+                    if matches!(cfg.transport, Some(mcp_bouncer::config::TransportType::StreamableHttp)) {
+                        unauthorized::on_possible_unauthorized(name, cfg.endpoint.as_deref()).await;
                     }
-                    ov::set_error(name, Some(msg)).await;
+                    let snap = mcp_bouncer::overlay::snapshot().await;
+                    if let Some(ent) = snap.get(name) {
+                        if ent.authorization_required || ent.state == ClientConnectionState::RequiresAuthorization {
+                            client_status_changed(emitter, name, "requires_authorization");
+                            return;
+                        }
+                    }
+                    ov::set_error(name, Some(e.to_string())).await;
                     ov::set_state(name, ClientConnectionState::Errored).await;
                     println!("[lifecycle] '{}' error during initialize", name);
                     client_status_changed(emitter, name, "error");
@@ -273,9 +310,9 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
                     return;
                 }
             }
-            ov::set_error(name, Some(e.clone())).await;
+            ov::set_error(name, Some(e.to_string())).await;
             ov::set_state(name, ClientConnectionState::Errored).await;
-            client_error(emitter, name, "enable", &e);
+            client_error(emitter, name, "enable", &e.to_string());
             println!("[lifecycle] '{}' failed to start: {}", name, e);
             client_status_changed(emitter, name, "error");
         }

@@ -16,7 +16,7 @@ async fn unsupported_transport_errors() {
         enabled: true,
     };
     let err = ensure_rmcp_client(&cfg.name, &cfg).await.err().unwrap();
-    assert!(err.contains("unsupported"));
+    assert!(err.to_string().contains("unsupported"));
 }
 
 #[tokio::test]
@@ -34,5 +34,5 @@ async fn missing_command_for_stdio_errors() {
         enabled: true,
     };
     let err = ensure_rmcp_client(&cfg.name, &cfg).await.err().unwrap();
-    assert!(err.contains("missing command"));
+    assert!(err.to_string().contains("missing command"));
 }

@@ -25,7 +25,6 @@ export interface MCPServerConfig {
 export interface Settings {
   mcp_servers: MCPServerConfig[];
   listen_addr: string;
-  auto_start: boolean;
 }
 
 export interface ClientStatus {

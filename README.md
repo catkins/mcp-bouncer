@@ -121,7 +121,6 @@ The application automatically manages settings in platform-specific locations:
     }
   ],
   "listen_addr": "http://localhost:8091/mcp",
-  "auto_start": false
 }
 ```
 

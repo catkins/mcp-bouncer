@@ -13,6 +13,7 @@ use crate::config::{
 use crate::events::{incoming_clients_updated, client_status_changed};
 use crate::events::{EventEmitter};
 use crate::incoming::record_connect;
+use crate::unauthorized;
 
 // Runtime-bound listen address storage
 static RUNTIME_ADDR: std::sync::OnceLock<std::net::SocketAddr> = std::sync::OnceLock::new();
@@ -97,7 +98,17 @@ where
             mcp::ClientRequest::ListToolsRequest(_req) => {
                 let s = load_settings_with(&self.cp);
                 let servers: Vec<_> = s.mcp_servers.into_iter().filter(|c| c.enabled).collect();
-                let tools = aggregate_tools(servers, std::time::Duration::from_secs(6)).await;
+                const TOOL_LIST_TIMEOUT_SECS: u64 = 6;
+                let mut tools = aggregate_tools(servers, std::time::Duration::from_secs(TOOL_LIST_TIMEOUT_SECS)).await;
+                // Filter out disabled tools based on persisted toggles
+                let state = crate::config::load_tools_state_with(&self.cp);
+                tools.retain(|t| {
+                    if let Some((server, tool)) = t.name.split_once("::") {
+                        state.0.get(server).and_then(|m| m.get(tool)).copied().unwrap_or(true)
+                    } else {
+                        true
+                    }
+                });
                 Ok(mcp::ServerResult::ListToolsResult(mcp::ListToolsResult { tools, next_cursor: None }))
             }
             mcp::ClientRequest::CallToolRequest(req) => {
@@ -112,13 +123,15 @@ where
                     .clone()
                     .map(serde_json::Value::Object)
                     .and_then(|v| v.as_object().cloned());
-                let cfg_opt = if !server_name.is_empty() {
-                    load_settings_with(&self.cp)
-                        .mcp_servers
-                        .into_iter()
-                        .find(|c| c.name == server_name)
-                } else {
-                    load_settings_with(&self.cp).mcp_servers.into_iter().find(|c| c.enabled)
+                let cfg_opt = match select_target_server(&self.cp, &server_name) {
+                    Ok(opt) => opt,
+                    Err(msg) => {
+                        return Ok(mcp::ServerResult::CallToolResult(mcp::CallToolResult {
+                            content: vec![mcp::Content::text(msg)],
+                            structured_content: None,
+                            is_error: Some(true),
+                        }));
+                    }
                 };
                 if let Some(cfg) = cfg_opt {
                     match ensure_rmcp_client(&cfg.name, &cfg).await {
@@ -128,10 +141,9 @@ where
                         {
                             Ok(res) => Ok(mcp::ServerResult::CallToolResult(res)),
                             Err(e) => {
-                                let msg = e.to_string();
-                                let lower = msg.to_ascii_lowercase();
-                                if lower.contains("401") || lower.contains("unauthorized") {
-                                    crate::overlay::mark_unauthorized(&cfg.name).await;
+                                if matches!(cfg.transport, Some(crate::config::TransportType::StreamableHttp)) {
+                                    unauthorized::on_possible_unauthorized(&cfg.name, cfg.endpoint.as_deref()).await;
+                                    // Notify UI when auth is required
                                     client_status_changed(&self.emitter, &cfg.name, "requires_authorization");
                                 }
                                 Ok(mcp::ServerResult::CallToolResult(mcp::CallToolResult {
@@ -196,6 +208,23 @@ fn to_mcp_tool(server: &str, v: &serde_json::Value) -> Option<mcp::Tool> {
     Some(mcp::Tool::new(fullname, description.unwrap_or_default(), schema_obj))
 }
 
+fn select_target_server<CP: ConfigProvider>(cp: &CP, server_name: &str) -> Result<Option<MCPServerConfig>, String> {
+    if !server_name.is_empty() {
+        Ok(load_settings_with(cp)
+            .mcp_servers
+            .into_iter()
+            .find(|c| c.name == server_name))
+    } else {
+        let settings = load_settings_with(cp);
+        let enabled: Vec<_> = settings.mcp_servers.into_iter().filter(|c| c.enabled).collect();
+        Ok(match enabled.len() {
+            0 => None,
+            1 => enabled.into_iter().next(),
+            _ => return Err("multiple enabled servers; specify 'server::tool'".to_string()),
+        })
+    }
+}
+
 async fn aggregate_tools(
     servers: Vec<MCPServerConfig>,
     timeout: std::time::Duration,
@@ -218,6 +247,53 @@ async fn aggregate_tools(
         }
     }
     tools
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::{default_settings, save_settings_with, ConfigProvider};
+    use crate::events::MockEventEmitter;
+    use std::fs;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[derive(Clone)]
+    struct TestProvider { base: PathBuf }
+    impl TestProvider { fn new() -> Self { let stamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos(); let dir = std::env::temp_dir().join(format!("mcp-bouncer-route-{}-{}", std::process::id(), stamp)); fs::create_dir_all(&dir).unwrap(); Self{ base: dir } } }
+    impl ConfigProvider for TestProvider { fn base_dir(&self) -> PathBuf { self.base.clone() } }
+
+    #[test]
+    fn unqualified_tool_errors_when_multiple_enabled() {
+        let cp = TestProvider::new();
+        let mut s = default_settings();
+        s.mcp_servers.push(MCPServerConfig{ name: "a".into(), description: "d".into(), transport: None, command: String::new(), args: None, env: None, endpoint: None, headers: None, requires_auth: None, enabled: true });
+        s.mcp_servers.push(MCPServerConfig{ name: "b".into(), description: "d".into(), transport: None, command: String::new(), args: None, env: None, endpoint: None, headers: None, requires_auth: None, enabled: true });
+        save_settings_with(&cp, &s).unwrap();
+        let sel = super::select_target_server(&cp, "");
+        assert!(sel.is_err());
+        assert!(sel.err().unwrap().contains("multiple enabled servers"));
+    }
+
+    #[test]
+    fn extract_str_reads_multiple_paths() {
+        let val = serde_json::json!({
+            "params": { "client_info": { "name": "X", "version": "1", "title": "T" } }
+        });
+        assert_eq!(super::extract_str(&val, &["clientInfo.name", "params.client_info.name"]), Some("X"));
+        assert_eq!(super::extract_str(&val, &["clientInfo.version", "params.client_info.version"]), Some("1"));
+        assert_eq!(super::extract_str(&val, &["clientInfo.title", "params.client_info.title"]), Some("T"));
+    }
+
+    #[test]
+    fn to_mcp_tool_handles_input_schema_casing() {
+        let v1 = serde_json::json!({ "name": "echo", "description": "d", "inputSchema": { "type": "object" } });
+        let v2 = serde_json::json!({ "name": "ping", "input_schema": { "type": "object" } });
+        let t1 = super::to_mcp_tool("srv", &v1).unwrap();
+        let t2 = super::to_mcp_tool("srv", &v2).unwrap();
+        assert!(t1.name.contains("srv::echo"));
+        assert!(t2.name.contains("srv::ping"));
+    }
 }
 
 pub async fn start_http_server<E, CP>(

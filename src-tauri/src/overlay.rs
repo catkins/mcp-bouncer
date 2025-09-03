@@ -71,6 +71,11 @@ pub async fn snapshot() -> HashMap<String, OverlayEntry> {
     overlay_map().lock().await.clone()
 }
 
+pub async fn remove(name: &str) {
+    let mut g = overlay_map().lock().await;
+    g.remove(name);
+}
+
 // Helper to mark a client as requiring authorization (e.g., after a 401),
 // and clear any oauth_authenticated flag.
 pub async fn mark_unauthorized(name: &str) {
