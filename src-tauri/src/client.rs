@@ -141,6 +141,15 @@ pub async fn remove_rmcp_client(name: &str) -> Result<()> {
     Ok(())
 }
 
+// Cancel all running clients and clear the registry
+pub async fn shutdown_all_clients() {
+    let reg = client_registry();
+    let mut guard = reg.lock().await;
+    for (_, service) in guard.drain() {
+        service.cancellation_token().cancel();
+    }
+}
+
 pub async fn fetch_tools_for_cfg(cfg: &MCPServerConfig) -> Result<Vec<serde_json::Value>> {
     let client = ensure_rmcp_client(&cfg.name, cfg).await?;
     let tools = match client.list_all_tools().await {

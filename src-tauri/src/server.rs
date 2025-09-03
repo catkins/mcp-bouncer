@@ -294,6 +294,17 @@ mod tests {
         assert!(t1.name.contains("srv::echo"));
         assert!(t2.name.contains("srv::ping"));
     }
+
+    #[tokio::test]
+    async fn stop_server_aborts_task() {
+        let emitter = crate::events::BufferingEventEmitter::default();
+        let cp = TestProvider::new();
+        let (handle, _addr) = super::start_http_server(emitter.clone(), cp.clone(), "127.0.0.1:0".parse().unwrap()).await.unwrap();
+        // Abort the server handle and ensure task finishes promptly
+        super::stop_http_server(&handle);
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        assert!(handle.is_finished());
+    }
 }
 
 pub async fn start_http_server<E, CP>(
@@ -320,4 +331,9 @@ where
         let _ = axum::serve(listener, router).await;
     });
     Ok((handle, local))
+}
+
+// Abort the HTTP server task. Intended for integration tests or coordinated shutdown.
+pub fn stop_http_server(handle: &tokio::task::JoinHandle<()>) {
+    handle.abort();
 }

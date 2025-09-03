@@ -20,6 +20,17 @@ impl EventEmitter for TauriEventEmitter {
     }
 }
 
+// A simple, threadsafe emitter for integration tests that want to assert
+// event sequencing or payloads without Tauri. Stores events in a Vec.
+#[derive(Default, Clone)]
+pub struct BufferingEventEmitter(pub std::sync::Arc<std::sync::Mutex<Vec<(String, serde_json::Value)>>>);
+
+impl EventEmitter for BufferingEventEmitter {
+    fn emit(&self, event: &str, payload: &serde_json::Value) {
+        self.0.lock().unwrap().push((event.to_string(), payload.clone()));
+    }
+}
+
 // Helper functions to standardize payload shapes
 pub fn servers_updated<E: EventEmitter>(emitter: &E, reason: &str) {
     emitter.emit(EVENT_SERVERS_UPDATED, &json!({ "reason": reason }));
