@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { MCPServerConfig, Settings, ClientStatus } from '../tauri/bridge';
 import { useMCPBootstrap } from './mcp/useMCPBootstrap';
 import { useMCPActions } from './mcp/useMCPActions';
@@ -33,6 +33,17 @@ export function useMCPService() {
     toggleServer?: { [key: string]: string | undefined };
   }>({});
   // Build helpers from modular hooks
+  const setGeneralLoading = React.useCallback(
+    (k: 'addServer' | 'updateServer' | 'removeServer' | 'general', v: boolean) =>
+      setLoadingStates(prev => ({ ...prev, [k]: v })),
+    [],
+  );
+  const setGeneralError = React.useCallback(
+    (k: 'addServer' | 'updateServer' | 'removeServer' | 'general', e?: string) =>
+      setErrors(prev => ({ ...prev, [k]: e })),
+    [],
+  );
+
   const { loadServers, loadSettings, loadMcpUrl, loadActive, loadClientStatus, init } =
     useMCPBootstrap({
       setServers,
@@ -40,8 +51,8 @@ export function useMCPService() {
       setMcpUrl,
       setIsActive,
       setClientStatus,
-      setLoading: (k, v) => setLoadingStates(prev => ({ ...prev, [k]: v })),
-      setError: (k, e) => setErrors(prev => ({ ...prev, [k]: e })),
+      setLoading: setGeneralLoading,
+      setError: setGeneralError,
     });
 
   const actions = useMCPActions({
