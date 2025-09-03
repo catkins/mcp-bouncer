@@ -4,8 +4,9 @@ use std::path::PathBuf;
 use axum::{extract::Query, http::StatusCode, routing::get, Router};
 use rmcp::transport::auth::{OAuthState, OAuthTokenResponse};
 
-use crate::config::{ ConfigProvider, OsConfigProvider };
-use crate::events::{client_status_changed, EventEmitter};
+use crate::client::ensure_rmcp_client;
+use crate::config::{ ConfigProvider, OsConfigProvider, load_settings_with, ClientConnectionState };
+use crate::events::{client_status_changed, client_error, EventEmitter};
 use crate::overlay;
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
@@ -134,6 +135,41 @@ pub async fn start_oauth_for_server<E: EventEmitter>(
     overlay::set_auth_required(name, false).await;
     overlay::set_error(name, None).await;
 
-    client_status_changed(emitter, name, "oauth");
+    // Attempt to (re)start the client automatically if the server is enabled
+    let settings = load_settings_with(&OsConfigProvider);
+    if let Some(cfg) = settings.mcp_servers.into_iter().find(|c| c.name == name && c.enabled) {
+        overlay::set_error(name, None).await;
+        overlay::set_oauth_authenticated(name, true).await;
+        overlay::set_auth_required(name, false).await;
+        overlay::set_state(name, ClientConnectionState::Connecting).await;
+        client_status_changed(emitter, name, "connecting");
+        match ensure_rmcp_client(name, &cfg).await {
+            Ok(client) => match client.list_all_tools().await {
+                Ok(tools) => {
+                    overlay::set_error(name, None).await;
+                    overlay::set_state(name, ClientConnectionState::Connected).await;
+                    overlay::set_oauth_authenticated(name, true).await;
+                    overlay::set_auth_required(name, false).await;
+                    crate::overlay::set_tools(name, tools.len() as u32).await;
+                    client_status_changed(emitter, name, "connected");
+                }
+                Err(e) => {
+                    overlay::set_error(name, Some(e.to_string())).await;
+                    overlay::set_state(name, ClientConnectionState::Errored).await;
+                    client_error(emitter, name, "oauth_connect", &e.to_string());
+                    client_status_changed(emitter, name, "error");
+                }
+            },
+            Err(e) => {
+                overlay::set_error(name, Some(e.clone())).await;
+                overlay::set_state(name, ClientConnectionState::Errored).await;
+                client_error(emitter, name, "oauth_connect", &e);
+                client_status_changed(emitter, name, "error");
+            }
+        }
+    } else {
+        // Still emit an update so UI can refresh
+        client_status_changed(emitter, name, "oauth");
+    }
     Ok(())
 }
