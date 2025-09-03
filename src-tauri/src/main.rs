@@ -266,6 +266,13 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
                 Ok(tools) => {
                     ov::set_tools(name, tools.len() as u32).await;
                     ov::set_state(name, ClientConnectionState::Connected).await;
+                    // If we have stored OAuth credentials and this is HTTP, reflect authenticated badge
+                    if matches!(cfg.transport, Some(mcp_bouncer::config::TransportType::StreamableHttp)) {
+                        if mcp_bouncer::oauth::load_credentials_for(&mcp_bouncer::config::OsConfigProvider, name).is_some() {
+                            ov::set_oauth_authenticated(name, true).await;
+                            ov::set_auth_required(name, false).await;
+                        }
+                    }
                     println!("[lifecycle] '{}' connected ({} tools)", name, tools.len());
                     client_status_changed(emitter, name, "connected");
                 }

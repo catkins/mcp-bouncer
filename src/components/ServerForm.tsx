@@ -301,15 +301,7 @@ export function ServerForm({
             />
           )}
 
-          {formData.transport === TransportType.StreamableHttp && (
-            <ToggleSwitch
-              checked={formData.requires_auth || false}
-              onChange={checked => setFormData(prev => ({ ...prev, requires_auth: checked }))}
-              size="sm"
-              label="Requires Authorization (OAuth)"
-              description="Enable this if the server requires OAuth authentication"
-            />
-          )}
+          {/* OAuth no longer requires a manual toggle; inferred at connect time. */}
 
           {formData.transport === TransportType.Stdio && (
             <FormInput
