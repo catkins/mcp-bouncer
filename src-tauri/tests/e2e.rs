@@ -51,10 +51,7 @@ async fn e2e_list_and_echo_hermetic_http() {
                     .enable_tools()
                     .enable_tool_list_changed()
                     .build(),
-                server_info: mcp::Implementation {
-                    name: "up".into(),
-                    version: "0.0.1".into(),
-                },
+                server_info: mcp::Implementation { name: "up".into(), version: "0.0.1".into() },
                 instructions: None,
             }
         }
@@ -62,33 +59,17 @@ async fn e2e_list_and_echo_hermetic_http() {
             &self,
             _request: Option<mcp::PaginatedRequestParam>,
             _context: rmcp::service::RequestContext<rmcp::RoleServer>,
-        ) -> impl core::future::Future<Output = Result<mcp::ListToolsResult, mcp::ErrorData>> + Send + '_
-        {
+        ) -> impl core::future::Future<Output = Result<mcp::ListToolsResult, mcp::ErrorData>> + Send + '_ {
             let schema: mcp::JsonObject = Default::default();
-            std::future::ready(Ok(mcp::ListToolsResult {
-                tools: vec![mcp::Tool::new("echo", "echo", schema)],
-                next_cursor: None,
-            }))
+            std::future::ready(Ok(mcp::ListToolsResult { tools: vec![mcp::Tool::new("echo", "echo", schema)], next_cursor: None }))
         }
         fn call_tool(
             &self,
             request: mcp::CallToolRequestParam,
             _context: rmcp::service::RequestContext<rmcp::RoleServer>,
-        ) -> impl core::future::Future<Output = Result<mcp::CallToolResult, mcp::ErrorData>> + Send + '_
-        {
-            let msg = request
-                .arguments
-                .and_then(|m| {
-                    m.get("message")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string())
-                })
-                .unwrap_or_default();
-            std::future::ready(Ok(mcp::CallToolResult {
-                content: vec![mcp::Content::text(msg)],
-                structured_content: None,
-                is_error: None,
-            }))
+        ) -> impl core::future::Future<Output = Result<mcp::CallToolResult, mcp::ErrorData>> + Send + '_ {
+            let msg = request.arguments.and_then(|m| m.get("message").and_then(|v| v.as_str()).map(|s| s.to_string())).unwrap_or_default();
+            std::future::ready(Ok(mcp::CallToolResult { content: vec![mcp::Content::text(msg)], structured_content: None, is_error: None }))
         }
     }
 

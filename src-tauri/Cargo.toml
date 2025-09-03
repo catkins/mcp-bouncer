@@ -20,6 +20,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 rmcp = { version = "0.6.1", features = [
   "client",
+  "macros",
   "transport-streamable-http-client-reqwest",
   "transport-sse-client-reqwest",
   "transport-sse-server",
@@ -40,3 +41,4 @@ default = []
 
 [dev-dependencies]
 async-trait = "0.1"
+schemars = "0.8"
