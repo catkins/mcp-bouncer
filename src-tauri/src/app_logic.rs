@@ -1,5 +1,5 @@
 use crate::config::{save_settings_with, ConfigProvider, Settings};
-use crate::events::{settings_updated, EventEmitter};
+use crate::events::{settings_updated, servers_updated, EventEmitter};
 
 pub fn update_settings<E: EventEmitter>(
     cp: &dyn ConfigProvider,
@@ -9,6 +9,12 @@ pub fn update_settings<E: EventEmitter>(
     save_settings_with(cp, &settings)?;
     settings_updated(emitter);
     Ok(())
+}
+
+// Emit a single consolidated server-change event. Intentionally does not emit
+// incoming_clients_updated to avoid duplicate UI refreshes for server mutations.
+pub fn notify_servers_changed<E: EventEmitter>(emitter: &E, reason: &str) {
+    servers_updated(emitter, reason);
 }
 
 
@@ -36,5 +42,14 @@ mod tests {
         assert!(p.exists());
         let events = mock.0.lock().unwrap();
         assert_eq!(events.len(), 1);
+    }
+
+    #[test]
+    fn notify_servers_changed_emits_once() {
+        let mock = MockEventEmitter::default();
+        super::notify_servers_changed(&mock, "add");
+        let events = mock.0.lock().unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].0, crate::events::EVENT_SERVERS_UPDATED);
     }
 }

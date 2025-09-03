@@ -96,7 +96,7 @@ async fn mcp_add_server(app: tauri::AppHandle, config: MCPServerConfig) -> Resul
     }
     s.mcp_servers.push(config);
     save_settings(&s)?;
-    servers_updated(&TauriEventEmitter(app.clone()), "add");
+    app_logic::notify_servers_changed(&TauriEventEmitter(app.clone()), "add");
     Ok(())
 }
 
@@ -113,7 +113,7 @@ async fn mcp_update_server(
         *item = config;
         save_settings(&s)?;
         // notify UI that servers changed
-        servers_updated(&TauriEventEmitter(app.clone()), "update");
+        app_logic::notify_servers_changed(&TauriEventEmitter(app.clone()), "update");
         // try to connect if enabling
         if enabling {
             if let Some(cfg) = get_server_by_name(&server_name) {
@@ -146,7 +146,7 @@ async fn mcp_remove_server(app: tauri::AppHandle, name: String) -> Result<(), St
     save_settings(&s)?;
     let _ = remove_rmcp_client(&name).await;
     mcp_bouncer::overlay::remove(&name).await;
-    servers_updated(&TauriEventEmitter(app.clone()), "remove");
+    app_logic::notify_servers_changed(&TauriEventEmitter(app.clone()), "remove");
     Ok(())
 }
 
@@ -179,7 +179,7 @@ async fn mcp_toggle_server_enabled(
             mcp_bouncer::overlay::set_error(&server_name, None).await;
             client_status_changed(&TauriEventEmitter(app.clone()), &server_name, "disable");
         }
-        servers_updated(&TauriEventEmitter(app.clone()), "toggle");
+        app_logic::notify_servers_changed(&TauriEventEmitter(app.clone()), "toggle");
         Ok(())
     } else {
         Err("server not found".into())
