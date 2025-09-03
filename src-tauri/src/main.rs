@@ -110,8 +110,7 @@ async fn mcp_update_server(
                 client_error(&TauriEventEmitter(app.clone()), &name, "enable", &err);
                 // update client state with last_error and auth_required
                 mcp_bouncer::overlay::set_error(&name, Some("Authorization required".into())).await;
-                mcp_bouncer::overlay::set_auth_required(&name, true).await;
-                mcp_bouncer::overlay::set_oauth_authenticated(&name, false).await;
+                mcp_bouncer::overlay::mark_unauthorized(&name).await;
                 return Err("authorization required".into());
             }
         }
@@ -260,8 +259,7 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
                     let msg = e.to_string();
                     let lower = msg.to_ascii_lowercase();
                     if lower.contains("401") || lower.contains("unauthorized") {
-                        ov::set_auth_required(name, true).await;
-                        ov::set_oauth_authenticated(name, false).await;
+                        ov::mark_unauthorized(name).await;
                     }
                     ov::set_error(name, Some(msg)).await;
                     ov::set_state(name, ClientConnectionState::Errored).await;

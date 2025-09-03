@@ -132,8 +132,7 @@ pub async fn fetch_tools_for_cfg(cfg: &MCPServerConfig) -> Result<Vec<serde_json
             let lower = msg.to_ascii_lowercase();
             if lower.contains("401") || lower.contains("unauthorized") {
                 // Force clear in overlay and show authorize pill
-                overlay::set_auth_required(&cfg.name, true).await;
-                overlay::set_oauth_authenticated(&cfg.name, false).await;
+                overlay::mark_unauthorized(&cfg.name).await;
             }
             return Err(msg);
         }
