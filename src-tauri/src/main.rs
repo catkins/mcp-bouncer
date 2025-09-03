@@ -99,36 +99,6 @@ async fn mcp_update_server(
 ) -> Result<(), String> {
     let mut s = load_settings();
     if let Some(item) = s.mcp_servers.iter_mut().find(|c| c.name == name) {
-        // Simulate an auth error when enabling a server that requires auth but is not authorized
-        let requires_auth = config.requires_auth.unwrap_or(false);
-        let is_enabling = config.enabled;
-        if requires_auth && is_enabling {
-            let oauth_ok = mcp_bouncer::overlay::snapshot().await
-                .get(&name)
-                .map(|e| e.oauth_authenticated)
-                .unwrap_or(false);
-            if !oauth_ok {
-                let err = "Authorization required".to_string();
-                // update client state with last_error and auth_required
-                mcp_bouncer::overlay::set_error(&name, Some("Authorization required".into())).await;
-                mcp_bouncer::overlay::mark_unauthorized(&name).await;
-                // emit events so UI can show authorize pill; do not hard-fail the toggle
-                client_error(&TauriEventEmitter(app.clone()), &name, "enable", &err);
-                client_status_changed(&TauriEventEmitter(app.clone()), &name, "authorization_required");
-                // Skip auto-connect below
-                let enabling = false;
-                let server_name = item.name.clone();
-                *item = config;
-                let _ = item;
-                save_settings(&s)?;
-                servers_updated(&TauriEventEmitter(app.clone()), "update");
-                incoming_clients_updated(&TauriEventEmitter(app.clone()), "servers_changed");
-                let _ = enabling;
-                let _ = server_name;
-                return Ok(());
-            }
-        }
-
         let enabling = config.enabled;
         let server_name = item.name.clone();
         *item = config;
