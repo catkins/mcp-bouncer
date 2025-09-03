@@ -326,7 +326,7 @@ where
     let local = listener.local_addr().map_err(|e| e.to_string())?;
     // Record the runtime-bound address for UI/commands to query
     set_runtime_listen_addr(local);
-    println!("[server] proxy listening on http://{}:{}/mcp", local.ip(), local.port());
+    tracing::info!(target = "server", "proxy listening on http://{}:{}/mcp", local.ip(), local.port());
     let handle = tokio::spawn(async move {
         let _ = axum::serve(listener, router).await;
     });

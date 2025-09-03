@@ -35,7 +35,7 @@ fn spawn_mcp_proxy(app: &tauri::AppHandle) {
         )
         .await
         {
-            eprintln!("[server] bind {primary} failed: {e}; falling back to ephemeral port");
+            tracing::warn!("[server] bind {} failed: {}; falling back to ephemeral port", primary, e);
             let _ = start_http_server(
                 mcp_bouncer::events::TauriEventEmitter(app_handle.clone()),
                 mcp_bouncer::config::OsConfigProvider,
@@ -258,7 +258,7 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
     cfg: &MCPServerConfig,
 ) {
     use mcp_bouncer::overlay as ov;
-    println!("[lifecycle] connect_and_initialize -> '{}'", name);
+    tracing::info!(target = "lifecycle", "connect_and_initialize -> '{}'", name);
     ov::set_state(name, ClientConnectionState::Connecting).await;
     ov::set_error(name, None).await;
     client_status_changed(emitter, name, "connecting");
@@ -276,7 +276,7 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
                             ov::set_auth_required(name, false).await;
                         }
                     }
-                    println!("[lifecycle] '{}' connected ({} tools)", name, tools.len());
+                    tracing::info!(target = "lifecycle", "'{}' connected ({} tools)", name, tools.len());
                     client_status_changed(emitter, name, "connected");
                 }
                 Err(e) => {
@@ -292,7 +292,7 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
                     }
                     ov::set_error(name, Some(e.to_string())).await;
                     ov::set_state(name, ClientConnectionState::Errored).await;
-                    println!("[lifecycle] '{}' error during initialize", name);
+                    tracing::warn!(target = "lifecycle", "'{}' error during initialize", name);
                     client_status_changed(emitter, name, "error");
                 }
             }
@@ -309,7 +309,7 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
             ov::set_error(name, Some(e.to_string())).await;
             ov::set_state(name, ClientConnectionState::Errored).await;
             client_error(emitter, name, "enable", &e.to_string());
-            println!("[lifecycle] '{}' failed to start: {}", name, e);
+            tracing::error!(target = "lifecycle", "'{}' failed to start: {}", name, e);
             client_status_changed(emitter, name, "error");
         }
     }
@@ -356,6 +356,11 @@ async fn settings_update_settings(
 }
 
 fn main() {
+    // Initialize structured logging via tracing with env filter.
+    // Configure via RUST_LOG, e.g., RUST_LOG=info,mcp_bouncer=debug
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .try_init();
     tauri::Builder::default()
         // Shell plugin is commonly needed to open links, etc.
         .plugin(tauri_plugin_shell::init())

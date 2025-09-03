@@ -107,7 +107,7 @@ pub async fn start_oauth_for_server<E: EventEmitter>(
     );
     let server = tokio::spawn(async move {
         if let Err(e) = axum::serve(listener, app).await {
-            eprintln!("callback server error: {e}");
+            tracing::error!(target = "oauth", "callback server error: {}", e);
         }
     });
     drop(server); // detach task

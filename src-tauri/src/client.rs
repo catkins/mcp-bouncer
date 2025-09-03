@@ -34,10 +34,7 @@ pub async fn ensure_rmcp_client(
     let reg = client_registry();
     let mut guard = reg.lock().await;
     if let Some(c) = guard.get(name) { return Ok(c.clone()); }
-    println!(
-        "[client] starting '{}' with transport {:?}",
-        name, cfg.transport
-    );
+    tracing::info!(target = "client", "starting '{}' with transport {:?}", name, cfg.transport);
     let service = match cfg.transport {
         Some(TransportType::StreamableHttp) => {
             let endpoint = cfg.endpoint.clone().unwrap_or_default();
@@ -127,7 +124,7 @@ pub async fn ensure_rmcp_client(
     };
     let arc = Arc::new(service);
     guard.insert(name.to_string(), arc.clone());
-    println!("[client] '{}' registered", name);
+    tracing::info!(target = "client", "'{}' registered", name);
     Ok(arc)
 }
 
@@ -135,7 +132,7 @@ pub async fn remove_rmcp_client(name: &str) -> Result<()> {
     let reg = client_registry();
     let mut guard = reg.lock().await;
     if let Some(service) = guard.remove(name) {
-        println!("[client] stopping '{}'", name);
+        tracing::info!(target = "client", "stopping '{}'", name);
         service.cancellation_token().cancel();
     }
     Ok(())
