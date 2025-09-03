@@ -165,8 +165,6 @@ async fn mcp_toggle_server_enabled(
         item.enabled = enabled;
         let _ = item;
         save_settings(&s)?;
-        // notify UI that servers changed first
-        servers_updated(&TauriEventEmitter(app.clone()), "toggle");
         if enabled {
             if let Some(cfg) = get_server_by_name(&server_name) {
                 connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg).await;
