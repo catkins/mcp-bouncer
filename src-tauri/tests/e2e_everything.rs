@@ -4,7 +4,7 @@ use mcp_bouncer::config::{
 use mcp_bouncer::{events::EventEmitter, server::start_http_server};
 use rmcp::ServiceExt;
 use rmcp::model as mcp;
-use rmcp::transport::StreamableHttpClientTransport;
+use rmcp::transport::{StreamableHttpClientTransport, streamable_http_server::{StreamableHttpService, StreamableHttpServerConfig, session::local::LocalSessionManager}};
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -33,33 +33,59 @@ impl ConfigProvider for TempConfigProvider {
     }
 }
 
-// This test requires Node/npm and network access to install @modelcontextprotocol/server-everything.
 #[tokio::test]
-async fn e2e_list_and_echo_with_everything_server() {
-    // Require npx to be available
-    assert!(
-        std::process::Command::new("npx")
-            .arg("--version")
-            .status()
-            .ok()
-            .filter(|s| s.success())
-            .is_some(),
-        "npx must be installed and available on PATH"
+async fn e2e_list_and_echo_hermetic_http() {
+// Start an in-process upstream HTTP MCP server exposing an echo tool
+    #[derive(Clone)]
+    struct Upstream;
+    impl rmcp::handler::server::ServerHandler for Upstream {
+        fn get_info(&self) -> mcp::ServerInfo {
+            mcp::ServerInfo {
+                protocol_version: mcp::ProtocolVersion::V_2025_03_26,
+                capabilities: mcp::ServerCapabilities::builder().enable_tools().enable_tool_list_changed().build(),
+                server_info: mcp::Implementation { name: "up".into(), version: "0.0.1".into() },
+                instructions: None,
+            }
+        }
+        fn list_tools(
+            &self,
+            _request: Option<mcp::PaginatedRequestParam>,
+            _context: rmcp::service::RequestContext<rmcp::RoleServer>,
+        ) -> impl core::future::Future<Output = Result<mcp::ListToolsResult, mcp::ErrorData>> + Send + '_ {
+            let schema: mcp::JsonObject = Default::default();
+            std::future::ready(Ok(mcp::ListToolsResult { tools: vec![mcp::Tool::new("echo", "echo", schema)], next_cursor: None }))
+        }
+        fn call_tool(
+            &self,
+            request: mcp::CallToolRequestParam,
+            _context: rmcp::service::RequestContext<rmcp::RoleServer>,
+        ) -> impl core::future::Future<Output = Result<mcp::CallToolResult, mcp::ErrorData>> + Send + '_ {
+            let msg = request.arguments.and_then(|m| m.get("message").and_then(|v| v.as_str()).map(|s| s.to_string())).unwrap_or_default();
+            std::future::ready(Ok(mcp::CallToolResult { content: vec![mcp::Content::text(msg)], structured_content: None, is_error: None }))
+        }
+    }
+
+    let upstream_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let upstream_addr = upstream_listener.local_addr().unwrap();
+    let upstream_service: StreamableHttpService<Upstream, LocalSessionManager> = StreamableHttpService::new(
+        || Ok(Upstream),
+        Default::default(),
+        StreamableHttpServerConfig { stateful_mode: true, sse_keep_alive: Some(std::time::Duration::from_secs(15)) },
     );
-    // Write settings with a single stdio server using npx @modelcontextprotocol/server-everything
+    let upstream_router = axum::Router::new().nest_service("/mcp", upstream_service);
+    tokio::spawn(async move { let _ = axum::serve(upstream_listener, upstream_router).await; });
+
+    // Write settings with a single HTTP upstream
     let cp = TempConfigProvider::new();
     let mut s = default_settings();
     s.mcp_servers.push(MCPServerConfig {
-        name: "everything".into(),
+        name: "up".into(),
         description: "test".into(),
-        transport: Some(TransportType::Stdio),
-        command: "npx".into(),
-        args: Some(vec![
-            "-y".into(),
-            "@modelcontextprotocol/server-everything".into(),
-        ]),
+        transport: Some(TransportType::StreamableHttp),
+        command: String::new(),
+        args: None,
         env: None,
-        endpoint: None,
+        endpoint: Some(format!("http://{}:{}/mcp", upstream_addr.ip(), upstream_addr.port())),
         headers: None,
         requires_auth: Some(false),
         enabled: true,
@@ -83,7 +109,7 @@ async fn e2e_list_and_echo_with_everything_server() {
     let client = ().serve(transport).await.expect("serve client");
 
     // List tools; expect everything::echo present (retry while upstream boots)
-    let echo_name = "everything::echo";
+    let echo_name = "up::echo";
     let start = std::time::Instant::now();
     let _names = loop {
         let tools = client.list_all_tools().await.expect("list tools");
