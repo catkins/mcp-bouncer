@@ -1,13 +1,7 @@
-use mcp_bouncer::config::{default_settings, save_settings_with, ClientConnectionState, ConfigProvider, MCPServerConfig, TransportType};
+use mcp_bouncer::config::{default_settings, save_settings_with, ClientConnectionState, MCPServerConfig, TransportType};
 use mcp_bouncer::status::compute_client_status_map_with;
-use std::fs;
-use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
-
-#[derive(Clone)]
-struct TestProvider { base: PathBuf }
-impl TestProvider { fn new() -> Self { let stamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos(); let dir = std::env::temp_dir().join(format!("mcp-bouncer-auth-{}-{}", std::process::id(), stamp)); fs::create_dir_all(&dir).unwrap(); Self{ base: dir } } }
-impl ConfigProvider for TestProvider { fn base_dir(&self) -> PathBuf { self.base.clone() } }
+mod common;
+use common::TestProvider;
 
 #[tokio::test]
 async fn mark_unauthorized_sets_state_and_clears_error() {
@@ -61,4 +55,3 @@ async fn authorizing_state_is_exposed() {
     let cs = map.get("srv2").expect("srv present");
     assert_eq!(cs.state, ClientConnectionState::Authorizing);
 }
-

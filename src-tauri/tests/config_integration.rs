@@ -1,12 +1,9 @@
-use std::{fs, path::PathBuf, time::{SystemTime, UNIX_EPOCH}};
+use std::fs;
 
-use mcp_bouncer::config::{ConfigProvider, MCPServerConfig, Settings, TransportType};
+use mcp_bouncer::config::{MCPServerConfig, Settings, TransportType};
 use mcp_bouncer::config::{default_settings, load_settings_with, save_settings_with, save_tools_toggle_with, tools_state_path};
-
-#[derive(Clone)]
-struct TestProvider { base: PathBuf }
-impl TestProvider { fn new() -> Self { let stamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis(); let dir = std::env::temp_dir().join(format!("mcp-bouncer-it-{}-{}", std::process::id(), stamp)); fs::create_dir_all(&dir).unwrap(); Self{ base: dir } } }
-impl ConfigProvider for TestProvider { fn base_dir(&self) -> PathBuf { self.base.clone() } }
+mod common;
+use common::TestProvider;
 
 #[test]
 fn settings_and_tools_persist() {
