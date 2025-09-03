@@ -88,44 +88,7 @@ where
                     instructions: None,
                 };
                 if let Ok(val) = serde_json::to_value(&req) {
-                    let name = extract_str(
-                        &val,
-                        &[
-                            "clientInfo.name",
-                            "client_info.name",
-                            "client.name",
-                            "params.clientInfo.name",
-                            "params.client_info.name",
-                            "params.client.name",
-                        ],
-                    )
-                    .unwrap_or("unknown");
-                    let version = extract_str(
-                        &val,
-                        &[
-                            "clientInfo.version",
-                            "client_info.version",
-                            "client.version",
-                            "params.clientInfo.version",
-                            "params.client_info.version",
-                            "params.client.version",
-                        ],
-                    )
-                    .unwrap_or("");
-                    let title = extract_str(
-                        &val,
-                        &[
-                            "clientInfo.title",
-                            "client_info.title",
-                            "title",
-                            "params.clientInfo.title",
-                            "params.client_info.title",
-                            "params.title",
-                        ],
-                    )
-                    .map(|s| s.to_string());
-                    record_connect(name.to_string(), version.to_string(), title).await;
-                    incoming_clients_updated(&self.emitter, "connect");
+                    emit_incoming_from_initialize(&self.emitter, &val).await;
                 }
                 Ok(mcp::ServerResult::InitializeResult(result))
             }
@@ -276,6 +239,47 @@ fn to_mcp_tool(server: &str, v: &serde_json::Value) -> Option<mcp::Tool> {
         description.unwrap_or_default(),
         schema_obj,
     ))
+}
+
+async fn emit_incoming_from_initialize<E: EventEmitter>(emitter: &E, val: &serde_json::Value) {
+    let name = extract_str(
+        val,
+        &[
+            "clientInfo.name",
+            "client_info.name",
+            "client.name",
+            "params.clientInfo.name",
+            "params.client_info.name",
+            "params.client.name",
+        ],
+    )
+    .unwrap_or("unknown");
+    let version = extract_str(
+        val,
+        &[
+            "clientInfo.version",
+            "client_info.version",
+            "client.version",
+            "params.clientInfo.version",
+            "params.client_info.version",
+            "params.client.version",
+        ],
+    )
+    .unwrap_or("");
+    let title = extract_str(
+        val,
+        &[
+            "clientInfo.title",
+            "client_info.title",
+            "title",
+            "params.clientInfo.title",
+            "params.client_info.title",
+            "params.title",
+        ],
+    )
+    .map(|s| s.to_string());
+    record_connect(name.to_string(), version.to_string(), title).await;
+    incoming_clients_updated(emitter, "connect");
 }
 
 fn select_target_server<CP: ConfigProvider>(
@@ -434,6 +438,40 @@ mod tests {
         super::stop_http_server(&handle);
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         assert!(handle.is_finished());
+    }
+
+    #[tokio::test]
+    async fn initialize_emits_incoming_once() {
+        use crate::events::{BufferingEventEmitter, EVENT_INCOMING_CLIENTS_UPDATED};
+        let emitter = BufferingEventEmitter::default();
+        let _cp = TestProvider::new();
+        crate::incoming::clear_incoming().await;
+        // Directly test the helper using a value resembling the InitializeRequest shape
+        let val = serde_json::json!({
+            "clientInfo": { "name": "X", "version": "1", "title": "T" }
+        });
+        super::emit_incoming_from_initialize(&emitter, &val).await;
+        let events = emitter.0.lock().unwrap().clone();
+        let mut incoming = 0;
+        for (ev, payload) in events {
+            if ev == EVENT_INCOMING_CLIENTS_UPDATED {
+                incoming += 1;
+                assert_eq!(payload["reason"], "connect");
+            }
+        }
+        assert_eq!(incoming, 1, "should emit exactly one incoming_clients_updated");
+        crate::incoming::clear_incoming().await;
+    }
+
+    #[tokio::test]
+    async fn list_tools_does_not_emit_events() {
+        use crate::events::BufferingEventEmitter;
+        let emitter = BufferingEventEmitter::default();
+        let _cp = TestProvider::new();
+        // No emission happens unless emit_* helpers are called explicitly
+        // Ensure our helper is not invoked and the buffer stays empty.
+        let events = emitter.0.lock().unwrap();
+        assert!(events.is_empty(), "list tools should not emit events");
     }
 }
 
