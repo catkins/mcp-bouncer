@@ -301,7 +301,7 @@ export function ServerForm({
             />
           )}
 
-          {/* OAuth no longer requires a manual toggle; inferred at connect time. */}
+
 
           {formData.transport === TransportType.Stdio && (
             <FormInput
