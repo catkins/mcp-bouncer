@@ -1,7 +1,7 @@
 steps:
   - label: ":test_tube: Backend Tests"
     commands:
-      - cargo clippy --manifest-path src-tauri/Cargo.toml
+      - cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
       - cargo test --manifest-path src-tauri/Cargo.toml --lib --tests
     plugins:
       - docker-compose#v5.10.0:

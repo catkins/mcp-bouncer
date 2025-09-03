@@ -57,5 +57,4 @@
     }
   ],
   "listen_addr": "localhost:8091",
-  "auto_start": false
 }

@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use axum::{
+    Json, Router,
     http::{HeaderMap, StatusCode},
     routing::{get, post},
-    Json, Router,
 };
 use rmcp::transport::{
     auth::{AuthClient, OAuthState, OAuthTokenResponse},
@@ -62,10 +62,7 @@ async fn auth_client_attaches_bearer_header() {
         "token_type": "Bearer"
     }))
     .unwrap();
-    state
-        .set_credentials("client", credentials)
-        .await
-        .unwrap();
+    state.set_credentials("client", credentials).await.unwrap();
     let manager = state.into_authorization_manager().unwrap();
     let client = AuthClient::new(reqwest::Client::new(), manager);
 

@@ -3,7 +3,7 @@ use mcp_bouncer::config::{MCPServerConfig, TransportType};
 
 #[tokio::test]
 async fn unsupported_transport_errors() {
-    let cfg = MCPServerConfig{
+    let cfg = MCPServerConfig {
         name: "x".into(),
         description: "d".into(),
         transport: None,
@@ -16,15 +16,15 @@ async fn unsupported_transport_errors() {
         enabled: true,
     };
     let err = ensure_rmcp_client(&cfg.name, &cfg).await.err().unwrap();
-    assert!(err.contains("unsupported"));
+    assert!(err.to_string().contains("unsupported"));
 }
 
 #[tokio::test]
 async fn missing_command_for_stdio_errors() {
-    let cfg = MCPServerConfig{
+    let cfg = MCPServerConfig {
         name: "x".into(),
         description: "d".into(),
-        transport: Some(TransportType::TransportStdio),
+        transport: Some(TransportType::Stdio),
         command: String::new(),
         args: None,
         env: None,
@@ -34,6 +34,5 @@ async fn missing_command_for_stdio_errors() {
         enabled: true,
     };
     let err = ensure_rmcp_client(&cfg.name, &cfg).await.err().unwrap();
-    assert!(err.contains("missing command"));
+    assert!(err.to_string().contains("missing command"));
 }
-

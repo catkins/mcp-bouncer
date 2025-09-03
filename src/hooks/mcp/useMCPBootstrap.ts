@@ -14,59 +14,68 @@ export function useMCPBootstrap(
     setError: (key: 'addServer' | 'updateServer' | 'removeServer' | 'general', error?: string) => void;
   },
 ) {
+  const {
+    setServers,
+    setSettings,
+    setMcpUrl,
+    setIsActive,
+    setClientStatus,
+    setLoading,
+    setError,
+  } = setters;
   const loadServers = useCallback(async () => {
     try {
-      setters.setLoading('general', true);
+      setLoading('general', true);
       const serverList = await MCPService.List();
       if (import.meta.env.DEV) console.log('Loaded servers:', serverList);
-      setters.setServers(serverList);
+      setServers(serverList);
     } catch (error) {
       console.error('Failed to load servers:', error);
-      setters.setError('general', 'Failed to load servers');
+      setError('general', 'Failed to load servers');
     } finally {
-      setters.setLoading('general', false);
+      setLoading('general', false);
     }
-  }, [setters]);
+  }, [setLoading, setServers, setError]);
 
   const loadSettings = useCallback(async () => {
     try {
       const currentSettings = await SettingsService.GetSettings();
-      setters.setSettings(currentSettings);
+      setSettings(currentSettings);
     } catch (error) {
       console.error('Failed to load settings:', error);
-      setters.setError('general', 'Failed to load settings');
+      setError('general', 'Failed to load settings');
     }
-  }, [setters]);
+  }, [setSettings, setError]);
 
   const loadMcpUrl = useCallback(async () => {
     try {
       const url = await MCPService.ListenAddr();
-      setters.setMcpUrl(url);
+      setMcpUrl(url);
     } catch (error) {
       console.error('Failed to load MCP URL:', error);
-      setters.setError('general', 'Failed to load MCP URL');
+      setError('general', 'Failed to load MCP URL');
     }
-  }, [setters]);
+  }, [setMcpUrl, setError]);
 
   const loadActive = useCallback(async () => {
     try {
       const active = await MCPService.IsActive();
-      setters.setIsActive(active);
+      setIsActive(active);
     } catch (error) {
       console.error('Failed to load active state:', error);
-      setters.setError('general', 'Failed to load service status');
+      setError('general', 'Failed to load service status');
     }
-  }, [setters]);
+  }, [setIsActive, setError]);
 
   const loadClientStatus = useCallback(async () => {
     try {
       const status = await MCPService.GetClientStatus();
-      setters.setClientStatus(status);
+      setClientStatus(status);
     } catch (error) {
       console.error('Failed to load client status:', error);
-      setters.setError('general', 'Failed to load client status');
+      setError('general', 'Failed to load client status');
     }
-  }, [setters]);
+  }, [setClientStatus, setError]);
 
   const init = useCallback(async () => {
     await loadSettings();
@@ -78,4 +87,3 @@ export function useMCPBootstrap(
 
   return { loadServers, loadSettings, loadMcpUrl, loadActive, loadClientStatus, init };
 }
-

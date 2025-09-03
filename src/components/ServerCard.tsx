@@ -109,6 +109,18 @@ export function ServerCard({
                   Error
                 </span>
               )}
+              {clientStatus.state === 'requires_authorization' && (
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full transition-all duration-200 bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-400 ${toggleLoading ? 'animate-pulse' : ''}`}>
+                  <KeyIcon className="w-3 h-3" />
+                  Authorization required
+                </span>
+              )}
+              {clientStatus.state === 'authorizing' && (
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full transition-all duration-200 bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-400 ${toggleLoading ? 'animate-pulse' : ''}`}>
+                  <ArrowPathIcon className="w-3 h-3 animate-spin" />
+                  Authorizing
+                </span>
+              )}
               {clientStatus.state === 'disconnected' && (
                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full transition-all duration-200 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-300 ${toggleLoading ? 'animate-pulse' : ''}`}>
                   <NoSymbolIcon className="w-3 h-3" />
@@ -132,7 +144,7 @@ export function ServerCard({
                   {clientStatus.tools}
                 </button>
               )}
-              {clientStatus.state !== 'connected' && clientStatus.authorization_required && (
+              {(clientStatus.state === 'requires_authorization' || (clientStatus.state !== 'connected' && clientStatus.authorization_required)) && (
                 <button
                   onClick={() => onAuthorize && onAuthorize(server.name)}
                   className={`inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-400 rounded-full text-xs font-medium transition-all duration-200 hover:bg-amber-200 dark:hover:bg-amber-800/70 hover:scale-105 active:scale-95 cursor-pointer ${
@@ -222,8 +234,13 @@ export function ServerCard({
         </div>
       )}
 
-      {/* Show client error if present */}
-      {server.enabled && clientStatus && clientStatus.last_error && !toggleError && (
+      {/* Show client error if present (but not when auth is required/authorizing) */}
+      {server.enabled &&
+        clientStatus &&
+        clientStatus.last_error &&
+        !toggleError &&
+        clientStatus.state !== 'requires_authorization' &&
+        clientStatus.state !== 'authorizing' && (
         <div className="mb-2 p-2 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-md animate-fadeIn">
           <div className="flex items-center gap-2 text-xs text-orange-600 dark:text-orange-400">
             <NoSymbolIcon className="w-3 h-3 flex-shrink-0" />

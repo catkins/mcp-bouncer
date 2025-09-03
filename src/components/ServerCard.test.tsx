@@ -10,7 +10,7 @@ afterEach(() => cleanup());
 const baseServer: MCPServerConfig = {
   name: 'svc',
   description: 'desc',
-  transport: TransportType.TransportStdio,
+  transport: TransportType.Stdio,
   command: 'cmd',
   args: [],
   env: {},
@@ -61,5 +61,47 @@ describe('ServerCard', () => {
     expect(
       screen.getByRole('button', { name: /authorize svc/i }),
     ).toBeInTheDocument();
+  });
+
+  it('shows requires_authorization badge and hides error banner on 401 state', () => {
+    const status: ClientStatus = {
+      name: 'svc',
+      state: 'requires_authorization',
+      tools: 0,
+      last_error: 'some error',
+      authorization_required: true,
+      oauth_authenticated: false,
+    };
+    render(
+      <ServerCard
+        server={{ ...baseServer, enabled: true }}
+        clientStatus={status}
+        onEdit={() => {}}
+        onRemove={async () => {}}
+        onToggle={async () => {}}
+      />,
+    );
+    expect(screen.getByText(/authorization required/i)).toBeInTheDocument();
+    expect(screen.queryByText(/connection error/i)).not.toBeInTheDocument();
+  });
+
+  it('shows authorizing badge when OAuth flow started', () => {
+    const status: ClientStatus = {
+      name: 'svc',
+      state: 'authorizing',
+      tools: 0,
+      authorization_required: true,
+      oauth_authenticated: false,
+    };
+    render(
+      <ServerCard
+        server={{ ...baseServer, enabled: true }}
+        clientStatus={status}
+        onEdit={() => {}}
+        onRemove={async () => {}}
+        onToggle={async () => {}}
+      />,
+    );
+    expect(screen.getByText(/authorizing/i)).toBeInTheDocument();
   });
 });

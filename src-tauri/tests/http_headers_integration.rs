@@ -1,13 +1,17 @@
 use std::collections::HashMap;
 
+use axum::Router;
 use mcp_bouncer::client::ensure_rmcp_client;
 use mcp_bouncer::config::{MCPServerConfig, TransportType};
 use rmcp::model as mcp;
+use rmcp::transport::streamable_http_server::{
+    StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
+};
 
 #[derive(Clone)]
-struct TestSseService;
+struct TestHttpService;
 
-impl rmcp::handler::server::ServerHandler for TestSseService {
+impl rmcp::handler::server::ServerHandler for TestHttpService {
     fn get_info(&self) -> mcp::ServerInfo {
         mcp::ServerInfo {
             protocol_version: mcp::ProtocolVersion::V_2025_03_26,
@@ -16,7 +20,7 @@ impl rmcp::handler::server::ServerHandler for TestSseService {
                 .enable_tool_list_changed()
                 .build(),
             server_info: mcp::Implementation {
-                name: "sse-test".into(),
+                name: "http-test".into(),
                 version: "0.0.1".into(),
             },
             instructions: None,
@@ -62,28 +66,35 @@ impl rmcp::handler::server::ServerHandler for TestSseService {
 }
 
 #[tokio::test]
-async fn sse_client_can_connect_list_tools_and_send_headers() {
-    // Start SSE server on ephemeral port
-    // Pick an available port by probing, then start server on that port
-    let probe = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let addr = probe.local_addr().unwrap();
-    drop(probe);
-    let server = rmcp::transport::SseServer::serve(addr)
-        .await
-        .expect("start sse server");
-    let _ct = server.with_service(|| TestSseService);
+async fn http_client_can_connect_list_tools_and_send_headers() {
+    // Start HTTP server at /mcp
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let service: StreamableHttpService<TestHttpService, LocalSessionManager> =
+        StreamableHttpService::new(
+            || Ok(TestHttpService),
+            Default::default(),
+            StreamableHttpServerConfig {
+                stateful_mode: true,
+                sse_keep_alive: Some(std::time::Duration::from_secs(15)),
+            },
+        );
+    let router = Router::new().nest_service("/mcp", service);
+    tokio::spawn(async move {
+        let _ = axum::serve(listener, router).await;
+    });
 
-    // Configure SSE client with custom headers
+    // Configure HTTP client with custom headers
     let mut headers = HashMap::new();
     headers.insert("x-test".to_string(), "yes".to_string());
     let cfg = MCPServerConfig {
-        name: "sse-upstream".into(),
+        name: "http-upstream".into(),
         description: "test".into(),
-        transport: Some(TransportType::Sse),
+        transport: Some(TransportType::StreamableHttp),
         command: String::new(),
         args: None,
         env: None,
-        endpoint: Some(format!("http://{}:{}/sse", addr.ip(), addr.port())),
+        endpoint: Some(format!("http://{}:{}/mcp", addr.ip(), addr.port())),
         headers: Some(headers),
         requires_auth: Some(false),
         enabled: true,
@@ -91,13 +102,13 @@ async fn sse_client_can_connect_list_tools_and_send_headers() {
 
     let client = ensure_rmcp_client(&cfg.name, &cfg)
         .await
-        .expect("ensure sse client");
+        .expect("ensure http client");
     // list tools
     let tools = client.list_all_tools().await.expect("list tools");
     let names: Vec<_> = tools.into_iter().map(|t| t.name.to_string()).collect();
     assert!(names.contains(&"echo".to_string()));
 
-    // call a tool and verify header observed by server
+    // call tool and verify header observed
     let res = client
         .call_tool(mcp::CallToolRequestParam {
             name: "echo".into(),
@@ -111,8 +122,5 @@ async fn sse_client_can_connect_list_tools_and_send_headers() {
         .filter_map(|c| c.as_text().map(|t| t.text.clone()))
         .collect::<Vec<_>>()
         .join("\n");
-    assert!(
-        text.contains("x-test:yes"),
-        "expected header value, got: {text}"
-    );
+    assert!(text.contains("x-test:yes"), "expected header, got: {text}");
 }

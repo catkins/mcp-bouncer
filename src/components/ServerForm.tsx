@@ -33,7 +33,7 @@ export function ServerForm({
   const [formData, setFormData] = useState<MCPServerConfig>({
     name: '',
     description: '',
-    transport: TransportType.TransportStdio,
+    transport: TransportType.Stdio,
     command: '',
     args: [],
     env: {},
@@ -92,14 +92,14 @@ export function ServerForm({
     }
 
     // Validate command for stdio transport
-    if (formData.transport === TransportType.TransportStdio && !formData.command.trim()) {
+    if (formData.transport === TransportType.Stdio && !formData.command.trim()) {
       newErrors.command = 'Command is required for stdio transport';
     }
 
     // Validate endpoint for HTTP transports
     if (
-      (formData.transport === TransportType.TransportSSE ||
-        formData.transport === TransportType.TransportStreamableHTTP) &&
+      (formData.transport === TransportType.Sse ||
+        formData.transport === TransportType.StreamableHttp) &&
       !formData.endpoint?.trim()
     ) {
       newErrors.endpoint = 'Endpoint is required for HTTP transports';
@@ -264,10 +264,10 @@ export function ServerForm({
                   // Clear validation errors when switching transport types
                   setErrors(prev => {
                     const newErrors = { ...prev };
-                    if (newTransport !== TransportType.TransportStdio) {
+                  if (newTransport !== TransportType.Stdio) {
                       delete newErrors.command;
                     }
-                    if (newTransport === TransportType.TransportStdio) {
+                    if (newTransport === TransportType.Stdio) {
                       delete newErrors.endpoint;
                     }
                     return newErrors;
@@ -275,16 +275,16 @@ export function ServerForm({
                 }}
                 className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-purple-500 dark:focus:border-purple-400 text-sm appearance-none cursor-pointer transition-all duration-200 hover:border-gray-400 dark:hover:border-gray-600"
               >
-                <option value={TransportType.TransportStdio}>stdio</option>
-                <option value={TransportType.TransportSSE}>sse</option>
-                <option value={TransportType.TransportStreamableHTTP}>streamable http</option>
+                <option value={TransportType.Stdio}>stdio</option>
+                <option value={TransportType.Sse}>sse</option>
+                <option value={TransportType.StreamableHttp}>streamable http</option>
               </select>
               <ChevronDownIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
             </div>
           </div>
 
-          {(formData.transport === TransportType.TransportSSE ||
-            formData.transport === TransportType.TransportStreamableHTTP) && (
+          {(formData.transport === TransportType.Sse ||
+            formData.transport === TransportType.StreamableHttp) && (
             <FormInput
               id="server-endpoint"
               label="Endpoint"
@@ -301,17 +301,9 @@ export function ServerForm({
             />
           )}
 
-          {formData.transport === TransportType.TransportStreamableHTTP && (
-            <ToggleSwitch
-              checked={formData.requires_auth || false}
-              onChange={checked => setFormData(prev => ({ ...prev, requires_auth: checked }))}
-              size="sm"
-              label="Requires Authorization (OAuth)"
-              description="Enable this if the server requires OAuth authentication"
-            />
-          )}
 
-          {formData.transport === TransportType.TransportStdio && (
+
+          {formData.transport === TransportType.Stdio && (
             <FormInput
               id="server-command"
               label="Command"
@@ -327,7 +319,7 @@ export function ServerForm({
             />
           )}
 
-          {formData.transport === TransportType.TransportStdio && (
+          {formData.transport === TransportType.Stdio && (
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
@@ -371,7 +363,7 @@ export function ServerForm({
             </div>
           )}
 
-          {formData.transport === TransportType.TransportStdio && (
+          {formData.transport === TransportType.Stdio && (
             <KeyValueList
               label="Environment Variables"
               items={formData.env || {}}
@@ -384,8 +376,8 @@ export function ServerForm({
             />
           )}
 
-          {(formData.transport === TransportType.TransportSSE ||
-            formData.transport === TransportType.TransportStreamableHTTP) && (
+          {(formData.transport === TransportType.Sse ||
+            formData.transport === TransportType.StreamableHttp) && (
             <KeyValueList
               label="HTTP Headers"
               items={formData.headers || {}}

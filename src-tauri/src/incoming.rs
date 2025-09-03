@@ -1,4 +1,7 @@
-use std::sync::{atomic::{AtomicU64, Ordering}, OnceLock};
+use std::sync::{
+    OnceLock,
+    atomic::{AtomicU64, Ordering},
+};
 
 use crate::config::IncomingClient;
 
@@ -59,6 +62,9 @@ mod tests {
         let list = list_incoming().await;
         assert_eq!(list.len(), 2);
         assert!(list.iter().any(|c| c.name == "client-a"));
-        assert!(list.iter().any(|c| c.name == "client-b" && c.title.as_deref() == Some("Title")));
+        assert!(
+            list.iter()
+                .any(|c| c.name == "client-b" && c.title.as_deref() == Some("Title"))
+        );
     }
 }

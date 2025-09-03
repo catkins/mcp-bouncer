@@ -4,9 +4,9 @@ import { invoke } from '@tauri-apps/api/core';
 
 // Shared types for frontend-backend communication
 export enum TransportType {
-  TransportStdio = 'stdio',
-  TransportSSE = 'sse',
-  TransportStreamableHTTP = 'streamable_http',
+  Stdio = 'stdio',
+  Sse = 'sse',
+  StreamableHttp = 'streamable_http',
 }
 
 export interface MCPServerConfig {
@@ -25,12 +25,11 @@ export interface MCPServerConfig {
 export interface Settings {
   mcp_servers: MCPServerConfig[];
   listen_addr: string;
-  auto_start: boolean;
 }
 
 export interface ClientStatus {
   name: string;
-  state: 'disconnected' | 'connecting' | 'errored' | 'connected';
+  state: 'disconnected' | 'connecting' | 'errored' | 'connected' | 'requires_authorization' | 'authorizing';
   tools: number;
   last_error?: string;
   authorization_required: boolean;
