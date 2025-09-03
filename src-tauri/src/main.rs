@@ -265,6 +265,14 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
             }
         }
         Err(e) => {
+            // If an unauthorized state was inferred (e.g., via HTTP probe), don't surface a noisy error.
+            let snap = mcp_bouncer::overlay::snapshot().await;
+            if let Some(ent) = snap.get(name) {
+                if ent.authorization_required || ent.state == ClientConnectionState::RequiresAuthorization {
+                    client_status_changed(emitter, name, "requires_authorization");
+                    return;
+                }
+            }
             ov::set_error(name, Some(e.clone())).await;
             ov::set_state(name, ClientConnectionState::Errored).await;
             client_error(emitter, name, "enable", &e);
