@@ -234,8 +234,13 @@ export function ServerCard({
         </div>
       )}
 
-      {/* Show client error if present */}
-      {server.enabled && clientStatus && clientStatus.last_error && !toggleError && (
+      {/* Show client error if present (but not when auth is required/authorizing) */}
+      {server.enabled &&
+        clientStatus &&
+        clientStatus.last_error &&
+        !toggleError &&
+        clientStatus.state !== 'requires_authorization' &&
+        clientStatus.state !== 'authorizing' && (
         <div className="mb-2 p-2 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-md animate-fadeIn">
           <div className="flex items-center gap-2 text-xs text-orange-600 dark:text-orange-400">
             <NoSymbolIcon className="w-3 h-3 flex-shrink-0" />
