@@ -14,7 +14,7 @@ use mcp_bouncer::events::{
 };
 use mcp_bouncer::incoming::list_incoming;
 use mcp_bouncer::oauth::start_oauth_for_server;
-use mcp_bouncer::server::start_http_server;
+use mcp_bouncer::server::{start_http_server, get_runtime_listen_addr};
 
 // ---------- Streamable HTTP MCP proxy (basic) ----------
 
@@ -55,6 +55,9 @@ async fn mcp_list() -> Result<Vec<MCPServerConfig>, String> {
 
 #[tauri::command]
 async fn mcp_listen_addr() -> Result<String, String> {
+    if let Some(addr) = get_runtime_listen_addr() {
+        return Ok(format!("http://{}:{}/mcp", addr.ip(), addr.port()));
+    }
     Ok(load_settings().listen_addr)
 }
 

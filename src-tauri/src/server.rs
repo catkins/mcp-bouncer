@@ -14,6 +14,17 @@ use crate::events::incoming_clients_updated;
 use crate::events::{EventEmitter};
 use crate::incoming::record_connect;
 
+// Runtime-bound listen address storage
+static RUNTIME_ADDR: std::sync::OnceLock<std::net::SocketAddr> = std::sync::OnceLock::new();
+
+pub fn set_runtime_listen_addr(addr: std::net::SocketAddr) {
+    let _ = RUNTIME_ADDR.set(addr);
+}
+
+pub fn get_runtime_listen_addr() -> Option<std::net::SocketAddr> {
+    RUNTIME_ADDR.get().copied()
+}
+
 // Helper: JSON path extraction for InitializeRequest params (duplicated from main for reuse)
 fn extract_str<'a>(val: &'a serde_json::Value, paths: &[&str]) -> Option<&'a str> {
     for path in paths {
@@ -225,6 +236,8 @@ where
     let router = Router::new().nest_service("/mcp", service);
     let listener = tokio::net::TcpListener::bind(addr).await.map_err(|e| e.to_string())?;
     let local = listener.local_addr().map_err(|e| e.to_string())?;
+    // Record the runtime-bound address for UI/commands to query
+    set_runtime_listen_addr(local);
     let handle = tokio::spawn(async move {
         let _ = axum::serve(listener, router).await;
     });
