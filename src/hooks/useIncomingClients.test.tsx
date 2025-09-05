@@ -18,7 +18,7 @@ vi.mock('../tauri/bridge', async () => {
 import { useIncomingClients } from './useIncomingClients';
 import { emit } from '@tauri-apps/api/event';
 import { mockIPC } from '@tauri-apps/api/mocks';
-import { EventsMap } from '../types/events';
+import { EVENT_INCOMING_CLIENT_CONNECTED, EVENT_INCOMING_CLIENT_DISCONNECTED } from '../tauri/events';
 
 function TestHarness({ onState }: { onState: (s: any) => void }) {
   const state = useIncomingClients();
@@ -45,7 +45,7 @@ describe('useIncomingClients', () => {
 
     // Emit connect event
     await act(async () => {
-      await emit(EventsMap.IncomingClientConnected, {
+      await emit(EVENT_INCOMING_CLIENT_CONNECTED, {
         id: 'c1',
         name: 'client',
         version: '1.0.0',
@@ -60,7 +60,7 @@ describe('useIncomingClients', () => {
 
     // Emit disconnect event
     await act(async () => {
-      await emit(EventsMap.IncomingClientDisconnected, { id: 'c1' });
+      await emit(EVENT_INCOMING_CLIENT_DISCONNECTED, { id: 'c1' });
     });
 
     await waitFor(() => {

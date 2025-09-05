@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { MCPService, type IncomingClient as IncomingClientType } from '../tauri/bridge';
-import { listen } from '@tauri-apps/api/event';
+import { on, safeUnlisten, EVENT_INCOMING_CLIENT_CONNECTED, EVENT_INCOMING_CLIENT_DISCONNECTED, EVENT_INCOMING_CLIENTS_UPDATED } from '../tauri/events';
 import { normalizeConnectedAt } from '../utils/date';
-import { EventsMap, type IncomingClientConnectedPayload, type IncomingClientDisconnectedPayload } from '../types/events';
+import type { IncomingClientConnectedPayload, IncomingClientDisconnectedPayload } from '../types/events';
 
 export type IncomingClient = IncomingClientType;
 
@@ -29,7 +29,7 @@ export function useIncomingClients() {
     let cancelled = false;
     const unsubs: Array<() => void> = [];
 
-    const unsub1Promise = listen<IncomingClientConnectedPayload>(EventsMap.IncomingClientConnected, async (e) => {
+    const unsub1Promise = on<IncomingClientConnectedPayload>(EVENT_INCOMING_CLIENT_CONNECTED, async (e) => {
       const data = e.payload;
       setClients(prev => {
         const rest = prev.filter(c => c.id !== data.id);
@@ -46,12 +46,12 @@ export function useIncomingClients() {
       });
     });
 
-    const unsub2Promise = listen<IncomingClientDisconnectedPayload>(EventsMap.IncomingClientDisconnected, async (e) => {
+    const unsub2Promise = on<IncomingClientDisconnectedPayload>(EVENT_INCOMING_CLIENT_DISCONNECTED, async (e) => {
       const data = e.payload;
       setClients(prev => prev.filter(c => c.id !== data.id));
     });
 
-    const unsub3Promise = listen(EventsMap.IncomingClientsUpdated, async () => {
+    const unsub3Promise = on(EVENT_INCOMING_CLIENTS_UPDATED, async () => {
       await reload();
     });
 
@@ -59,18 +59,6 @@ export function useIncomingClients() {
     unsub1Promise.then(u => (cancelled ? (void safeUnlisten(u)) : unsubs.push(u))).catch(() => {});
     unsub2Promise.then(u => (cancelled ? (void safeUnlisten(u)) : unsubs.push(u))).catch(() => {});
     unsub3Promise.then(u => (cancelled ? (void safeUnlisten(u)) : unsubs.push(u))).catch(() => {});
-
-    function safeUnlisten(u: () => void | Promise<void>) {
-      try {
-        const res = u();
-        // In Tauri v2, unlisten may return a Promise
-        if (res && typeof (res as any).then === 'function') {
-          (res as Promise<void>).catch(() => {});
-        }
-      } catch {
-        // noop
-      }
-    }
 
     return () => {
       cancelled = true;

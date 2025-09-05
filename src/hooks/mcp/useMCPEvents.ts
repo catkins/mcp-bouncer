@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import { listen } from '@tauri-apps/api/event';
-import { EventsMap, type ClientErrorPayload } from '../../types/events';
+import type { ClientErrorPayload } from '../../types/events';
+import { on, safeUnlisten, EVENT_SERVERS_UPDATED, EVENT_SETTINGS_UPDATED, EVENT_CLIENT_STATUS_CHANGED, EVENT_CLIENT_ERROR } from '../../tauri/events';
 
 export function useMCPEvents({
   loadServers,
@@ -23,48 +23,24 @@ export function useMCPEvents({
 }) {
   useEffect(() => {
     const unsubs: Array<() => void> = [];
-    const runUnlisten = (u: () => void) => {
-      try {
-        const maybe: any = (u as any)();
-        if (maybe && typeof maybe.catch === 'function') (maybe as Promise<void>).catch(() => {});
-      } catch {
-        // noop
-      }
-    };
     let cancelled = false;
 
-    listen(EventsMap.ServersUpdated, async (event) => {
+    on(EVENT_SERVERS_UPDATED, async (event) => {
       if (import.meta.env.DEV) console.log('Received mcp:servers_updated event:', event);
       await loadServers();
       await loadActive();
       await loadClientStatus();
-    })
-      .then(u => {
-        if (cancelled) {
-          runUnlisten(u);
-        } else {
-          unsubs.push(u);
-        }
-      })
-      .catch(() => {});
+    }).then(u => (cancelled ? safeUnlisten(u) : unsubs.push(u))).catch(() => {});
 
-    listen(EventsMap.SettingsUpdated, async (event) => {
+    on(EVENT_SETTINGS_UPDATED, async (event) => {
       if (import.meta.env.DEV) console.log('Received settings:updated event:', event);
       await loadSettings();
       await loadMcpUrl();
       await loadServers();
       await loadClientStatus();
-    })
-      .then(u => {
-        if (cancelled) {
-          runUnlisten(u);
-        } else {
-          unsubs.push(u);
-        }
-      })
-      .catch(() => {});
+    }).then(u => (cancelled ? safeUnlisten(u) : unsubs.push(u))).catch(() => {});
 
-    listen(EventsMap.ClientStatusChanged, async (event) => {
+    on(EVENT_CLIENT_STATUS_CHANGED, async (event) => {
       if (import.meta.env.DEV) console.log('Received mcp:client_status_changed event:', event);
       await loadClientStatus();
       const payload = (event?.payload || {}) as { server_name?: string; action?: string };
@@ -74,32 +50,16 @@ export function useMCPEvents({
         clearToggleLoading?.(server);
         clearRestartLoading?.(server);
       }
-    })
-      .then(u => {
-        if (cancelled) {
-          runUnlisten(u);
-        } else {
-          unsubs.push(u);
-        }
-      })
-      .catch(() => {});
+    }).then(u => (cancelled ? safeUnlisten(u) : unsubs.push(u))).catch(() => {});
 
-    listen<ClientErrorPayload>(EventsMap.ClientError, async (event) => {
+    on<ClientErrorPayload>(EVENT_CLIENT_ERROR, async (event) => {
       if (import.meta.env.DEV) console.log('Received mcp:client_error event:', event);
       const data = event.payload;
       if (data && data.server_name) {
         setToggleError(data.server_name, `${data.action} failed: ${data.error}`);
         await loadClientStatus();
       }
-    })
-      .then(u => {
-        if (cancelled) {
-          try { u(); } catch { /* noop */ }
-        } else {
-          unsubs.push(u);
-        }
-      })
-      .catch(() => {});
+    }).then(u => (cancelled ? safeUnlisten(u) : unsubs.push(u))).catch(() => {});
 
     // Poll client status every 5s as a safety net
     let ticking = false;
@@ -120,7 +80,7 @@ export function useMCPEvents({
       // drain and unlisten safely
       while (unsubs.length) {
         const u = unsubs.pop();
-        if (u) runUnlisten(u);
+        if (u) safeUnlisten(u);
       }
       clearInterval(intervalId);
     };
