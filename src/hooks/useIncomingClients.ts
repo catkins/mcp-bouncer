@@ -56,12 +56,20 @@ export function useIncomingClients() {
     });
 
     // capture unsubs when ready; if already cancelled, unlisten immediately
-    unsub1Promise.then(u => (cancelled ? (void (safeUnlisten(u))) : unsubs.push(u))).catch(() => {});
-    unsub2Promise.then(u => (cancelled ? (void (safeUnlisten(u))) : unsubs.push(u))).catch(() => {});
-    unsub3Promise.then(u => (cancelled ? (void (safeUnlisten(u))) : unsubs.push(u))).catch(() => {});
+    unsub1Promise.then(u => (cancelled ? (void safeUnlisten(u)) : unsubs.push(u))).catch(() => {});
+    unsub2Promise.then(u => (cancelled ? (void safeUnlisten(u)) : unsubs.push(u))).catch(() => {});
+    unsub3Promise.then(u => (cancelled ? (void safeUnlisten(u)) : unsubs.push(u))).catch(() => {});
 
-    function safeUnlisten(u: () => void) {
-      try { u(); } catch { /* noop */ }
+    function safeUnlisten(u: () => void | Promise<void>) {
+      try {
+        const res = u();
+        // In Tauri v2, unlisten may return a Promise
+        if (res && typeof (res as any).then === 'function') {
+          (res as Promise<void>).catch(() => {});
+        }
+      } catch {
+        // noop
+      }
     }
 
     return () => {

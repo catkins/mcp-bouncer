@@ -23,6 +23,14 @@ export function useMCPEvents({
 }) {
   useEffect(() => {
     const unsubs: Array<() => void> = [];
+    const runUnlisten = (u: () => void) => {
+      try {
+        const maybe: any = (u as any)();
+        if (maybe && typeof maybe.catch === 'function') (maybe as Promise<void>).catch(() => {});
+      } catch {
+        // noop
+      }
+    };
     let cancelled = false;
 
     listen(EventsMap.ServersUpdated, async (event) => {
@@ -33,7 +41,7 @@ export function useMCPEvents({
     })
       .then(u => {
         if (cancelled) {
-          try { u(); } catch { /* noop */ }
+          runUnlisten(u);
         } else {
           unsubs.push(u);
         }
@@ -49,7 +57,7 @@ export function useMCPEvents({
     })
       .then(u => {
         if (cancelled) {
-          try { u(); } catch { /* noop */ }
+          runUnlisten(u);
         } else {
           unsubs.push(u);
         }
@@ -69,7 +77,7 @@ export function useMCPEvents({
     })
       .then(u => {
         if (cancelled) {
-          try { u(); } catch { /* noop */ }
+          runUnlisten(u);
         } else {
           unsubs.push(u);
         }
@@ -112,7 +120,7 @@ export function useMCPEvents({
       // drain and unlisten safely
       while (unsubs.length) {
         const u = unsubs.pop();
-        try { u && u(); } catch { /* noop */ }
+        if (u) runUnlisten(u);
       }
       clearInterval(intervalId);
     };
