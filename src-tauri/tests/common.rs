@@ -27,6 +27,12 @@ impl TestProvider {
     }
 }
 
+impl Default for TestProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ConfigProvider for TestProvider {
     fn base_dir(&self) -> PathBuf {
         self.base.clone()
