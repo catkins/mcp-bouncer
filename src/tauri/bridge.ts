@@ -1,64 +1,52 @@
 // Tauri v2 bridge: exports MCPService, SettingsService, and shared types.
 
 import { invoke } from '@tauri-apps/api/core';
+import { z } from 'zod';
+import {
+  MCPServerConfigSchema,
+  SettingsSchema,
+  ClientStatusSchema,
+  IncomingClientSchema,
+  ToolSchema,
+} from '../types/schemas';
 
 // Shared types for frontend-backend communication
-export enum TransportType {
-  Stdio = 'stdio',
-  Sse = 'sse',
-  StreamableHttp = 'streamable_http',
-}
+export const TransportType = {
+  Stdio: 'stdio',
+  Sse: 'sse',
+  StreamableHttp: 'streamable_http',
+} as const;
+export type TransportType = typeof TransportType[keyof typeof TransportType];
 
-export interface MCPServerConfig {
-  name: string;
-  description: string;
-  transport: TransportType | '';
-  command: string;
-  args?: string[];
-  env?: Record<string, string>;
-  endpoint?: string;
-  headers?: Record<string, string>;
-  requires_auth?: boolean;
-  enabled: boolean;
-}
+export type MCPServerConfig = z.infer<typeof MCPServerConfigSchema>;
 
-export interface Settings {
-  mcp_servers: MCPServerConfig[];
-  listen_addr: string;
-}
+export type Settings = z.infer<typeof SettingsSchema>;
 
-export interface ClientStatus {
-  name: string;
-  state: 'disconnected' | 'connecting' | 'errored' | 'connected' | 'requires_authorization' | 'authorizing';
-  tools: number;
-  last_error?: string;
-  authorization_required: boolean;
-  oauth_authenticated: boolean;
-}
+export type ClientStatus = z.infer<typeof ClientStatusSchema>;
 
-export type IncomingClient = {
-  id: string;
-  name: string;
-  version: string;
-  title?: string;
-  connected_at: string | Date | null;
-};
+export type IncomingClient = z.infer<typeof IncomingClientSchema>;
+export type Tool = z.infer<typeof ToolSchema>;
 
 export const MCPService = {
   async List(): Promise<MCPServerConfig[]> {
-    return invoke('mcp_list');
+    const raw = await invoke('mcp_list');
+    return z.array(MCPServerConfigSchema).parse(raw);
   },
   async ListenAddr(): Promise<string> {
-    return invoke('mcp_listen_addr');
+    const raw = await invoke('mcp_listen_addr');
+    return z.string().parse(raw);
   },
   async IsActive(): Promise<boolean> {
-    return invoke('mcp_is_active');
+    const raw = await invoke('mcp_is_active');
+    return z.boolean().parse(raw);
   },
   async GetClientStatus(): Promise<Record<string, ClientStatus>> {
-    return invoke('mcp_get_client_status');
+    const raw = await invoke('mcp_get_client_status');
+    return z.record(ClientStatusSchema).parse(raw);
   },
   async GetIncomingClients(): Promise<IncomingClient[]> {
-    return invoke('mcp_get_incoming_clients');
+    const raw = await invoke('mcp_get_incoming_clients');
+    return z.array(IncomingClientSchema).parse(raw);
   },
   async AddMCPServer(config: MCPServerConfig): Promise<void> {
     return invoke('mcp_add_server', { config });
@@ -78,8 +66,10 @@ export const MCPService = {
   async StartOAuth(name: string): Promise<void> {
     return invoke('mcp_start_oauth', { name });
   },
-  async GetClientTools(clientName: string): Promise<any[]> {
-    return invoke('mcp_get_client_tools', { clientName });
+  async GetClientTools(clientName: string): Promise<Tool[]> {
+    const raw = await invoke('mcp_get_client_tools', { clientName });
+    // Accept both exact shape and lenient entries but require a string `name` at minimum
+    return z.array(ToolSchema).parse(raw);
   },
   async ToggleTool(clientName: string, toolName: string, enabled: boolean): Promise<void> {
     return invoke('mcp_toggle_tool', { clientName, toolName, enabled });
@@ -88,7 +78,9 @@ export const MCPService = {
 
 export const SettingsService = {
   async GetSettings(): Promise<Settings | null> {
-    return invoke('settings_get_settings');
+    const raw = await invoke('settings_get_settings');
+    if (raw == null) return null;
+    return SettingsSchema.parse(raw);
   },
   async OpenConfigDirectory(): Promise<void> {
     return invoke('settings_open_config_directory');

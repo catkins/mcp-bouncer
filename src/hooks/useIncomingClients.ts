@@ -1,23 +1,17 @@
 import { useEffect, useState } from 'react';
-import { MCPService } from '../tauri/bridge';
+import { MCPService, type IncomingClient as IncomingClientType } from '../tauri/bridge';
 import { listen } from '@tauri-apps/api/event';
 import { normalizeConnectedAt } from '../utils/date';
 import { EventsMap, type IncomingClientConnectedPayload, type IncomingClientDisconnectedPayload } from '../types/events';
 
-export type IncomingClient = {
-  id: string;
-  name: string;
-  version: string;
-  title?: string;
-  connected_at: string | Date | null;
-};
+export type IncomingClient = IncomingClientType;
 
 export function useIncomingClients() {
   const [clients, setClients] = useState<IncomingClient[]>([]);
 
   const reload = async () => {
     try {
-      const list = (await MCPService.GetIncomingClients()) as any[];
+      const list = await MCPService.GetIncomingClients();
       setClients(
         list.map(item => ({
           ...item,

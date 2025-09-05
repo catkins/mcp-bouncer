@@ -1,14 +1,10 @@
 import { useState, useEffect } from 'react';
 import { XMarkIcon, WrenchScrewdriverIcon, PowerIcon } from '@heroicons/react/24/outline';
-import { MCPService } from '../tauri/bridge';
+import { MCPService, type Tool } from '../tauri/bridge';
 import { ToggleSwitch } from './ToggleSwitch';
 import { LoadingButton } from './LoadingButton';
 
-interface Tool {
-  name: string;
-  description: string;
-  inputSchema?: any;
-}
+// Tool type comes from backend schema via bridge
 
 interface ToolsModalProps {
   serverName: string;
@@ -35,11 +31,11 @@ export function ToolsModal({ serverName, isOpen, onClose }: ToolsModalProps) {
       setLoading(true);
       setError('');
       const toolsData = await MCPService.GetClientTools(serverName);
-      setTools(toolsData as Tool[]);
+      setTools(toolsData);
 
       // Initialize all tools as enabled by default
       const initialStates: { [key: string]: boolean } = {};
-      toolsData.forEach((tool: any) => {
+      toolsData.forEach((tool) => {
         initialStates[tool.name] = true;
       });
       setToolStates(initialStates);
