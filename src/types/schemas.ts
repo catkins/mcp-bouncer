@@ -5,13 +5,37 @@ export const TransportTypeSchema = z.enum(['stdio', 'sse', 'streamable_http']);
 export const MCPServerConfigSchema = z.object({
   name: z.string(),
   description: z.string(),
-  transport: TransportTypeSchema.or(z.literal('')).optional().transform((v) => (v === '' ? undefined : v)),
+  transport: TransportTypeSchema
+    .or(z.literal(''))
+    .nullable()
+    .optional()
+    .transform((v) => (v === '' || v == null ? undefined : v)),
   command: z.string(),
-  args: z.array(z.string()).optional(),
-  env: z.record(z.string()).optional(),
-  endpoint: z.string().optional(),
-  headers: z.record(z.string()).optional(),
-  requires_auth: z.boolean().optional(),
+  args: z
+    .array(z.string())
+    .nullable()
+    .optional()
+    .transform((v) => (v == null ? undefined : v)),
+  env: z
+    .record(z.string())
+    .nullable()
+    .optional()
+    .transform((v) => (v == null ? undefined : v)),
+  endpoint: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((v) => (v == null ? undefined : v)),
+  headers: z
+    .record(z.string())
+    .nullable()
+    .optional()
+    .transform((v) => (v == null ? undefined : v)),
+  requires_auth: z
+    .boolean()
+    .nullable()
+    .optional()
+    .transform((v) => (v == null ? undefined : v)),
   enabled: z.boolean(),
 });
 
@@ -52,4 +76,3 @@ export type Settings = z.infer<typeof SettingsSchema>;
 export type ClientStatus = z.infer<typeof ClientStatusSchema>;
 export type IncomingClient = z.infer<typeof IncomingClientSchema>;
 export type Tool = z.infer<typeof ToolSchema>;
-
