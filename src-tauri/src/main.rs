@@ -116,29 +116,28 @@ async fn mcp_update_server(
         // notify UI that servers changed
         app_logic::notify_servers_changed(&TauriEventEmitter(app.clone()), "update");
         // try to connect if enabling
-        if enabling {
-            if let Some(cfg) = get_server_by_name(&server_name) {
-                // If HTTP transport requires auth and no credentials, gate and mark unauthorized
-                if matches!(
-                    cfg.transport,
-                    Some(mcp_bouncer::config::TransportType::StreamableHttp)
-                ) && cfg.requires_auth.unwrap_or(false)
-                    && mcp_bouncer::oauth::load_credentials_for(
-                        &mcp_bouncer::config::OsConfigProvider,
-                        &server_name,
-                    )
-                    .is_none()
-                {
-                    mcp_bouncer::overlay::mark_unauthorized(&server_name).await;
-                    client_status_changed(
-                        &TauriEventEmitter(app.clone()),
-                        &server_name,
-                        "requires_authorization",
-                    );
-                } else {
-                    connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg)
-                        .await;
-                }
+        if let Some(cfg) = get_server_by_name(&server_name)
+            && enabling
+        {
+            // If HTTP transport requires auth and no credentials, gate and mark unauthorized
+            if matches!(
+                cfg.transport,
+                Some(mcp_bouncer::config::TransportType::StreamableHttp)
+            ) && cfg.requires_auth.unwrap_or(false)
+                && mcp_bouncer::oauth::load_credentials_for(
+                    &mcp_bouncer::config::OsConfigProvider,
+                    &server_name,
+                )
+                .is_none()
+            {
+                mcp_bouncer::overlay::mark_unauthorized(&server_name).await;
+                client_status_changed(
+                    &TauriEventEmitter(app.clone()),
+                    &server_name,
+                    "requires_authorization",
+                );
+            } else {
+                connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg).await;
             }
         }
         Ok(())
@@ -328,13 +327,12 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
                         unauthorized::on_possible_unauthorized(name, cfg.endpoint.as_deref()).await;
                     }
                     let snap = mcp_bouncer::overlay::snapshot().await;
-                    if let Some(ent) = snap.get(name) {
-                        if ent.authorization_required
-                            || ent.state == ClientConnectionState::RequiresAuthorization
-                        {
-                            client_status_changed(emitter, name, "requires_authorization");
-                            return;
-                        }
+                    if let Some(ent) = snap.get(name)
+                        && (ent.authorization_required
+                            || ent.state == ClientConnectionState::RequiresAuthorization)
+                    {
+                        client_status_changed(emitter, name, "requires_authorization");
+                        return;
                     }
                     ov::set_error(name, Some(e.to_string())).await;
                     ov::set_state(name, ClientConnectionState::Errored).await;
@@ -346,13 +344,12 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
         Err(e) => {
             // If an unauthorized state was inferred (e.g., via HTTP probe), don't surface a noisy error.
             let snap = mcp_bouncer::overlay::snapshot().await;
-            if let Some(ent) = snap.get(name) {
-                if ent.authorization_required
-                    || ent.state == ClientConnectionState::RequiresAuthorization
-                {
-                    client_status_changed(emitter, name, "requires_authorization");
-                    return;
-                }
+            if let Some(ent) = snap.get(name)
+                && (ent.authorization_required
+                    || ent.state == ClientConnectionState::RequiresAuthorization)
+            {
+                client_status_changed(emitter, name, "requires_authorization");
+                return;
             }
             ov::set_error(name, Some(e.to_string())).await;
             ov::set_state(name, ClientConnectionState::Errored).await;

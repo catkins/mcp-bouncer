@@ -97,10 +97,10 @@ pub fn settings_path(cp: &dyn ConfigProvider) -> PathBuf {
 
 pub fn load_settings_with(cp: &dyn ConfigProvider) -> Settings {
     let path = settings_path(cp);
-    if let Ok(content) = fs::read_to_string(&path) {
-        if let Ok(s) = serde_json::from_str::<Settings>(&content) {
-            return s;
-        }
+    if let Ok(content) = fs::read_to_string(&path)
+        && let Ok(s) = serde_json::from_str::<Settings>(&content)
+    {
+        return s;
     }
     default_settings()
 }
@@ -133,10 +133,10 @@ pub fn tools_state_path(cp: &dyn ConfigProvider) -> PathBuf {
 
 pub fn load_tools_state_with(cp: &dyn ConfigProvider) -> ToolsState {
     let path = tools_state_path(cp);
-    if let Ok(content) = fs::read_to_string(&path) {
-        if let Ok(s) = serde_json::from_str::<ToolsState>(&content) {
-            return s;
-        }
+    if let Ok(content) = fs::read_to_string(&path)
+        && let Ok(s) = serde_json::from_str::<ToolsState>(&content)
+    {
+        return s;
     }
     ToolsState::default()
 }
