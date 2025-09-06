@@ -15,6 +15,10 @@ use mcp_bouncer::server::{get_runtime_listen_addr, start_http_server};
 use mcp_bouncer::unauthorized;
 use serde::Serialize;
 use specta::Type;
+#[cfg(debug_assertions)]
+use specta_typescript::Typescript;
+#[cfg(debug_assertions)]
+use tauri_specta::{Builder as SpectaBuilder, collect_commands};
 
 // ---------- Streamable HTTP MCP proxy (basic) ----------
 
@@ -451,6 +455,32 @@ fn main() {
         .with_target(true)
         .pretty()
         .try_init();
+    #[cfg(debug_assertions)]
+    {
+        // Export Typescript bindings for commands during dev builds.
+        let builder = SpectaBuilder::<tauri::Wry>::new().commands(collect_commands![
+            mcp_list,
+            mcp_listen_addr,
+            mcp_is_active,
+            mcp_get_client_status,
+            mcp_get_incoming_clients,
+            mcp_add_server,
+            mcp_update_server,
+            mcp_remove_server,
+            mcp_toggle_server_enabled,
+            mcp_restart_client,
+            mcp_start_oauth,
+            mcp_get_client_tools,
+            mcp_toggle_tool,
+            settings_get_settings,
+            settings_open_config_directory,
+            settings_update_settings
+        ]);
+        let _ = builder
+            .export(Typescript::default(), "../src/tauri/bindings.ts")
+            .map_err(|e| eprintln!("[specta] export failed: {e}"));
+    }
+
     tauri::Builder::default()
         // Shell plugin is commonly needed to open links, etc.
         .plugin(tauri_plugin_shell::init())
