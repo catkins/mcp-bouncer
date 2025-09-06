@@ -15,8 +15,8 @@ export function useIncomingClients() {
       setClients(
         list.map(item => ({
           ...item,
-          connected_at: normalizeConnectedAt(item.connected_at),
-        })),
+          connected_at: normalizeConnectedAt(item.connected_at as any) as string | null,
+        })) as IncomingClient[]
       );
     } catch (e) {
       console.error('Failed to load incoming clients', e);
@@ -40,7 +40,7 @@ export function useIncomingClients() {
             name: data.name,
             version: data.version,
             title: data.title,
-            connected_at: normalizeConnectedAt(data.connected_at),
+            connected_at: normalizeConnectedAt(data.connected_at as any) as string | null,
           },
         ];
       });

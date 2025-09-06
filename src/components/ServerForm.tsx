@@ -52,9 +52,13 @@ export function ServerForm({
   useEffect(() => {
     if (server) {
       setFormData(server);
-      const envEntries = Object.entries(server.env || {});
+      const envEntries = Object.entries((server.env ?? {}) as Record<string, string>) as Array<
+        [string, string]
+      >;
       setEnvList(envEntries.map(([k, v]) => ({ id: nextId(), key: k, value: v })));
-      const headerEntries = Object.entries(server.headers || {});
+      const headerEntries = Object.entries((server.headers ?? {}) as Record<string, string>) as Array<
+        [string, string]
+      >;
       setHeaderList(headerEntries.map(([k, v]) => ({ id: nextId(), key: k, value: v })));
     } else {
       setEnvList([]);
@@ -253,7 +257,7 @@ export function ServerForm({
             </label>
             <div className="relative">
               <select
-                value={formData.transport}
+                value={formData.transport ?? TransportType.Stdio}
                 onChange={e => {
                   const newTransport = e.target.value as TransportType;
                   setFormData(prev => ({ ...prev, transport: newTransport }));

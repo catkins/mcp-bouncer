@@ -156,10 +156,7 @@ export type TransportType = "stdio" | "sse" | "streamable_http"
 
 /** tauri-specta globals **/
 
-import {
-	invoke as TAURI_INVOKE,
-	Channel as TAURI_CHANNEL,
-} from "@tauri-apps/api/core";
+import { invoke as TAURI_INVOKE } from "@tauri-apps/api/core";
 import * as TAURI_API_EVENT from "@tauri-apps/api/event";
 import { type WebviewWindow as __WebviewWindow__ } from "@tauri-apps/api/webviewWindow";
 
@@ -179,9 +176,9 @@ export type Result<T, E> =
 	| { status: "ok"; data: T }
 	| { status: "error"; error: E };
 
-function __makeEvents__<T extends Record<string, any>>(
-	mappings: Record<keyof T, string>,
-) {
+/* eslint-disable @typescript-eslint/no-unused-vars */
+// @ts-ignore -- generated helper currently unused (no typed events exported)
+function __makeEvents__<T extends Record<string, any>>(mappings: Record<keyof T, string>) {
 	return new Proxy(
 		{} as unknown as {
 			[K in keyof T]: __EventObj__<T[K]> & {
