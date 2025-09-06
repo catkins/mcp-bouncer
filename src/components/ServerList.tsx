@@ -129,7 +129,7 @@ export function ServerList({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!showAddServer && !editingServer && !toolsModalServer) {
         if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
-          e.preventDefault
+          e.preventDefault()
           handleAddServer();
         }
       }
