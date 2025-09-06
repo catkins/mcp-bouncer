@@ -159,14 +159,14 @@ export function ServerForm({
     }));
   };
 
-  const updateEnvVar = (oldKey: string, newKey: string, value: string) => {
+  const updateEnvVar = (index: number, oldKey: string, newKey: string, value: string) => {
     setFormData(prev => {
-      const newEnv = { ...prev.env };
-      delete newEnv[oldKey];
-      if (newKey) {
-        newEnv[newKey] = value;
-      }
-      return { ...prev, env: newEnv };
+      const entries = Object.entries(prev.env || {});
+      if (index < 0 || index >= entries.length) return prev;
+      entries[index] = [newKey, value];
+      const next: Record<string, string> = {};
+      for (const [k, v] of entries) next[k] = v;
+      return { ...prev, env: next };
     });
   };
 
@@ -185,14 +185,14 @@ export function ServerForm({
     }));
   };
 
-  const updateHeader = (oldKey: string, newKey: string, value: string) => {
+  const updateHeader = (index: number, oldKey: string, newKey: string, value: string) => {
     setFormData(prev => {
-      const newHeaders = { ...prev.headers };
-      delete newHeaders[oldKey];
-      if (newKey) {
-        newHeaders[newKey] = value;
-      }
-      return { ...prev, headers: newHeaders };
+      const entries = Object.entries(prev.headers || {});
+      if (index < 0 || index >= entries.length) return prev;
+      entries[index] = [newKey, value];
+      const next: Record<string, string> = {};
+      for (const [k, v] of entries) next[k] = v;
+      return { ...prev, headers: next };
     });
   };
 
