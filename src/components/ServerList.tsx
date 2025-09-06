@@ -127,9 +127,18 @@ export function ServerList({
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Respect select-all inside inputs/textareas/contenteditable
+      const target = e.target as HTMLElement | null;
+      const isEditable = !!target && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable ||
+        target.getAttribute('role') === 'textbox'
+      );
       // Check for Cmd+A (macOS) or Ctrl+A (other platforms)
-      if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
-        e.preventDefault(); // Prevent default "select all" behavior
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
+        if (isEditable) return; // Allow native select-all behavior
+        e.preventDefault();
         if (!showAddServer && !editingServer && !toolsModalServer) {
           handleAddServer();
         }
