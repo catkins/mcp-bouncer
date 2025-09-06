@@ -93,18 +93,6 @@ const mockClientStatusWithErrors: Record<string, ClientStatus> = {
   },
 };
 
-const mockLoadingStates = {
-  addServer: false,
-  updateServer: false,
-  removeServer: false,
-  general: false,
-  toggleServer: {},
-  restartServer: {},
-};
-
-const mockErrors = {
-  toggleServer: {},
-};
 
 const meta: Meta<typeof ServerList> = {
   title: 'Components/ServerList',
@@ -123,8 +111,6 @@ const meta: Meta<typeof ServerList> = {
   args: {
     servers: mockServers,
     clientStatus: mockClientStatus,
-    loadingStates: mockLoadingStates,
-    errors: mockErrors,
   },
   argTypes: {
     onAddServer: { action: 'addServer' },
@@ -172,63 +158,7 @@ export const WithErrors: Story = {
   },
 };
 
-export const LoadingAddServer: Story = {
-  args: {
-    loadingStates: {
-      ...mockLoadingStates,
-      addServer: true,
-    },
-  },
-};
-
-export const LoadingToggle: Story = {
-  args: {
-    loadingStates: {
-      ...mockLoadingStates,
-      toggleServer: {
-        fetch: true,
-      },
-    },
-  },
-};
-
-export const LoadingRestart: Story = {
-  args: {
-    loadingStates: {
-      ...mockLoadingStates,
-      restartServer: {
-        buildkite: true,
-      },
-    },
-  },
-};
-
-export const LoadingMultiple: Story = {
-  args: {
-    loadingStates: {
-      ...mockLoadingStates,
-      toggleServer: {
-        fetch: true,
-        buildkite: true,
-      },
-      restartServer: {
-        fetch: true,
-      },
-    },
-  },
-};
-
-export const WithToggleErrors: Story = {
-  args: {
-    errors: {
-      ...mockErrors,
-      toggleServer: {
-        fetch: 'Failed to enable server: Connection refused',
-        buildkite: 'Server is already running',
-      },
-    },
-  },
-};
+// Loading and error states are now internal to the component and exercised via unit tests.
 
 export const MixedTransports: Story = {
   args: {

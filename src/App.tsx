@@ -18,21 +18,9 @@ function AppContent() {
   const { mcpUrl, isActive, loadMcpUrl, loadActive } = useServiceInfo();
   const { loadSettings, openConfigDirectory } = useSettingsState();
 
-  const [loadingStates, setLoadingStates] = useState({
-    addServer: false,
-    updateServer: false,
-    removeServer: false,
-    general: false,
-    restartServer: {} as Record<string, boolean>,
-    toggleServer: {} as Record<string, boolean>,
-  });
-  const [errors, setErrors] = useState<{ addServer?: string; updateServer?: string; removeServer?: string; general?: string; toggleServer?: Record<string, string | undefined> }>({});
-
   const { addServer, updateServer, removeServer, toggleServer, restartServer, authorizeServer } = useServerActions({
     servers,
     setServers: updater => setServers(prev => updater(prev)),
-    setLoadingStates: updater => setLoadingStates(prev => updater(prev)),
-    setErrors: updater => setErrors(prev => updater(prev)),
     loadServers,
     loadClientStatus,
   });
@@ -43,12 +31,6 @@ function AppContent() {
     loadSettings,
     loadMcpUrl,
     loadClientStatus,
-    setToggleError: (serverName: string, error?: string) =>
-      setErrors(prev => ({ ...prev, toggleServer: { ...(prev.toggleServer || {}), [serverName]: error } })),
-    clearToggleLoading: (serverName: string) =>
-      setLoadingStates(prev => ({ ...prev, toggleServer: { ...prev.toggleServer, [serverName]: false } })),
-    clearRestartLoading: (serverName: string) =>
-      setLoadingStates(prev => ({ ...prev, restartServer: { ...prev.restartServer, [serverName]: false } })),
   });
 
   // Initial bootstrap
@@ -100,8 +82,6 @@ function AppContent() {
             onRestartServer={restartServer}
             onAuthorizeServer={authorizeServer}
             onRefreshStatus={handleRefreshStatus}
-            loadingStates={loadingStates}
-            errors={errors}
           />
         ) : (
           <ClientList />

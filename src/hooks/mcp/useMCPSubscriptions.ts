@@ -8,11 +8,8 @@ export function useMCPSubscriptions(opts: {
   loadSettings: () => Promise<void>;
   loadMcpUrl: () => Promise<void>;
   loadClientStatus: () => Promise<void>;
-  clearToggleLoading?: (serverName: string) => void;
-  clearRestartLoading?: (serverName: string) => void;
-  setToggleError: (serverName: string, error?: string) => void;
 }) {
-  const { loadServers, loadActive, loadSettings, loadMcpUrl, loadClientStatus, clearToggleLoading, clearRestartLoading, setToggleError } = opts;
+  const { loadServers, loadActive, loadSettings, loadMcpUrl, loadClientStatus } = opts;
 
   useEffect(() => {
     const unsubs: Array<() => void> = [];
@@ -36,22 +33,11 @@ export function useMCPSubscriptions(opts: {
     on(EVENT_CLIENT_STATUS_CHANGED, async (event) => {
       if (import.meta.env.DEV) console.log('Received mcp:client_status_changed event:', event);
       await loadClientStatus();
-      const payload = (event?.payload || {}) as { server_name?: string; action?: string };
-      const server = payload.server_name;
-      const action = (payload.action || '').toLowerCase();
-      if (server && (action === 'connected' || action === 'disable' || action === 'error')) {
-        clearToggleLoading?.(server);
-        clearRestartLoading?.(server);
-      }
     }).then(u => (cancelled ? safeUnlisten(u) : unsubs.push(u))).catch(() => {});
 
     on<ClientErrorPayload>(EVENT_CLIENT_ERROR, async (event) => {
       if (import.meta.env.DEV) console.log('Received mcp:client_error event:', event);
-      const data = event.payload;
-      if (data && data.server_name) {
-        setToggleError(data.server_name, `${data.action} failed: ${data.error}`);
-        await loadClientStatus();
-      }
+      await loadClientStatus();
     }).then(u => (cancelled ? safeUnlisten(u) : unsubs.push(u))).catch(() => {});
 
     // Poll client status every 5s as a safety net
@@ -77,15 +63,5 @@ export function useMCPSubscriptions(opts: {
       }
       clearInterval(intervalId);
     };
-  }, [
-    loadServers,
-    loadActive,
-    loadSettings,
-    loadMcpUrl,
-    loadClientStatus,
-    setToggleError,
-    clearToggleLoading,
-    clearRestartLoading,
-  ]);
+  }, [loadServers, loadActive, loadSettings, loadMcpUrl, loadClientStatus]);
 }
-
