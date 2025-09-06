@@ -49,7 +49,7 @@ export function KeyValueList({
               onChange={e => onUpdate(index, key, e.target.value, value)}
               className="w-1/3 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
               placeholder={keyPlaceholder}
-              aria-label={`${ariaLabelBase} name ${index + 1}`}
+              aria-label={`${ariaLabelBase} key ${index + 1}`}
             />
             <input
               type="text"
