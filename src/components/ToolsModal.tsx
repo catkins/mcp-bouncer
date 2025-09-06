@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { XMarkIcon, WrenchScrewdriverIcon, PowerIcon } from '@heroicons/react/24/outline';
 import { MCPService, type Tool } from '../tauri/bridge';
 import { ToggleSwitch } from './ToggleSwitch';
 import { LoadingButton } from './LoadingButton';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 // Tool type comes from backend schema via bridge
 
@@ -19,6 +20,9 @@ export function ToolsModal({ serverName, isOpen, onClose }: ToolsModalProps) {
   const [toolStates, setToolStates] = useState<{ [key: string]: boolean }>({});
   const [toggleLoading, setToggleLoading] = useState<{ [key: string]: boolean }>({});
   const [bulkLoading, setBulkLoading] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const titleId = `tools-modal-title-${serverName}`;
+  const descId = `tools-modal-desc-${serverName}`;
 
   useEffect(() => {
     if (isOpen && serverName) {
@@ -103,21 +107,16 @@ export function ToolsModal({ serverName, isOpen, onClose }: ToolsModalProps) {
 
   // Handle escape key to close modal
   useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
     };
-
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape);
-      return () => {
-        document.removeEventListener('keydown', handleEscape);
-      };
-    }
-
-    return undefined;
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
   }, [isOpen, onClose]);
+
+  // Trap focus within the modal when open
+  useFocusTrap(containerRef as React.RefObject<HTMLElement>, isOpen, { initialFocusSelector: '[data-initial-focus]' });
 
   if (!isOpen) return null;
 
@@ -127,23 +126,30 @@ export function ToolsModal({ serverName, isOpen, onClose }: ToolsModalProps) {
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative w-full max-w-4xl mx-4 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-hidden">
+      <div
+        ref={containerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descId}
+        className="relative w-full max-w-4xl mx-4 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-hidden"
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2">
             <WrenchScrewdriverIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h2 id={titleId} className="text-lg font-semibold text-gray-900 dark:text-white">
               Tools - {serverName}
             </h2>
             <span className="text-sm text-gray-500 dark:text-gray-400">({tools.length} tools)</span>
           </div>
-          <LoadingButton onClick={onClose} variant="secondary" size="sm" className="p-1.5">
+          <LoadingButton data-initial-focus onClick={onClose} variant="secondary" size="sm" className="p-1.5" ariaLabel="Close tools modal">
             <XMarkIcon className="h-4 w-4" />
           </LoadingButton>
         </div>
 
         {/* Content */}
-        <div className="p-4 overflow-y-auto max-h-[calc(90vh-120px)]">
+        <div id={descId} className="p-4 overflow-y-auto max-h-[calc(90vh-120px)]">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
@@ -174,6 +180,7 @@ export function ToolsModal({ serverName, isOpen, onClose }: ToolsModalProps) {
                       ? 'bg-green-100 hover:bg-green-200 text-green-800 border border-green-300 hover:border-green-400'
                       : 'bg-orange-100 hover:bg-orange-200 text-orange-800 border border-orange-300 hover:border-orange-400'
                   }`}
+                  aria-label={bulkActionDescription}
                 >
                   {bulkLoading ? (
                     <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current" />
@@ -251,7 +258,7 @@ export function ToolsModal({ serverName, isOpen, onClose }: ToolsModalProps) {
               </span>
             )}
           </div>
-          <LoadingButton onClick={onClose} variant="secondary" size="sm">
+          <LoadingButton onClick={onClose} variant="secondary" size="sm" ariaLabel="Close tools modal">
             Close
           </LoadingButton>
         </div>
