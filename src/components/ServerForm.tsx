@@ -42,12 +42,23 @@ export function ServerForm({
     requires_auth: false,
     enabled: true,
   });
+  const idSeq = React.useRef(0);
+  const nextId = () => `row-${++idSeq.current}`;
+  const [envList, setEnvList] = useState<Array<{ id: string; key: string; value: string }>>([]);
+  const [headerList, setHeaderList] = useState<Array<{ id: string; key: string; value: string }>>([]);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [submitError, setSubmitError] = useState<string>('');
 
   useEffect(() => {
     if (server) {
       setFormData(server);
+      const envEntries = Object.entries(server.env || {});
+      setEnvList(envEntries.map(([k, v]) => ({ id: nextId(), key: k, value: v })));
+      const headerEntries = Object.entries(server.headers || {});
+      setHeaderList(headerEntries.map(([k, v]) => ({ id: nextId(), key: k, value: v })));
+    } else {
+      setEnvList([]);
+      setHeaderList([]);
     }
   }, [server]);
 
@@ -118,7 +129,12 @@ export function ServerForm({
     }
 
     try {
-      await onSave(formData);
+      const env: Record<string, string> = {};
+      for (const { key, value } of envList) if (key) env[key] = value;
+      const headers: Record<string, string> = {};
+      for (const { key, value } of headerList) if (key) headers[key] = value;
+      const payload: MCPServerConfig = { ...formData, env, headers };
+      await onSave(payload);
     } catch (error: any) {
       console.error('Failed to save server:', error);
 
@@ -153,54 +169,34 @@ export function ServerForm({
   };
 
   const addEnvVar = () => {
-    setFormData(prev => ({
-      ...prev,
-      env: { ...prev.env, '': '' },
-    }));
+    setEnvList(prev => [...prev, { id: nextId(), key: '', value: '' }]);
   };
 
-  const updateEnvVar = (index: number, oldKey: string, newKey: string, value: string) => {
-    setFormData(prev => {
-      const entries = Object.entries(prev.env || {});
-      if (index < 0 || index >= entries.length) return prev;
-      entries[index] = [newKey, value];
-      const next: Record<string, string> = {};
-      for (const [k, v] of entries) next[k] = v;
-      return { ...prev, env: next };
-    });
+  const updateEnvVar = (index: number, _oldKey: string, newKey: string, value: string) => {
+    setEnvList(prev => prev.map((row, i) => (i === index ? { ...row, key: newKey, value } : row)));
   };
 
   const removeEnvVar = (key: string) => {
-    setFormData(prev => {
-      const newEnv = { ...prev.env };
-      delete newEnv[key];
-      return { ...prev, env: newEnv };
+    setEnvList(prev => {
+      const idx = prev.findIndex(r => r.key === key);
+      if (idx === -1) return prev;
+      return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
     });
   };
 
   const addHeader = () => {
-    setFormData(prev => ({
-      ...prev,
-      headers: { ...prev.headers, '': '' },
-    }));
+    setHeaderList(prev => [...prev, { id: nextId(), key: '', value: '' }]);
   };
 
-  const updateHeader = (index: number, oldKey: string, newKey: string, value: string) => {
-    setFormData(prev => {
-      const entries = Object.entries(prev.headers || {});
-      if (index < 0 || index >= entries.length) return prev;
-      entries[index] = [newKey, value];
-      const next: Record<string, string> = {};
-      for (const [k, v] of entries) next[k] = v;
-      return { ...prev, headers: next };
-    });
+  const updateHeader = (index: number, _oldKey: string, newKey: string, value: string) => {
+    setHeaderList(prev => prev.map((row, i) => (i === index ? { ...row, key: newKey, value } : row)));
   };
 
   const removeHeader = (key: string) => {
-    setFormData(prev => {
-      const newHeaders = { ...prev.headers };
-      delete newHeaders[key];
-      return { ...prev, headers: newHeaders };
+    setHeaderList(prev => {
+      const idx = prev.findIndex(r => r.key === key);
+      if (idx === -1) return prev;
+      return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
     });
   };
 
@@ -366,7 +362,7 @@ export function ServerForm({
           {formData.transport === TransportType.Stdio && (
             <KeyValueList
               label="Environment Variables"
-              items={formData.env || {}}
+              items={Object.fromEntries(envList.map(r => [r.key, r.value]))}
               keyPlaceholder="Variable name"
               valuePlaceholder="Value"
               onAdd={addEnvVar}
@@ -380,7 +376,7 @@ export function ServerForm({
             formData.transport === TransportType.StreamableHttp) && (
             <KeyValueList
               label="HTTP Headers"
-              items={formData.headers || {}}
+              items={Object.fromEntries(headerList.map(r => [r.key, r.value]))}
               keyPlaceholder="Header name"
               valuePlaceholder="Value"
               onAdd={addHeader}
