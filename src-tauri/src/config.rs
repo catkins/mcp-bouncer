@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
+use specta::Type;
 use std::{collections::HashMap, fs, path::PathBuf};
 
 // Types shared with Tauri commands and service
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum TransportType {
     #[serde(rename = "stdio")]
@@ -14,7 +15,7 @@ pub enum TransportType {
     StreamableHttp,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct MCPServerConfig {
     pub name: String,
     pub description: String,
@@ -28,13 +29,13 @@ pub struct MCPServerConfig {
     pub enabled: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct Settings {
     pub mcp_servers: Vec<MCPServerConfig>,
     pub listen_addr: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum ClientConnectionState {
     Disconnected,
@@ -45,7 +46,7 @@ pub enum ClientConnectionState {
     Authorizing,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct ClientStatus {
     pub name: String,
     pub state: ClientConnectionState,
@@ -56,7 +57,7 @@ pub struct ClientStatus {
     pub oauth_authenticated: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct IncomingClient {
     pub id: String,
     pub name: String,

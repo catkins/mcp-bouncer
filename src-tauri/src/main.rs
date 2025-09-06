@@ -13,6 +13,8 @@ use mcp_bouncer::incoming::list_incoming;
 use mcp_bouncer::oauth::start_oauth_for_server;
 use mcp_bouncer::server::{get_runtime_listen_addr, start_http_server};
 use mcp_bouncer::unauthorized;
+use serde::Serialize;
+use specta::Type;
 
 // ---------- Streamable HTTP MCP proxy (basic) ----------
 
@@ -59,11 +61,13 @@ fn get_server_by_name(name: &str) -> Option<MCPServerConfig> {
 
 // ---------------- RMCP Service Implementation ----------------
 
+#[specta::specta]
 #[tauri::command]
 async fn mcp_list() -> Result<Vec<MCPServerConfig>, String> {
     Ok(load_settings().mcp_servers)
 }
 
+#[specta::specta]
 #[tauri::command]
 async fn mcp_listen_addr() -> Result<String, String> {
     if let Some(addr) = get_runtime_listen_addr() {
@@ -72,23 +76,27 @@ async fn mcp_listen_addr() -> Result<String, String> {
     Ok(load_settings().listen_addr)
 }
 
+#[specta::specta]
 #[tauri::command]
 async fn mcp_is_active() -> Result<bool, String> {
     let s = load_settings();
     Ok(!s.mcp_servers.is_empty())
 }
 
+#[specta::specta]
 #[tauri::command]
 async fn mcp_get_client_status() -> Result<HashMap<String, ClientStatus>, String> {
     let map = mcp_bouncer::status::compute_client_status_map().await;
     Ok(map)
 }
 
+#[specta::specta]
 #[tauri::command]
 async fn mcp_get_incoming_clients() -> Result<Vec<IncomingClient>, String> {
     Ok(list_incoming().await)
 }
 
+#[specta::specta]
 #[tauri::command]
 async fn mcp_add_server(app: tauri::AppHandle, config: MCPServerConfig) -> Result<(), String> {
     let mut s = load_settings();
@@ -101,6 +109,7 @@ async fn mcp_add_server(app: tauri::AppHandle, config: MCPServerConfig) -> Resul
     Ok(())
 }
 
+#[specta::specta]
 #[tauri::command]
 async fn mcp_update_server(
     app: tauri::AppHandle,
@@ -146,6 +155,7 @@ async fn mcp_update_server(
     }
 }
 
+#[specta::specta]
 #[tauri::command]
 async fn mcp_remove_server(app: tauri::AppHandle, name: String) -> Result<(), String> {
     let mut s = load_settings();
@@ -161,6 +171,7 @@ async fn mcp_remove_server(app: tauri::AppHandle, name: String) -> Result<(), St
     Ok(())
 }
 
+#[specta::specta]
 #[tauri::command]
 async fn mcp_toggle_server_enabled(
     app: tauri::AppHandle,
@@ -209,6 +220,7 @@ async fn mcp_toggle_server_enabled(
     }
 }
 
+#[specta::specta]
 #[tauri::command]
 async fn mcp_restart_client(app: tauri::AppHandle, name: String) -> Result<(), String> {
     // If server doesn't exist or is disabled, emit client_error
@@ -243,6 +255,7 @@ async fn mcp_restart_client(app: tauri::AppHandle, name: String) -> Result<(), S
     Ok(())
 }
 
+#[specta::specta]
 #[tauri::command]
 async fn mcp_start_oauth(app: tauri::AppHandle, name: String) -> Result<(), String> {
     // Find server and ensure endpoint available
@@ -260,28 +273,51 @@ async fn mcp_start_oauth(app: tauri::AppHandle, name: String) -> Result<(), Stri
         .map_err(|e| e.to_string())
 }
 
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct ToolInfo {
+    pub name: String,
+    #[specta(optional)]
+    pub description: Option<String>,
+    #[specta(optional)]
+    pub input_schema: Option<serde_json::Value>,
+}
+
 #[tauri::command]
-async fn mcp_get_client_tools(client_name: String) -> Result<Vec<serde_json::Value>, String> {
+#[specta::specta]
+async fn mcp_get_client_tools(client_name: String) -> Result<Vec<ToolInfo>, String> {
     if let Some(cfg) = get_server_by_name(&client_name) {
         let list = fetch_tools_for_cfg(&cfg).await.map_err(|e| e.to_string())?;
         // Filter based on toggles
         let state =
             mcp_bouncer::config::load_tools_state_with(&mcp_bouncer::config::OsConfigProvider);
-        let filtered: Vec<_> = list
-            .into_iter()
-            .filter(|v| {
-                let Some(tool_name) = v.get("name").and_then(|n| n.as_str()) else {
-                    return true;
-                };
-                state
-                    .0
-                    .get(&client_name)
-                    .and_then(|m| m.get(tool_name))
-                    .copied()
-                    .unwrap_or(true)
-            })
-            .collect();
-        return Ok(filtered);
+        let mut out: Vec<ToolInfo> = Vec::new();
+        for v in list.into_iter() {
+            // keep only enabled tools
+            let name = v.get("name").and_then(|n| n.as_str()).unwrap_or("");
+            if !state
+                .0
+                .get(&client_name)
+                .and_then(|m| m.get(name))
+                .copied()
+                .unwrap_or(true)
+            {
+                continue;
+            }
+            let description = v
+                .get("description")
+                .and_then(|d| d.as_str())
+                .map(|s| s.to_string());
+            let input_schema = v
+                .get("input_schema")
+                .cloned()
+                .or_else(|| v.get("inputSchema").cloned());
+            out.push(ToolInfo {
+                name: name.to_string(),
+                description,
+                input_schema,
+            });
+        }
+        return Ok(out);
     }
     Ok(Vec::new())
 }
@@ -360,6 +396,7 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
     }
 }
 
+#[specta::specta]
 #[tauri::command]
 async fn mcp_toggle_tool(
     client_name: String,
@@ -374,11 +411,13 @@ async fn mcp_toggle_tool(
     )
 }
 
+#[specta::specta]
 #[tauri::command]
 async fn settings_get_settings() -> Result<Option<Settings>, String> {
     Ok(Some(load_settings()))
 }
 
+#[specta::specta]
 #[tauri::command]
 async fn settings_open_config_directory() -> Result<(), String> {
     let dir = config_dir();
@@ -387,6 +426,7 @@ async fn settings_open_config_directory() -> Result<(), String> {
     Ok(())
 }
 
+#[specta::specta]
 #[tauri::command]
 async fn settings_update_settings(
     app: tauri::AppHandle,
