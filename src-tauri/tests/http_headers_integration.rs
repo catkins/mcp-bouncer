@@ -90,13 +90,13 @@ async fn http_client_can_connect_list_tools_and_send_headers() {
     let cfg = MCPServerConfig {
         name: "http-upstream".into(),
         description: "test".into(),
-        transport: Some(TransportType::StreamableHttp),
+        transport: TransportType::StreamableHttp,
         command: String::new(),
-        args: None,
-        env: None,
-        endpoint: Some(format!("http://{}:{}/mcp", addr.ip(), addr.port())),
-        headers: Some(headers),
-        requires_auth: Some(false),
+        args: vec![],
+        env: Default::default(),
+        endpoint: format!("http://{}:{}/mcp", addr.ip(), addr.port()),
+        headers,
+        requires_auth: false,
         enabled: true,
     };
 

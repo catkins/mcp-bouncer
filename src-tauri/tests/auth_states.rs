@@ -12,13 +12,13 @@ async fn mark_unauthorized_sets_state_and_clears_error() {
     s.mcp_servers.push(MCPServerConfig {
         name: "srv1".into(),
         description: "d".into(),
-        transport: Some(TransportType::StreamableHttp),
+        transport: TransportType::StreamableHttp,
         command: String::new(),
-        args: None,
-        env: None,
-        endpoint: Some("http://127.0.0.1".into()),
-        headers: None,
-        requires_auth: Some(false),
+        args: vec![],
+        env: Default::default(),
+        endpoint: "http://127.0.0.1".into(),
+        headers: Default::default(),
+        requires_auth: false,
         enabled: true,
     });
     save_settings_with(&cp, &s).unwrap();
@@ -44,13 +44,13 @@ async fn authorizing_state_is_exposed() {
     s.mcp_servers.push(MCPServerConfig {
         name: "srv2".into(),
         description: "d".into(),
-        transport: Some(TransportType::StreamableHttp),
+        transport: TransportType::StreamableHttp,
         command: String::new(),
-        args: None,
-        env: None,
-        endpoint: Some("http://127.0.0.1".into()),
-        headers: None,
-        requires_auth: Some(false),
+        args: vec![],
+        env: Default::default(),
+        endpoint: "http://127.0.0.1".into(),
+        headers: Default::default(),
+        requires_auth: false,
         enabled: true,
     });
     save_settings_with(&cp, &s).unwrap();

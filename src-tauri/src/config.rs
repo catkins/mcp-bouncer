@@ -222,13 +222,13 @@ mod tests {
         s.mcp_servers.push(MCPServerConfig {
             name: "srv".into(),
             description: "d".into(),
-            transport: Some(TransportType::StreamableHttp),
+            transport: TransportType::StreamableHttp,
             command: "".into(),
-            args: None,
-            env: None,
-            endpoint: Some("http://127.0.0.1".into()),
-            headers: None,
-            requires_auth: Some(false),
+            args: vec![],
+            env: Default::default(),
+            endpoint: "http://127.0.0.1".into(),
+            headers: Default::default(),
+            requires_auth: false,
             enabled: true,
         });
         save_settings_with(&cp, &s).unwrap();

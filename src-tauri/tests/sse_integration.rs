@@ -79,13 +79,13 @@ async fn sse_client_can_connect_list_tools_and_send_headers() {
     let cfg = MCPServerConfig {
         name: "sse-upstream".into(),
         description: "test".into(),
-        transport: Some(TransportType::Sse),
+        transport: TransportType::Sse,
         command: String::new(),
-        args: None,
-        env: None,
-        endpoint: Some(format!("http://{}:{}/sse", addr.ip(), addr.port())),
-        headers: Some(headers),
-        requires_auth: Some(false),
+        args: vec![],
+        env: Default::default(),
+        endpoint: format!("http://{}:{}/sse", addr.ip(), addr.port()),
+        headers,
+        requires_auth: false,
         enabled: true,
     };
 

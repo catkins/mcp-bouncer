@@ -114,17 +114,17 @@ async fn e2e_list_and_echo_hermetic_http() {
     s.mcp_servers.push(MCPServerConfig {
         name: "up".into(),
         description: "test".into(),
-        transport: Some(TransportType::StreamableHttp),
+        transport: TransportType::StreamableHttp,
         command: String::new(),
-        args: None,
-        env: None,
-        endpoint: Some(format!(
+        args: vec![],
+        env: Default::default(),
+        endpoint: format!(
             "http://{}:{}/mcp",
             upstream_addr.ip(),
             upstream_addr.port()
-        )),
-        headers: None,
-        requires_auth: Some(false),
+        ),
+        headers: Default::default(),
+        requires_auth: false,
         enabled: true,
     });
     save_settings_with(&cp, &s).expect("save settings");
