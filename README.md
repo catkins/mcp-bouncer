@@ -2,9 +2,9 @@
 
 A desktop application that serves as a gateway and management interface for Model Context Protocol (MCP) servers. Now built with Tauri v2 (Rust + WebView) and the official Rust MCP SDK (rmcp). It provides a modern, cross‑platform GUI for configuring, managing, and monitoring MCP servers with support for multiple transport protocols.
 
-TypeScript bindings for Tauri commands and shared structs are generated automatically in debug builds using specta + tauri-specta. The generated file is at `src/tauri/bindings.ts`, and the frontend uses a thin adapter `src/tauri/bridge.ts` for ergonomic calls.
+![App screenshot](doc/screenshot.png)
 
-> **⚠️ Early Development Software**  
+> **⚠️ Early Development Software**
 > This project is in early development and may have bugs, incomplete features, or breaking changes. Use at your own risk and please report any issues you encounter.
 
 ## What is MCP Bouncer?
@@ -205,6 +205,7 @@ mcp-bouncer/
 - **Frontend**: React 19 + TypeScript + Tailwind CSS 4 + Vite.
   - Uses `@tauri-apps/api` and a small adapter at `src/tauri/bridge.ts` for commands and events.
 - **Settings**: JSON at `$XDG_CONFIG_HOME/mcp-bouncer/settings.json`.
+- TypeScript bindings for Tauri commands and shared structs are generated automatically in debug builds using specta + tauri-specta. The generated file is at `src/tauri/bindings.ts`, and the frontend uses a thin adapter `src/tauri/bridge.ts` for ergonomic calls.
 
 ### Dev Commands
 - Dev app: `npx tauri dev`
