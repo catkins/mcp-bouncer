@@ -14,9 +14,9 @@ Quality, safety, and coverage improvements
 - [ ] Prefer narrowing at the bridge boundary using generated types and Rust-side validation (no `zod`)
 
 Hooks, state, and events
-- [ ] Add tests for `useMCPSubscriptions` lifecycle (register/unregister listeners, 5s polling, handler fan-out)
+- [x] Add tests for `useMCPSubscriptions` lifecycle (register/unregister listeners, 5s polling, handler fan-out)
 - [x] Expand `useIncomingClients` tests to cover varied timestamp shapes and disconnect handling
-- [ ] Consolidate duplicate server action hooks (`useServerActions` vs `useMCPActions`) into a single, typed hook with optional loading/error state wiring
+- [x] Consolidate duplicate server action hooks: App now uses `useMCPActions`. Next, remove `useServerActions` or make it a thin alias.
 
 Components and a11y
 - [x] Accessibility and focus management for `ToolsModal` (dialog role, aria-modal, labelledby/describedby, focus trap, Escape)

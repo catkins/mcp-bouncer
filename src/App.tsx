@@ -3,7 +3,9 @@ import { useServersState } from './hooks/mcp/useServersState';
 import { useClientStatusState } from './hooks/mcp/useClientStatusState';
 import { useServiceInfo } from './hooks/mcp/useServiceInfo';
 import { useSettingsState } from './hooks/mcp/useSettingsState';
-import { useServerActions } from './hooks/mcp/useServerActions';
+// Prefer the richer actions hook that supports loading/error state wiring
+import { useMCPActions } from './hooks/mcp/useMCPActions';
+import type { LoadingStates, ErrorStates } from './hooks/mcp/types';
 import { useMCPSubscriptions } from './hooks/mcp/useMCPSubscriptions';
 import { useTheme } from './hooks/useTheme';
 import { ToastProvider } from './contexts/ToastContext';
@@ -18,9 +20,20 @@ function AppContent() {
   const { mcpUrl, isActive, loadMcpUrl, loadActive } = useServiceInfo();
   const { loadSettings, openConfigDirectory } = useSettingsState();
 
-  const { addServer, updateServer, removeServer, toggleServer, restartServer, authorizeServer } = useServerActions({
+  const [loadingStates, setLoadingStates] = useState<LoadingStates>({
+    addServer: false,
+    updateServer: false,
+    removeServer: false,
+    general: false,
+    restartServer: {},
+    toggleServer: {},
+  });
+  const [errors, setErrors] = useState<ErrorStates>({});
+  const { addServer, updateServer, removeServer, toggleServer, restartServer, authorizeServer } = useMCPActions({
     servers,
     setServers: updater => setServers(prev => updater(prev)),
+    setLoadingStates,
+    setErrors,
     loadServers,
     loadClientStatus,
   });
