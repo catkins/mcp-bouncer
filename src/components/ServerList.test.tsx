@@ -1,0 +1,67 @@
+import { describe, it, expect, vi } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { render, screen, waitFor } from '../test/render';
+import { ServerList } from './ServerList';
+
+// Mock bridge for ToolsModal to avoid real fetches
+vi.mock('../tauri/bridge', async () => {
+  const actual = await vi.importActual<Record<string, any>>('../tauri/bridge');
+  return {
+    ...actual,
+    MCPService: {
+      ...actual.MCPService,
+      GetClientTools: vi.fn(async () => []),
+    },
+  };
+});
+
+describe('ServerList', () => {
+  const servers = [
+    {
+      name: 'svc', description: '', transport: 'stdio', command: 'cmd', args: [], env: {},
+      endpoint: '', headers: {}, requires_auth: false, enabled: true,
+    },
+  ];
+
+  const status = {
+    svc: { name: 'svc', state: 'connected', tools: 2, authorization_required: false, oauth_authenticated: false },
+  } as const;
+
+  it('opens add form and tools modal, toggles server', async () => {
+    const onAddServer = vi.fn(async () => {});
+    const onUpdateServer = vi.fn(async () => {});
+    const onRemoveServer = vi.fn(async () => {});
+    const onToggleServer = vi.fn(async () => {});
+    const onRestartServer = vi.fn(async () => {});
+    const onAuthorizeServer = vi.fn(async () => {});
+
+    render(
+      <ServerList
+        servers={servers as any}
+        clientStatus={status as any}
+        onAddServer={onAddServer}
+        onUpdateServer={onUpdateServer}
+        onRemoveServer={onRemoveServer}
+        onToggleServer={onToggleServer}
+        onRestartServer={onRestartServer}
+        onAuthorizeServer={onAuthorizeServer}
+      />,
+    );
+
+    // Add Server button opens form
+    await userEvent.click(screen.getAllByRole('button', { name: /add server/i })[0]!);
+    expect(await screen.findByText(/Transport Type/)).toBeInTheDocument();
+
+    // Tools button opens modal (tools count is a button)
+    const toolsBtn = await screen.findByRole('button', { name: /open tools for svc/i });
+    await userEvent.click(toolsBtn);
+    expect(await screen.findByRole('dialog', { name: /Tools - svc/i })).toBeInTheDocument();
+
+    // Toggle
+    const toggles = await screen.findAllByRole('button', { name: /toggle switch/i });
+    await userEvent.click(toggles[0]!);
+    await waitFor(() => {
+      expect(onToggleServer).toHaveBeenCalled();
+    });
+  });
+});

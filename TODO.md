@@ -6,8 +6,9 @@ Prerequisite: keep CI green across backend/frontend
 
 Quality, safety, and coverage improvements
 - [x] Generate shared backend/frontend types via `tauri-specta` (see `src/tauri/bindings.ts` usage in `bridge.ts`)
-- [ ] Improve generated types via specta: annotate Rust types to narrow optionals and regen bindings
+- [x] Improve generated types via specta: annotate Rust types to narrow optionals and regen bindings
   - [x] Enable `specta` `chrono` feature for future date/time typing
+  - [x] Tighten `MCPServerConfig` (non-Option fields + serde defaults)
 - [x] Enable `noImplicitAny` and `strict` in `tsconfig.json`
 - [x] Strengthen TS strictness: enable `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `useUnknownInCatchVariables`, `noFallthroughCasesInSwitch`
 - [ ] Add ESLint (TypeScript + React) with sensible rules (`no-explicit-any`, `react-hooks/exhaustive-deps`, no console in prod) and wire into CI
@@ -29,6 +30,12 @@ Testing
 - [ ] Add negative-path tests for bridge parsing (malformed payloads throw)
 - [ ] Increase coverage on complex flows: toggling servers, OAuth start, restart error paths
 - [ ] Keep test output clean (no warnings/noise) and expand fixtures where helpful
+  
+Newly added tests
+- [x] useMCPSubscriptions lifecycle test
+- [ ] useSettingsState unit tests (load/open directory)
+- [ ] useServiceInfo, useServersState, useClientStatusState unit tests
+- [ ] ServerList interactions (open add form, open tools modal, toggle callbacks)
 
 Notes discovered during review
 - Duplicate hooks for server actions exist (`useServerActions` and `useMCPActions`); unify to avoid drift.
