@@ -157,10 +157,10 @@ export type TransportType = "stdio" | "sse" | "streamable_http"
 /** tauri-specta globals **/
 
 import {
-    invoke as TAURI_INVOKE,
-    Channel as TAURI_CHANNEL,
+	invoke as TAURI_INVOKE,
+	Channel as TAURI_CHANNEL,
 } from "@tauri-apps/api/core";
-// Mark Channel import as used for type-checking strictness
+// Mark Channel import as used for TS noUnusedLocals
 void TAURI_CHANNEL;
 import * as TAURI_API_EVENT from "@tauri-apps/api/event";
 import { type WebviewWindow as __WebviewWindow__ } from "@tauri-apps/api/webviewWindow";
