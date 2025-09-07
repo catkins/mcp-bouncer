@@ -45,9 +45,6 @@ export const MCPService = {
   async RemoveMCPServer(name: string): Promise<void> {
     unwrap(await commands.mcpRemoveServer(name));
   },
-  async ToggleServerEnabled(name: string, enabled: boolean): Promise<void> {
-    unwrap(await commands.mcpToggleServerEnabled(name, enabled));
-  },
   async RestartClient(name: string): Promise<void> {
     unwrap(await commands.mcpRestartClient(name));
   },
@@ -68,8 +65,5 @@ export const SettingsService = {
   },
   async OpenConfigDirectory(): Promise<void> {
     unwrap(await commands.settingsOpenConfigDirectory());
-  },
-  async UpdateSettings(settings: Settings | null): Promise<void> {
-    unwrap(await commands.settingsUpdateSettings(settings));
   },
 };

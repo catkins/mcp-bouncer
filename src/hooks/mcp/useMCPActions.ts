@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { MCPService, SettingsService } from '../../tauri/bridge';
+import { MCPService } from '../../tauri/bridge';
 import type { MCPServerConfig } from '../../tauri/bridge';
 import type { LoadingStates, ErrorStates } from './types';
 
@@ -170,15 +170,6 @@ export function useMCPActions(
     [deps, setError],
   );
 
-  const openConfigDirectory = useCallback(async () => {
-    try {
-      await SettingsService.OpenConfigDirectory();
-    } catch (error) {
-      console.error('Failed to open config directory:', error);
-      setError('general', 'Failed to open config directory');
-    }
-  }, [setError]);
-
   return {
     addServer,
     updateServer,
@@ -186,6 +177,5 @@ export function useMCPActions(
     toggleServer,
     restartServer,
     authorizeServer,
-    openConfigDirectory,
   };
 }

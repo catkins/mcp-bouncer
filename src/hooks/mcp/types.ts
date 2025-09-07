@@ -1,6 +1,4 @@
-import type { MCPServerConfig, Settings, ClientStatus } from '../../tauri/bridge';
-
-export type ClientStatusMap = { [key: string]: ClientStatus };
+import type { Settings } from '../../tauri/bridge';
 
 export interface LoadingStates {
   addServer: boolean;
@@ -19,13 +17,4 @@ export interface ErrorStates {
   toggleServer?: { [key: string]: string | undefined };
 }
 
-export interface MCPState {
-  servers: MCPServerConfig[];
-  settings: Settings | null;
-  mcpUrl: string;
-  isActive: boolean | null;
-  clientStatus: ClientStatusMap;
-  loadingStates: LoadingStates;
-  errors: ErrorStates;
-}
-
+// Historical aggregate type removed; prefer using dedicated hooks + LoadingStates/ErrorStates
