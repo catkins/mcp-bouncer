@@ -8,7 +8,7 @@ Quality, safety, and coverage improvements
 - [x] Generate shared backend/frontend types via `tauri-specta` (see `src/tauri/bindings.ts` usage in `bridge.ts`)
 - [ ] Improve generated types via specta: review `specta`/`tauri-specta` feature flags (e.g., `chrono`), annotate Rust types to narrow optionals, and regen bindings
 - [x] Enable `noImplicitAny` and `strict` in `tsconfig.json`
-- [ ] Strengthen TS strictness: enable `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `useUnknownInCatchVariables`, `noFallthroughCasesInSwitch`
+- [x] Strengthen TS strictness: enable `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `useUnknownInCatchVariables`, `noFallthroughCasesInSwitch`
 - [ ] Add ESLint (TypeScript + React) with sensible rules (`no-explicit-any`, `react-hooks/exhaustive-deps`, no console in prod) and wire into CI
 - [ ] Remove remaining `any` in app code paths; prefer `unknown` or concrete types
 - [ ] Prefer narrowing at the bridge boundary using generated types and Rust-side validation (no `zod`)

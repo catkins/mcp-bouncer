@@ -15,6 +15,10 @@
     "noUnusedParameters": false,
     "noImplicitAny": true,
     "noImplicitReturns": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "useUnknownInCatchVariables": true,
+    "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
     "jsx": "react-jsx",
     "types": ["vite/client", "vitest/globals"]
