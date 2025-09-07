@@ -26,10 +26,10 @@ import { MCPService } from '../tauri/bridge';
 
 describe('ToolsModal', () => {
   it('loads and displays tools', async () => {
-    const { findByText, getByText } = render(
+    const { findByRole, getByText } = render(
       <ToolsModal serverName="svc" isOpen={true} onClose={() => {}} />,
     );
-    expect(await findByText(/Tools - svc/)).toBeInTheDocument();
+    expect(await findByRole('dialog', { name: /tools - svc/i })).toBeInTheDocument();
     expect(getByText('a')).toBeInTheDocument();
     expect(getByText('b')).toBeInTheDocument();
   });
@@ -42,6 +42,22 @@ describe('ToolsModal', () => {
     const bulk = getByRole('button', { name: /enable all|disable all/i });
     await userEvent.click(bulk);
     expect((MCPService.ToggleTool as any).mock.calls.length).toBeGreaterThan(0);
+  });
+
+  it('shows error and reverts state when toggle fails', async () => {
+    const { findByRole, getAllByRole, findByText } = render(
+      <ToolsModal serverName="svc" isOpen={true} onClose={() => {}} />,
+    );
+    await findByRole('dialog', { name: /tools - svc/i });
+    // Cause ToggleTool to throw
+    ;(MCPService.ToggleTool as any).mockImplementationOnce(async () => {
+      throw new Error('nope');
+    });
+    // Click first toggle
+    const toggles = getAllByRole('button', { name: /toggle switch/i });
+    await userEvent.click(toggles[0]!);
+    // Error message appears
+    expect(await findByText(/failed to toggle tools?|nope/i)).toBeInTheDocument();
   });
 
   it('exposes dialog role and traps focus; Escape closes', async () => {

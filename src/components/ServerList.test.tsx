@@ -64,4 +64,53 @@ describe('ServerList', () => {
       expect(onToggleServer).toHaveBeenCalled();
     });
   });
+
+  it('calls restart and authorize handlers', async () => {
+    const onAddServer = vi.fn(async () => {});
+    const onUpdateServer = vi.fn(async () => {});
+    const onRemoveServer = vi.fn(async () => {});
+    const onToggleServer = vi.fn(async () => {});
+    const onRestartServer = vi.fn(async () => {});
+    const onAuthorizeServer = vi.fn(async () => {});
+
+    // First render to hit restart
+    const { rerender } = render(
+      <ServerList
+        servers={servers as any}
+        clientStatus={status as any}
+        onAddServer={onAddServer}
+        onUpdateServer={onUpdateServer}
+        onRemoveServer={onRemoveServer}
+        onToggleServer={onToggleServer}
+        onRestartServer={onRestartServer}
+        onAuthorizeServer={onAuthorizeServer}
+      />,
+    );
+
+    const restartBtns = await screen.findAllByRole('button', { name: /restart svc/i });
+    await userEvent.click(restartBtns[0]!);
+    expect(onRestartServer).toHaveBeenCalled();
+
+    // Rerender with requires authorization state
+    const authStatus = {
+      svc: { name: 'svc', state: 'requires_authorization', tools: 0, authorization_required: true, oauth_authenticated: false },
+    } as const;
+
+    rerender(
+      <ServerList
+        servers={servers as any}
+        clientStatus={authStatus as any}
+        onAddServer={onAddServer}
+        onUpdateServer={onUpdateServer}
+        onRemoveServer={onRemoveServer}
+        onToggleServer={onToggleServer}
+        onRestartServer={onRestartServer}
+        onAuthorizeServer={onAuthorizeServer}
+      />,
+    );
+
+    const authorizeBtn = await screen.findByRole('button', { name: /authorize svc/i });
+    await userEvent.click(authorizeBtn);
+    expect(onAuthorizeServer).toHaveBeenCalled();
+  });
 });
