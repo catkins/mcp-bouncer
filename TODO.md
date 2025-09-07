@@ -27,7 +27,7 @@ Components and a11y
 - [ ] Consider virtualization/memoization for large tool lists if performance becomes an issue
 
 Testing
-- [ ] Add negative-path tests for bridge parsing (malformed payloads throw)
+- [x] Add negative-path tests for bridge parsing (malformed payloads throw)
 - [ ] Increase coverage on complex flows: toggling servers, OAuth start, restart error paths
 - [ ] Keep test output clean (no warnings/noise) and expand fixtures where helpful
   
