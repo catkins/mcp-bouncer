@@ -10,8 +10,10 @@ export async function on<T = unknown>(name: EventName, handler: (event: Event<T>
 export function safeUnlisten(u?: Unlisten) {
   if (!u) return;
   try {
-    const maybe: any = u();
-    if (maybe && typeof maybe.catch === 'function') (maybe as Promise<void>).catch(() => {});
+    const maybe = u();
+    if (maybe && typeof (maybe as Promise<void>).catch === 'function') {
+      (maybe as Promise<void>).catch(() => {});
+    }
   } catch {
     // noop
   }
@@ -26,4 +28,3 @@ export {
   EVENT_INCOMING_CLIENT_DISCONNECTED,
   EVENT_INCOMING_CLIENTS_UPDATED,
 } from '../types/events';
-
