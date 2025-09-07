@@ -6,7 +6,8 @@ Prerequisite: keep CI green across backend/frontend
 
 Quality, safety, and coverage improvements
 - [x] Generate shared backend/frontend types via `tauri-specta` (see `src/tauri/bindings.ts` usage in `bridge.ts`)
-- [ ] Improve generated types via specta: review `specta`/`tauri-specta` feature flags (e.g., `chrono`), annotate Rust types to narrow optionals, and regen bindings
+- [ ] Improve generated types via specta: annotate Rust types to narrow optionals and regen bindings
+  - [x] Enable `specta` `chrono` feature for future date/time typing
 - [x] Enable `noImplicitAny` and `strict` in `tsconfig.json`
 - [x] Strengthen TS strictness: enable `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `useUnknownInCatchVariables`, `noFallthroughCasesInSwitch`
 - [ ] Add ESLint (TypeScript + React) with sensible rules (`no-explicit-any`, `react-hooks/exhaustive-deps`, no console in prod) and wire into CI
