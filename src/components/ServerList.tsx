@@ -184,18 +184,20 @@ export function ServerList({
             >
               <ServerCard
                 server={server}
-                clientStatus={clientStatus[server.name] || {}}
+                {...(clientStatus[server.name] ? { clientStatus: clientStatus[server.name] } : {})}
                 onEdit={handleEditServer}
                 onRemove={handleRemoveServer}
                 onToggle={handleToggle}
                 onRestart={() => handleRestart(server.name)}
-                onAuthorize={onAuthorizeServer ? () => onAuthorizeServer(server.name) : undefined}
+                {...(onAuthorizeServer ? { onAuthorize: () => onAuthorizeServer(server.name) } : {})}
                 onOpenTools={handleOpenTools}
                 loading={removeLoading[server.name] || false}
                 toggleLoading={toggleLoading[server.name] || false}
                 restartLoading={restartLoading[server.name] || false}
-                toggleError={toggleErrors[server.name]}
-                onRefreshStatus={onRefreshStatus}
+                {...(toggleErrors[server.name]
+                  ? { toggleError: toggleErrors[server.name] as string }
+                  : {})}
+                {...(onRefreshStatus ? { onRefreshStatus } : {})}
               />
             </div>
           ))}

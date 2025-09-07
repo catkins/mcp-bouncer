@@ -24,7 +24,7 @@ const mockConnectedStatus: ClientStatus = {
   name: 'fetch',
   state: 'connected',
   tools: 11,
-  last_error: undefined,
+  last_error: null,
   authorization_required: false,
   oauth_authenticated: false,
 };
@@ -42,7 +42,7 @@ const mockAuthRequiredStatus: ClientStatus = {
   name: 'fetch',
   state: 'disconnected',
   tools: 0,
-  last_error: undefined,
+  last_error: null,
   authorization_required: true,
   oauth_authenticated: false,
 };

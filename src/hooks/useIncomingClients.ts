@@ -39,7 +39,7 @@ export function useIncomingClients() {
             id: data.id,
             name: data.name,
             version: data.version,
-            title: data.title,
+            title: data.title ?? null,
             connected_at: normalizeConnectedAt(data.connected_at) as string | null,
           },
         ];

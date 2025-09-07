@@ -240,7 +240,7 @@ export function ServerForm({
                 setErrors(prev => ({ ...prev, name: '' }));
               }
             }}
-            error={errors.name}
+            {...(errors.name ? { error: errors.name } : {})}
             required
           />
 
@@ -295,7 +295,7 @@ export function ServerForm({
                   setErrors(prev => ({ ...prev, endpoint: '' }));
                 }
               }}
-              error={errors.endpoint}
+              {...(errors.endpoint ? { error: errors.endpoint } : {})}
               required
               placeholder="https://example.com/mcp"
             />
@@ -314,7 +314,7 @@ export function ServerForm({
                   setErrors(prev => ({ ...prev, command: '' }));
                 }
               }}
-              error={errors.command}
+              {...(errors.command ? { error: errors.command } : {})}
               required
             />
           )}

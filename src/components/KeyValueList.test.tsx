@@ -46,7 +46,7 @@ describe('KeyValueList', () => {
 
     // Remove button for first row
     const removeButtons = screen.getAllByRole('button', { name: /remove http header/i });
-    await userEvent.click(removeButtons[0]);
+    await userEvent.click(removeButtons.at(0)!);
     expect(onRemove).toHaveBeenCalled();
   });
 });

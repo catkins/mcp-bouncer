@@ -20,7 +20,7 @@ function AppContent() {
   const { mcpUrl, isActive, loadMcpUrl, loadActive } = useServiceInfo();
   const { loadSettings, openConfigDirectory } = useSettingsState();
 
-  const [loadingStates, setLoadingStates] = useState<LoadingStates>({
+  const [, setLoadingStates] = useState<LoadingStates>({
     addServer: false,
     updateServer: false,
     removeServer: false,
@@ -28,7 +28,7 @@ function AppContent() {
     restartServer: {},
     toggleServer: {},
   });
-  const [errors, setErrors] = useState<ErrorStates>({});
+  const [, setErrors] = useState<ErrorStates>({});
   const { addServer, updateServer, removeServer, toggleServer, restartServer, authorizeServer } = useMCPActions({
     servers,
     setServers: updater => setServers(prev => updater(prev)),

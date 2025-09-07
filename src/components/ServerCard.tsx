@@ -169,7 +169,7 @@ export function ServerCard({
           )}
         </div>
         <div className="flex items-center gap-3">
-          {server.enabled && (
+          {server.enabled && onRestart && (
             <LoadingButton
               onClick={onRestart}
               disabled={loading || toggleLoading}

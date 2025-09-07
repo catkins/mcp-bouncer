@@ -83,7 +83,6 @@ export const TitleOnly: Story = {
   args: {
     type: 'success',
     title: 'Server Started',
-    message: undefined,
   },
 };
 

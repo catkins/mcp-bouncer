@@ -29,8 +29,8 @@ export function useFocusTrap(ref: React.RefObject<HTMLElement>, active: boolean,
       if (e.key !== 'Tab') return;
       const list = getFocusable(el);
       if (list.length === 0) return;
-      const first = list[0];
-      const last = list[list.length - 1];
+      const first = list[0]!;
+      const last = list[list.length - 1]!;
       const activeEl = document.activeElement as HTMLElement | null;
       if (e.shiftKey) {
         if (!activeEl || activeEl === first) {
@@ -49,4 +49,3 @@ export function useFocusTrap(ref: React.RefObject<HTMLElement>, active: boolean,
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [ref, active, opts?.initialFocusSelector]);
 }
-

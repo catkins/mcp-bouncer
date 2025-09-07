@@ -53,7 +53,7 @@ const mockClientStatus: Record<string, ClientStatus> = {
     name: 'fetch',
     state: 'connected',
     tools: 11,
-    last_error: undefined,
+    last_error: null,
     authorization_required: false,
     oauth_authenticated: false,
   },
@@ -61,7 +61,7 @@ const mockClientStatus: Record<string, ClientStatus> = {
     name: 'buildkite',
     state: 'connected',
     tools: 27,
-    last_error: undefined,
+    last_error: null,
     authorization_required: false,
     oauth_authenticated: false,
   },
@@ -69,7 +69,7 @@ const mockClientStatus: Record<string, ClientStatus> = {
     name: 'disabled-server',
     state: 'disconnected',
     tools: 0,
-    last_error: undefined,
+    last_error: null,
     authorization_required: false,
     oauth_authenticated: false,
   },
@@ -96,7 +96,7 @@ const mockClientStatusWithErrors: Record<string, ClientStatus> = {
     name: 'disabled-server',
     state: 'disconnected',
     tools: 0,
-    last_error: undefined,
+    last_error: null,
     authorization_required: false,
     oauth_authenticated: false,
   },
@@ -146,9 +146,9 @@ export const EmptyList: Story = {
 
 export const SingleServer: Story = {
   args: {
-    servers: [mockServers[0]],
+    servers: [mockServers[0]!],
     clientStatus: {
-      fetch: mockClientStatus.fetch,
+      fetch: mockClientStatus.fetch as ClientStatus,
     },
   },
 };
@@ -217,7 +217,7 @@ export const AuthenticationRequired: Story = {
         authorization_required: false,
         oauth_authenticated: true,
       },
-      'disabled-server': mockClientStatus['disabled-server'],
+      'disabled-server': mockClientStatus['disabled-server'] as ClientStatus,
     },
   },
 };

@@ -1,5 +1,4 @@
 import { describe, it, expect, vi } from 'vitest';
-import React from 'react';
 import { render, waitFor, cleanup } from '../../test/render';
 import { useMCPSubscriptions } from './useMCPSubscriptions';
 import { emit } from '@tauri-apps/api/event';
@@ -80,4 +79,3 @@ describe('useMCPSubscriptions', () => {
 
   afterEach(() => cleanup());
 });
-
