@@ -476,28 +476,9 @@ fn main() {
             settings_open_config_directory,
             settings_update_settings
         ]);
-        let out_path = "../src/tauri/bindings.ts";
         let _ = builder
-            .export(Typescript::default(), out_path)
+            .export(Typescript::default(), "../src/tauri/bindings.ts")
             .map_err(|e| eprintln!("[specta] export failed: {e}"));
-        // Post-process generated bindings to satisfy TypeScript strict flags.
-        // - Avoid noUnusedLocals by marking TAURI_CHANNEL as used.
-        // - Ensure __makeEvents__ is exported so it isn't considered unused.
-        if let Ok(mut content) = std::fs::read_to_string(out_path) {
-            if content.contains("Channel as TAURI_CHANNEL") && !content.contains("void TAURI_CHANNEL;") {
-                content = content.replace(
-                    "from \"@tauri-apps/api/core\";",
-                    "from \"@tauri-apps/api/core\";\n// Mark Channel import as used for TS noUnusedLocals\nvoid TAURI_CHANNEL;",
-                );
-            }
-            if content.contains("function __makeEvents__<") && !content.contains("export function __makeEvents__<") {
-                content = content.replace(
-                    "function __makeEvents__<",
-                    "export function __makeEvents__<",
-                );
-            }
-            let _ = std::fs::write(out_path, content);
-        }
     }
 
     tauri::Builder::default()
