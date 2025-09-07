@@ -33,8 +33,8 @@ pub async fn ensure_rmcp_client(name: &str, cfg: &MCPServerConfig) -> Result<Arc
     }
     tracing::info!(target = "client", server=%name, transport=?cfg.transport, "starting");
     let service = match cfg.transport {
-        Some(TransportType::StreamableHttp) => {
-            let endpoint = cfg.endpoint.clone().unwrap_or_default();
+        TransportType::StreamableHttp => {
+            let endpoint = cfg.endpoint.clone();
             if endpoint.is_empty() {
                 return Err(anyhow!("no endpoint"));
             }
@@ -70,22 +70,18 @@ pub async fn ensure_rmcp_client(name: &str, cfg: &MCPServerConfig) -> Result<Arc
                 }
             } else {
                 // Build reqwest client with default headers if provided
-                let client = if let Some(hdrs) = &cfg.headers {
-                    let mut map = reqwest::header::HeaderMap::new();
-                    for (k, v) in hdrs {
-                        let name = reqwest::header::HeaderName::from_bytes(k.as_bytes())
-                            .with_context(|| format!("invalid header name {k}"))?;
-                        let val = reqwest::header::HeaderValue::from_str(v)
-                            .with_context(|| format!("invalid header value for {k}"))?;
-                        map.insert(name, val);
-                    }
-                    reqwest::Client::builder()
-                        .default_headers(map)
-                        .build()
-                        .context("http client build")?
-                } else {
-                    reqwest::Client::default()
-                };
+                let mut map = reqwest::header::HeaderMap::new();
+                for (k, v) in &cfg.headers {
+                    let name = reqwest::header::HeaderName::from_bytes(k.as_bytes())
+                        .with_context(|| format!("invalid header name {k}"))?;
+                    let val = reqwest::header::HeaderValue::from_str(v)
+                        .with_context(|| format!("invalid header value for {k}"))?;
+                    map.insert(name, val);
+                }
+                let client = reqwest::Client::builder()
+                    .default_headers(map)
+                    .build()
+                    .context("http client build")?;
                 let transport = StreamableHttpClientTransport::with_client(
                     client,
                     StreamableHttpClientTransportConfig::with_uri(endpoint.clone()),
@@ -99,28 +95,24 @@ pub async fn ensure_rmcp_client(name: &str, cfg: &MCPServerConfig) -> Result<Arc
                 }
             }
         }
-        Some(TransportType::Sse) => {
-            let endpoint = cfg.endpoint.clone().unwrap_or_default();
+        TransportType::Sse => {
+            let endpoint = cfg.endpoint.clone();
             if endpoint.is_empty() {
                 return Err(anyhow!("no endpoint"));
             }
             // Build reqwest client with default headers if provided
-            let client = if let Some(hdrs) = &cfg.headers {
-                let mut map = reqwest::header::HeaderMap::new();
-                for (k, v) in hdrs {
-                    let name = reqwest::header::HeaderName::from_bytes(k.as_bytes())
-                        .with_context(|| format!("invalid header name {k}"))?;
-                    let val = reqwest::header::HeaderValue::from_str(v)
-                        .with_context(|| format!("invalid header value for {k}"))?;
-                    map.insert(name, val);
-                }
-                reqwest::Client::builder()
-                    .default_headers(map)
-                    .build()
-                    .context("sse client build")?
-            } else {
-                reqwest::Client::default()
-            };
+            let mut map = reqwest::header::HeaderMap::new();
+            for (k, v) in &cfg.headers {
+                let name = reqwest::header::HeaderName::from_bytes(k.as_bytes())
+                    .with_context(|| format!("invalid header name {k}"))?;
+                let val = reqwest::header::HeaderValue::from_str(v)
+                    .with_context(|| format!("invalid header value for {k}"))?;
+                map.insert(name, val);
+            }
+            let client = reqwest::Client::builder()
+                .default_headers(map)
+                .build()
+                .context("sse client build")?;
             let transport = SseClientTransport::start_with_client(
                 client,
                 SseClientConfig {
@@ -132,24 +124,19 @@ pub async fn ensure_rmcp_client(name: &str, cfg: &MCPServerConfig) -> Result<Arc
             .context("sse start")?;
             ().serve(transport).await.context("rmcp serve")?
         }
-        Some(TransportType::Stdio) => {
+        TransportType::Stdio => {
             let cmd = cfg.command.clone();
             if cmd.is_empty() {
                 return Err(anyhow!("missing command"));
             }
             let mut command = tokio::process::Command::new(cmd);
-            if let Some(args) = &cfg.args {
-                command.args(args);
-            }
-            if let Some(envmap) = &cfg.env {
-                for (k, v) in envmap {
-                    command.env(k, v);
-                }
+            command.args(&cfg.args);
+            for (k, v) in &cfg.env {
+                command.env(k, v);
             }
             let transport = TokioChildProcess::new(command).context("spawn")?;
             ().serve(transport).await.context("rmcp serve")?
         }
-        _ => return Err(anyhow!("unsupported transport")),
     };
     let arc = Arc::new(service);
     guard.insert(name.to_string(), arc.clone());
@@ -181,8 +168,8 @@ pub async fn fetch_tools_for_cfg(cfg: &MCPServerConfig) -> Result<Vec<serde_json
     let tools = match client.list_all_tools().await {
         Ok(t) => t,
         Err(e) => {
-            if matches!(cfg.transport, Some(TransportType::StreamableHttp)) {
-                unauthorized::on_possible_unauthorized(&cfg.name, cfg.endpoint.as_deref()).await;
+            if matches!(cfg.transport, TransportType::StreamableHttp) {
+                unauthorized::on_possible_unauthorized(&cfg.name, Some(&cfg.endpoint)).await;
             }
             return Err(anyhow!("rmcp list tools").context(e));
         }

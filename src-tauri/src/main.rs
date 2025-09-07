@@ -133,10 +133,8 @@ async fn mcp_update_server(
             && enabling
         {
             // If HTTP transport requires auth and no credentials, gate and mark unauthorized
-            if matches!(
-                cfg.transport,
-                Some(mcp_bouncer::config::TransportType::StreamableHttp)
-            ) && cfg.requires_auth.unwrap_or(false)
+            if matches!(cfg.transport, mcp_bouncer::config::TransportType::StreamableHttp)
+                && cfg.requires_auth
                 && mcp_bouncer::oauth::load_credentials_for(
                     &mcp_bouncer::config::OsConfigProvider,
                     &server_name,
@@ -189,10 +187,8 @@ async fn mcp_toggle_server_enabled(
         save_settings(&s)?;
         if enabled {
             if let Some(cfg) = get_server_by_name(&server_name) {
-                if matches!(
-                    cfg.transport,
-                    Some(mcp_bouncer::config::TransportType::StreamableHttp)
-                ) && cfg.requires_auth.unwrap_or(false)
+                if matches!(cfg.transport, mcp_bouncer::config::TransportType::StreamableHttp)
+                    && cfg.requires_auth
                     && mcp_bouncer::oauth::load_credentials_for(
                         &mcp_bouncer::config::OsConfigProvider,
                         &server_name,
@@ -264,10 +260,10 @@ async fn mcp_restart_client(app: tauri::AppHandle, name: String) -> Result<(), S
 async fn mcp_start_oauth(app: tauri::AppHandle, name: String) -> Result<(), String> {
     // Find server and ensure endpoint available
     let cfg = get_server_by_name(&name).ok_or_else(|| "server not found".to_string())?;
-    let endpoint = cfg
-        .endpoint
-        .clone()
-        .ok_or_else(|| "missing endpoint".to_string())?;
+    let endpoint = cfg.endpoint.clone();
+    if endpoint.is_empty() {
+        return Err("missing endpoint".to_string());
+    }
     // Mark as authorizing for UI feedback
     mcp_bouncer::overlay::set_state(&name, ClientConnectionState::Authorizing).await;
     client_status_changed(&TauriEventEmitter(app.clone()), &name, "authorizing");
@@ -346,7 +342,7 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
                     // If HTTP and we have stored OAuth credentials, reflect authenticated badge
                     if matches!(
                         cfg.transport,
-                        Some(mcp_bouncer::config::TransportType::StreamableHttp)
+                        mcp_bouncer::config::TransportType::StreamableHttp
                     ) && mcp_bouncer::oauth::load_credentials_for(
                         &mcp_bouncer::config::OsConfigProvider,
                         name,
@@ -360,11 +356,8 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
                     client_status_changed(emitter, name, "connected");
                 }
                 Err(e) => {
-                    if matches!(
-                        cfg.transport,
-                        Some(mcp_bouncer::config::TransportType::StreamableHttp)
-                    ) {
-                        unauthorized::on_possible_unauthorized(name, cfg.endpoint.as_deref()).await;
+                    if matches!(cfg.transport, mcp_bouncer::config::TransportType::StreamableHttp) {
+                        unauthorized::on_possible_unauthorized(name, Some(&cfg.endpoint)).await;
                     }
                     let snap = mcp_bouncer::overlay::snapshot().await;
                     if let Some(ent) = snap.get(name)

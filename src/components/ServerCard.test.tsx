@@ -15,9 +15,9 @@ const baseServer: MCPServerConfig = {
   args: [],
   env: {},
   enabled: true,
-  endpoint: null,
+  endpoint: '',
   headers: {},
-  requires_auth: null,
+  requires_auth: false,
 };
 
 describe('ServerCard', () => {

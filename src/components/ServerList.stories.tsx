@@ -15,9 +15,9 @@ const mockServers: MCPServerConfig[] = [
     env: {
       API_KEY: 'your-api-key',
     },
-    endpoint: null,
+    endpoint: '',
     headers: {},
-    requires_auth: null,
+    requires_auth: false,
   },
   {
     name: 'buildkite',
@@ -31,7 +31,7 @@ const mockServers: MCPServerConfig[] = [
     headers: {
       Authorization: 'Bearer token123',
     },
-    requires_auth: null,
+    requires_auth: false,
   },
   {
     name: 'disabled-server',
@@ -41,9 +41,9 @@ const mockServers: MCPServerConfig[] = [
     transport: TransportType.Stdio,
     enabled: false,
     env: {},
-    endpoint: null,
+    endpoint: '',
     headers: {},
-    requires_auth: null,
+    requires_auth: false,
   },
 ];
 
@@ -183,7 +183,7 @@ export const MixedTransports: Story = {
         args: [],
         env: {},
         headers: {},
-        requires_auth: null,
+        requires_auth: false,
       },
     ],
     clientStatus: {
@@ -234,9 +234,9 @@ export const LargeList: Story = {
         transport: TransportType.Stdio,
         enabled: true,
         env: {},
-        endpoint: null,
+        endpoint: '',
         headers: {},
-        requires_auth: null,
+        requires_auth: false,
       },
       {
         name: 'server-5',
@@ -248,7 +248,7 @@ export const LargeList: Story = {
         args: [],
         env: {},
         headers: {},
-        requires_auth: null,
+        requires_auth: false,
       },
       {
         name: 'server-6',

@@ -19,15 +19,23 @@ pub enum TransportType {
 pub struct MCPServerConfig {
     pub name: String,
     pub description: String,
-    pub transport: Option<TransportType>,
+    #[serde(default = "default_transport")]
+    pub transport: TransportType,
     pub command: String,
-    pub args: Option<Vec<String>>,
-    pub env: Option<HashMap<String, String>>,
-    pub endpoint: Option<String>,
-    pub headers: Option<HashMap<String, String>>,
-    pub requires_auth: Option<bool>,
+    #[serde(default)]
+    pub args: Vec<String>,
+    #[serde(default)]
+    pub env: HashMap<String, String>,
+    #[serde(default)]
+    pub endpoint: String,
+    #[serde(default)]
+    pub headers: HashMap<String, String>,
+    #[serde(default)]
+    pub requires_auth: bool,
     pub enabled: bool,
 }
+
+fn default_transport() -> TransportType { TransportType::Stdio }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct Settings {

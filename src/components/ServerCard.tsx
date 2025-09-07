@@ -253,7 +253,7 @@ export function ServerCard({
         className={`space-y-1.5 transition-all duration-200 ${toggleLoading ? 'opacity-75' : ''}`}
       >
         {/* stdio transport fields */}
-        {(server.transport === 'stdio' || !server.transport) && (
+        {server.transport === 'stdio' && (
           <>
             <div>
               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Command:</span>

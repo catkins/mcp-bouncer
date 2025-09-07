@@ -257,7 +257,7 @@ export function ServerForm({
             </label>
             <div className="relative">
               <select
-                value={formData.transport ?? TransportType.Stdio}
+                value={formData.transport}
                 onChange={e => {
                   const newTransport = e.target.value as TransportType;
                   setFormData(prev => ({ ...prev, transport: newTransport }));

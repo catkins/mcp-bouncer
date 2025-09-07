@@ -15,9 +15,9 @@ const mockServerConfig: MCPServerConfig = {
     API_KEY: 'your-api-key',
     DEBUG: 'true',
   },
-  endpoint: null,
+  endpoint: '',
   headers: {},
-  requires_auth: null,
+  requires_auth: false,
 };
 
 const mockConnectedStatus: ClientStatus = {
@@ -145,7 +145,7 @@ export const HttpServer: Story = {
         Authorization: 'Bearer token123',
         'Content-Type': 'application/json',
       },
-      requires_auth: null,
+      requires_auth: false,
     },
     clientStatus: {
       name: 'buildkite',
@@ -169,7 +169,7 @@ export const SseServer: Story = {
       args: [],
       env: {},
       headers: {},
-      requires_auth: null,
+      requires_auth: false,
     },
     clientStatus: {
       name: 'Context7',

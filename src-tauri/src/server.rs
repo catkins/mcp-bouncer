@@ -151,13 +151,10 @@ where
                         {
                             Ok(res) => Ok(mcp::ServerResult::CallToolResult(res)),
                             Err(e) => {
-                                if matches!(
-                                    cfg.transport,
-                                    Some(crate::config::TransportType::StreamableHttp)
-                                ) {
+                                if matches!(cfg.transport, crate::config::TransportType::StreamableHttp) {
                                     unauthorized::on_possible_unauthorized(
                                         &cfg.name,
-                                        cfg.endpoint.as_deref(),
+                                        Some(&cfg.endpoint),
                                     )
                                     .await;
                                     // Notify UI when auth is required
@@ -370,25 +367,25 @@ mod tests {
         s.mcp_servers.push(MCPServerConfig {
             name: "a".into(),
             description: "d".into(),
-            transport: None,
+            transport: crate::config::TransportType::Stdio,
             command: String::new(),
-            args: None,
-            env: None,
-            endpoint: None,
-            headers: None,
-            requires_auth: None,
+            args: vec![],
+            env: Default::default(),
+            endpoint: String::new(),
+            headers: Default::default(),
+            requires_auth: false,
             enabled: true,
         });
         s.mcp_servers.push(MCPServerConfig {
             name: "b".into(),
             description: "d".into(),
-            transport: None,
+            transport: crate::config::TransportType::Stdio,
             command: String::new(),
-            args: None,
-            env: None,
-            endpoint: None,
-            headers: None,
-            requires_auth: None,
+            args: vec![],
+            env: Default::default(),
+            endpoint: String::new(),
+            headers: Default::default(),
+            requires_auth: false,
             enabled: true,
         });
         save_settings_with(&cp, &s).unwrap();
