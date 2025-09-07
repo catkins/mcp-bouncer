@@ -14,13 +14,13 @@ export function timeAgo(input: MaybeDate): string {
 
 // Normalize connected_at coming from varied backend shapes
 // Accepts string, Date, null, or Go-style { Time: string }
-export function normalizeConnectedAt(value: any): string | Date | null {
+export function normalizeConnectedAt(value: unknown): string | Date | null {
   if (!value) return null;
   if (typeof value === 'string' || value instanceof Date) return value;
   if (typeof value === 'object') {
-    if (value.Time) return value.Time as string;
-    if (value.connected_at) return normalizeConnectedAt(value.connected_at);
+    const v = value as Record<string, unknown>;
+    if (typeof v.Time === 'string') return v.Time;
+    if (v.connected_at) return normalizeConnectedAt(v.connected_at);
   }
   return null;
 }
-

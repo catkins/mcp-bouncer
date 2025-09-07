@@ -1,81 +1,35 @@
-# TODO
+# TODO (Frontend TypeScript)
 
 Prerequisite: keep CI green across backend/frontend
-- Ensure `cargo fmt`, `cargo clippy -D warnings`, and `cargo test` stay clean between frontend tasks. Small backend code hygiene fixes are acceptable to keep the gate green.
+- [ ] Ensure `npm run build` and `npm run test:run` pass locally before commits
+- [ ] Keep Rust CI green: `cargo fmt`, `cargo clippy -D warnings`, `cargo test` (backend-only fixes OK to keep gate green)
 
-1. **Generate shared backend/frontend types**
-   - Use `tauri-specta` or `ts-rs` to generate TypeScript definitions and command wrappers from Rust.
-   - Removes manual definitions like the ones in `src/tauri/bridge.ts` and keeps bindings in sync.
-   - _Trade-off:_ adds a build step and new dependencies.
-   - _Test impact:_ enables type-checked mocks in tests and prevents drift, improving coverage of backend contracts.
+Quality, safety, and coverage improvements
+- [x] Generate shared backend/frontend types via `tauri-specta` (see `src/tauri/bindings.ts` usage in `bridge.ts`)
+- [ ] Improve generated types via specta: review `specta`/`tauri-specta` feature flags (e.g., `chrono`), annotate Rust types to narrow optionals, and regen bindings
+- [x] Enable `noImplicitAny` and `strict` in `tsconfig.json`
+- [ ] Strengthen TS strictness: enable `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `useUnknownInCatchVariables`, `noFallthroughCasesInSwitch`
+- [ ] Add ESLint (TypeScript + React) with sensible rules (`no-explicit-any`, `react-hooks/exhaustive-deps`, no console in prod) and wire into CI
+- [ ] Remove remaining `any` in app code paths; prefer `unknown` or concrete types
+- [ ] Prefer narrowing at the bridge boundary using generated types and Rust-side validation (no `zod`)
 
-2. **Validate Tauri invoke responses with schemas**
-   - Introduce a library such as `zod` to parse data returned from `invoke` and event payloads.
-   - Example: `GetClientTools` currently returns `any[]` without shape guarantees.
-   - _Trade-off:_ small runtime cost and an extra dependency.
-   - _Test impact:_ unit tests can assert malformed payloads throw, increasing safety.
+Hooks, state, and events
+- [ ] Add tests for `useMCPSubscriptions` lifecycle (register/unregister listeners, 5s polling, handler fan-out)
+- [x] Expand `useIncomingClients` tests to cover varied timestamp shapes and disconnect handling
+- [ ] Consolidate duplicate server action hooks (`useServerActions` vs `useMCPActions`) into a single, typed hook with optional loading/error state wiring
 
-3. **Enable `noImplicitAny` in TypeScript config**
-   - Flip the flag in `tsconfig.json` and add missing annotations.
-   - Forces explicit typing and surfaces untyped paths early.
-   - _Trade-off:_ initial cleanup across files.
-   - _Test impact:_ TypeScript acts as a static test, raising coverage of edge cases.
+Components and a11y
+- [x] Accessibility and focus management for `ToolsModal` (dialog role, aria-modal, labelledby/describedby, focus trap, Escape)
+- [ ] Add `@storybook/addon-a11y` and basic interaction tests for `ServerForm` and `ToolsModal`
+- [ ] Consider virtualization/memoization for large tool lists if performance becomes an issue
 
-4. **Refactor `useMCPService` state management**
-   - Replace numerous `useState` calls with a reducer or adopt TanStack Query for data + loading/error states.
-   - Simplifies logic currently spread across the hook and makes transitions testable.
-   - _Trade-off:_ moderate refactor and learning curve for contributors unfamiliar with the library.
-   - _Test impact:_ reducer-level tests can target each action, improving coverage of client management flows.
+Testing
+- [ ] Add negative-path tests for bridge parsing (malformed payloads throw)
+- [ ] Increase coverage on complex flows: toggling servers, OAuth start, restart error paths
+- [ ] Keep test output clean (no warnings/noise) and expand fixtures where helpful
 
-5. **Add tests for `useMCPEvents` lifecycle**
-   - Mock `@tauri-apps/api/event` to verify listeners are registered, events trigger loaders, and cleanup cancels timers.
-   - _Trade-off:_ additional mocking utilities.
-   - _Test impact:_ exercises event-driven paths that are currently untested.
-
-6. **Expand `useIncomingClients` tests**
-   - Cover the `reload` function and multiple payload shapes handled by `normalizeConnectedAt`.
-   - _Trade-off:_ more test fixtures.
-   - _Test impact:_ ensures date normalization logic is protected against regressions.
-
-7. **Add runtime validation at the bridge boundary**
-   - Introduce `zod` schemas and validate all `MCPService`/`SettingsService` invoke responses and event payloads.
-   - Centralize parsing in `src/tauri/bridge.ts` (or a small wrapper) so hooks/components stay type-safe without `any` casts.
-   - _Trade-off:_ small bundle/runtime cost; clearer failures.
-   - _Test impact:_ add unit tests for parse failures and happy paths.
-
-8. **Strengthen TypeScript compiler strictness**
-   - In addition to `noImplicitAny`, enable: `strict`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `useUnknownInCatchVariables`, `noFallthroughCasesInSwitch`.
-   - _Trade-off:_ initial cleanup; long-term safety.
-   - _Test impact:_ compiler becomes a stronger static test net.
-
-9. **Remove duplicated types and narrow `any`**
-   - Deduplicate `IncomingClient` between `hook` and `bridge`; prefer a single exported type.
-   - Replace `any` (e.g., `ToolsModal.inputSchema`, casts in `useIncomingClients`) with `unknown` or concrete types.
-   - _Trade-off:_ minor refactors across files.
-   - _Test impact:_ reduces type gaps in mocks and fixtures.
-
-10. **Accessibility and focus management for modals**
-    - Add `role="dialog"`, `aria-modal`, aria labelling, and a lightweight focus trap to `ToolsModal`.
-    - Keep Escape-to-close and backdrop click; trap Tab within the modal.
-    - _Trade-off:_ a tiny util or helper component.
-    - _Test impact:_ RTL tests for focus loop and a11y attributes.
-
-11. **Event subscription helper**
-    - Factor the promise-to-unsub pattern used in `useIncomingClients`/`useMCPEvents` into a small utility to standardize safe cleanup.
-    - _Trade-off:_ new helper; simpler hooks.
-    - _Test impact:_ focused unit tests for subscribe/unsubscribe behavior.
-
-12. **Render performance for large lists**
-    - Memoize `ServerCard` rows and consider simple virtualization for Tools list when tool count is high.
-    - _Trade-off:_ minor complexity; big wins at scale.
-    - _Test impact:_ none required; optional performance assertions.
-
-13. **ESLint (TypeScript + React) setup**
-    - Add `eslint`, `@typescript-eslint/*`, `eslint-plugin-react-hooks`, and rules for `no-explicit-any`, `no-console` (warn in dev, error in prod), and import consistency.
-    - _Trade-off:_ dev dependency + config.
-    - _Test impact:_ catches issues earlier; integrate into CI.
-
-14. **Storybook a11y and interaction testing**
-    - Add `@storybook/addon-a11y` and a couple of interaction tests for critical components (ServerForm, ToolsModal).
-    - _Trade-off:_ more tooling; helps visual/behavioral regressions.
-    - _Test impact:_ improves coverage beyond unit tests.
+Notes discovered during review
+- Duplicate hooks for server actions exist (`useServerActions` and `useMCPActions`); unify to avoid drift.
+- Bridge `unwrap` uses loose casts; tighten typing and remove `as any`. [Done]
+- Narrow `any` in `normalizeConnectedAt` and `useIncomingClients` to `unknown` and handle precisely. [Done]
+- For stronger typing, push precision into Rust types and specta derivations (including `chrono` integration) and regenerate bindings.

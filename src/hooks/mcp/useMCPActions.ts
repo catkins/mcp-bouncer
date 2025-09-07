@@ -1,14 +1,14 @@
 import { useCallback } from 'react';
 import { MCPService, SettingsService } from '../../tauri/bridge';
 import type { MCPServerConfig } from '../../tauri/bridge';
-import type { LoadingStates } from './types';
+import type { LoadingStates, ErrorStates } from './types';
 
 export function useMCPActions(
   deps: {
     servers: MCPServerConfig[];
     setServers: (updater: (prev: MCPServerConfig[]) => MCPServerConfig[]) => void;
     setLoadingStates: (updater: (prev: LoadingStates) => LoadingStates) => void;
-    setErrors: (updater: (prev: any) => any) => void;
+    setErrors: (updater: (prev: ErrorStates) => ErrorStates) => void;
     loadClientStatus: () => Promise<void>;
     loadServers: () => Promise<void>;
   },
@@ -42,14 +42,14 @@ export function useMCPActions(
 
   const setError = useCallback(
     (key: 'addServer' | 'updateServer' | 'removeServer' | 'general', error?: string) => {
-      deps.setErrors((prev: any) => ({ ...prev, [key]: error }));
+      deps.setErrors(prev => ({ ...prev, [key]: error }));
     },
     [deps],
   );
 
   const setToggleError = useCallback(
     (serverName: string, error?: string) => {
-      deps.setErrors((prev: any) => ({
+      deps.setErrors(prev => ({
         ...prev,
         toggleServer: { ...prev.toggleServer, [serverName]: error },
       }));

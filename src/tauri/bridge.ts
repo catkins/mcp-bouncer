@@ -14,9 +14,8 @@ export type TransportType = TransportTypeType;
 export type { MCPServerConfig, Settings, ClientStatus, IncomingClient, Tool };
 
 function unwrap<T, E>(res: Result<T, E>): T {
-  if ((res as any).status === 'ok') return (res as any).data as T;
-  // Convert backend error to Error for catch blocks
-  const err = (res as any).error;
+  if (res.status === 'ok') return res.data;
+  const err = res.error;
   throw new Error(typeof err === 'string' ? err : JSON.stringify(err));
 }
 
