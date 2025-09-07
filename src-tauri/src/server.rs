@@ -42,10 +42,8 @@ fn extract_str<'a>(val: &'a serde_json::Value, paths: &[&str]) -> Option<&'a str
                 break;
             }
         }
-        if ok {
-            if let Some(s) = cur.as_str() {
-                return Some(s);
-            }
+        if ok && let Some(s) = cur.as_str() {
+            return Some(s);
         }
     }
     None
@@ -330,7 +328,9 @@ async fn aggregate_tools(
     tools
 }
 
+/* test module moved to end of file to satisfy clippy::items-after-test-module */
 #[cfg(test)]
+#[allow(clippy::items_after_test_module)]
 mod tests {
     use super::*;
     use crate::config::{ConfigProvider, default_settings, save_settings_with};
@@ -519,3 +519,5 @@ where
 pub fn stop_http_server(handle: &tokio::task::JoinHandle<()>) {
     handle.abort();
 }
+
+// Keep tests at the end of the file so clippy doesn't flag items after test module.

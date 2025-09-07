@@ -7,7 +7,7 @@ interface KeyValueListProps {
   keyPlaceholder: string;
   valuePlaceholder: string;
   onAdd: () => void;
-  onUpdate: (oldKey: string, newKey: string, value: string) => void;
+  onUpdate: (index: number, oldKey: string, newKey: string, value: string) => void;
   onRemove: (key: string) => void;
   ariaLabelBase: string;
 }
@@ -42,19 +42,19 @@ export function KeyValueList({
       </div>
       <div className="space-y-1.5">
         {Object.entries(items || {}).map(([key, value], index) => (
-          <div key={`${key}-${index}`} className="flex items-center gap-1.5">
+          <div key={`kv-${index}`} className="flex items-center gap-1.5">
             <input
               type="text"
               value={key}
-              onChange={e => onUpdate(key, e.target.value, value)}
+              onChange={e => onUpdate(index, key, e.target.value, value)}
               className="w-1/3 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
               placeholder={keyPlaceholder}
-              aria-label={`${ariaLabelBase} name ${index + 1}`}
+              aria-label={`${ariaLabelBase} key ${index + 1}`}
             />
             <input
               type="text"
               value={value}
-              onChange={e => onUpdate(key, key, e.target.value)}
+              onChange={e => onUpdate(index, key, key, e.target.value)}
               className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
               placeholder={valuePlaceholder}
               aria-label={`${ariaLabelBase} value ${index + 1}`}

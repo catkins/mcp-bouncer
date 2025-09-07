@@ -42,7 +42,8 @@ This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the of
 - `src-tauri/src/incoming.rs`: In-memory registry of incoming clients recorded on rmcp Initialize
 - `src-tauri/tauri.conf.json`: Tauri config (build hooks and frontendDist)
 - `src-tauri/capabilities/events.json`: grants `event.listen` to the main window/webview
-- `src/tauri/bridge.ts`: minimal adapter for Tauri `invoke` + `listen`
+- `src/tauri/bindings.ts`: generated TypeScript bindings for commands/types (debug builds)
+- `src/tauri/bridge.ts`: thin adapter over bindings (unwraps results, exports runtime TransportType constants)
 - `src/`: React 19 + TypeScript frontend (Vite, Tailwind 4)
 
 ### Backend (Rust)
@@ -79,7 +80,7 @@ This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the of
 - Clean output: tests should run with zero warnings; console noise is suppressed in setup.
 
 ### Frontend (React)
-- Uses `@tauri-apps/api` with `src/tauri/bridge.ts`
+- Uses `src/tauri/bridge.ts` (which wraps the generated `src/tauri/bindings.ts`)
 - Hooks (`useMCPService`, `useIncomingClients`) subscribe via `event.listen`
 - No Wails bindings — do not import from `frontend/bindings` or `@wailsio/runtime`
 

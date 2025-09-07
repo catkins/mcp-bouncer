@@ -15,6 +15,9 @@ const mockServers: MCPServerConfig[] = [
     env: {
       API_KEY: 'your-api-key',
     },
+    endpoint: null,
+    headers: {},
+    requires_auth: null,
   },
   {
     name: 'buildkite',
@@ -23,9 +26,12 @@ const mockServers: MCPServerConfig[] = [
     endpoint: 'http://localhost:7700/mcp',
     enabled: true,
     command: '',
+    args: [],
+    env: {},
     headers: {
       Authorization: 'Bearer token123',
     },
+    requires_auth: null,
   },
   {
     name: 'disabled-server',
@@ -35,6 +41,9 @@ const mockServers: MCPServerConfig[] = [
     transport: TransportType.Stdio,
     enabled: false,
     env: {},
+    endpoint: null,
+    headers: {},
+    requires_auth: null,
   },
 ];
 
@@ -93,18 +102,6 @@ const mockClientStatusWithErrors: Record<string, ClientStatus> = {
   },
 };
 
-const mockLoadingStates = {
-  addServer: false,
-  updateServer: false,
-  removeServer: false,
-  general: false,
-  toggleServer: {},
-  restartServer: {},
-};
-
-const mockErrors = {
-  toggleServer: {},
-};
 
 const meta: Meta<typeof ServerList> = {
   title: 'Components/ServerList',
@@ -123,8 +120,6 @@ const meta: Meta<typeof ServerList> = {
   args: {
     servers: mockServers,
     clientStatus: mockClientStatus,
-    loadingStates: mockLoadingStates,
-    errors: mockErrors,
   },
   argTypes: {
     onAddServer: { action: 'addServer' },
@@ -172,63 +167,7 @@ export const WithErrors: Story = {
   },
 };
 
-export const LoadingAddServer: Story = {
-  args: {
-    loadingStates: {
-      ...mockLoadingStates,
-      addServer: true,
-    },
-  },
-};
-
-export const LoadingToggle: Story = {
-  args: {
-    loadingStates: {
-      ...mockLoadingStates,
-      toggleServer: {
-        fetch: true,
-      },
-    },
-  },
-};
-
-export const LoadingRestart: Story = {
-  args: {
-    loadingStates: {
-      ...mockLoadingStates,
-      restartServer: {
-        buildkite: true,
-      },
-    },
-  },
-};
-
-export const LoadingMultiple: Story = {
-  args: {
-    loadingStates: {
-      ...mockLoadingStates,
-      toggleServer: {
-        fetch: true,
-        buildkite: true,
-      },
-      restartServer: {
-        fetch: true,
-      },
-    },
-  },
-};
-
-export const WithToggleErrors: Story = {
-  args: {
-    errors: {
-      ...mockErrors,
-      toggleServer: {
-        fetch: 'Failed to enable server: Connection refused',
-        buildkite: 'Server is already running',
-      },
-    },
-  },
-};
+// Loading and error states are now internal to the component and exercised via unit tests.
 
 export const MixedTransports: Story = {
   args: {
@@ -241,6 +180,10 @@ export const MixedTransports: Story = {
         endpoint: 'https://mcp.example.com/sse',
         enabled: true,
         command: '',
+        args: [],
+        env: {},
+        headers: {},
+        requires_auth: null,
       },
     ],
     clientStatus: {
@@ -291,6 +234,9 @@ export const LargeList: Story = {
         transport: TransportType.Stdio,
         enabled: true,
         env: {},
+        endpoint: null,
+        headers: {},
+        requires_auth: null,
       },
       {
         name: 'server-5',
@@ -299,6 +245,10 @@ export const LargeList: Story = {
         endpoint: 'https://api.example.com/sse',
         enabled: false,
         command: '',
+        args: [],
+        env: {},
+        headers: {},
+        requires_auth: null,
       },
       {
         name: 'server-6',
@@ -308,6 +258,9 @@ export const LargeList: Story = {
         enabled: true,
         command: '',
         requires_auth: true,
+        args: [],
+        env: {},
+        headers: {},
       },
     ],
     clientStatus: {

@@ -1,28 +1,22 @@
 import { useEffect, useState } from 'react';
-import { MCPService } from '../tauri/bridge';
-import { listen } from '@tauri-apps/api/event';
+import { MCPService, type IncomingClient as IncomingClientType } from '../tauri/bridge';
+import { on, safeUnlisten, EVENT_INCOMING_CLIENT_CONNECTED, EVENT_INCOMING_CLIENT_DISCONNECTED, EVENT_INCOMING_CLIENTS_UPDATED } from '../tauri/events';
 import { normalizeConnectedAt } from '../utils/date';
-import { EventsMap, type IncomingClientConnectedPayload, type IncomingClientDisconnectedPayload } from '../types/events';
+import type { IncomingClientConnectedPayload, IncomingClientDisconnectedPayload } from '../types/events';
 
-export type IncomingClient = {
-  id: string;
-  name: string;
-  version: string;
-  title?: string;
-  connected_at: string | Date | null;
-};
+export type IncomingClient = IncomingClientType;
 
 export function useIncomingClients() {
   const [clients, setClients] = useState<IncomingClient[]>([]);
 
   const reload = async () => {
     try {
-      const list = (await MCPService.GetIncomingClients()) as any[];
+      const list = await MCPService.GetIncomingClients();
       setClients(
         list.map(item => ({
           ...item,
-          connected_at: normalizeConnectedAt(item.connected_at),
-        })),
+          connected_at: normalizeConnectedAt(item.connected_at as any) as string | null,
+        })) as IncomingClient[]
       );
     } catch (e) {
       console.error('Failed to load incoming clients', e);
@@ -35,7 +29,7 @@ export function useIncomingClients() {
     let cancelled = false;
     const unsubs: Array<() => void> = [];
 
-    const unsub1Promise = listen<IncomingClientConnectedPayload>(EventsMap.IncomingClientConnected, async (e) => {
+    const unsub1Promise = on<IncomingClientConnectedPayload>(EVENT_INCOMING_CLIENT_CONNECTED, async (e) => {
       const data = e.payload;
       setClients(prev => {
         const rest = prev.filter(c => c.id !== data.id);
@@ -46,29 +40,25 @@ export function useIncomingClients() {
             name: data.name,
             version: data.version,
             title: data.title,
-            connected_at: normalizeConnectedAt(data.connected_at),
+            connected_at: normalizeConnectedAt(data.connected_at as any) as string | null,
           },
         ];
       });
     });
 
-    const unsub2Promise = listen<IncomingClientDisconnectedPayload>(EventsMap.IncomingClientDisconnected, async (e) => {
+    const unsub2Promise = on<IncomingClientDisconnectedPayload>(EVENT_INCOMING_CLIENT_DISCONNECTED, async (e) => {
       const data = e.payload;
       setClients(prev => prev.filter(c => c.id !== data.id));
     });
 
-    const unsub3Promise = listen(EventsMap.IncomingClientsUpdated, async () => {
+    const unsub3Promise = on(EVENT_INCOMING_CLIENTS_UPDATED, async () => {
       await reload();
     });
 
     // capture unsubs when ready; if already cancelled, unlisten immediately
-    unsub1Promise.then(u => (cancelled ? (void (safeUnlisten(u))) : unsubs.push(u))).catch(() => {});
-    unsub2Promise.then(u => (cancelled ? (void (safeUnlisten(u))) : unsubs.push(u))).catch(() => {});
-    unsub3Promise.then(u => (cancelled ? (void (safeUnlisten(u))) : unsubs.push(u))).catch(() => {});
-
-    function safeUnlisten(u: () => void) {
-      try { u(); } catch { /* noop */ }
-    }
+    unsub1Promise.then(u => (cancelled ? (void safeUnlisten(u)) : unsubs.push(u))).catch(() => {});
+    unsub2Promise.then(u => (cancelled ? (void safeUnlisten(u)) : unsubs.push(u))).catch(() => {});
+    unsub3Promise.then(u => (cancelled ? (void safeUnlisten(u)) : unsubs.push(u))).catch(() => {});
 
     return () => {
       cancelled = true;

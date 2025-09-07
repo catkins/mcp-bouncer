@@ -168,7 +168,9 @@ mcp-bouncer/
 │       ├── events.rs         # Event emission abstraction + helpers
 │       ├── app_logic.rs      # Thin orchestration adapters (e.g., settings update)
 │       ├── incoming.rs       # In‑memory registry for incoming clients (Initialize)
-│       └── main.rs           # App entry; thin Tauri commands wiring
+│       └── main.rs           # App entry; thin Tauri commands wiring (auto-exports TS bindings in debug)
+├── src/tauri/bindings.ts     # Generated TS bindings (debug builds)
+└── src/tauri/bridge.ts       # Thin wrapper over generated bindings for the UI
 └── settings.example.json     # Example configuration
 ```
 
@@ -203,6 +205,7 @@ mcp-bouncer/
 - **Frontend**: React 19 + TypeScript + Tailwind CSS 4 + Vite.
   - Uses `@tauri-apps/api` and a small adapter at `src/tauri/bridge.ts` for commands and events.
 - **Settings**: JSON at `$XDG_CONFIG_HOME/mcp-bouncer/settings.json`.
+- TypeScript bindings for Tauri commands and shared structs are generated automatically in debug builds using specta + tauri-specta. The generated file is at `src/tauri/bindings.ts`, and the frontend uses a thin adapter `src/tauri/bridge.ts` for ergonomic calls.
 
 ### Dev Commands
 - Dev app: `npx tauri dev`

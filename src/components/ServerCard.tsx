@@ -262,13 +262,13 @@ export function ServerCard({
               </code>
             </div>
 
-            {server.args && server.args.length > 0 && (
+            {(server.args ?? []).length > 0 && (
               <div className="flex items-start gap-2">
                 <span className="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">
                   Arguments:
                 </span>
                 <div className="flex flex-wrap gap-1">
-                  {server.args.map((arg, index) => (
+                  {(server.args ?? []).map((arg: string, index: number) => (
                     <code
                       key={index}
                       className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono"
@@ -280,13 +280,13 @@ export function ServerCard({
               </div>
             )}
 
-            {server.env && Object.keys(server.env).length > 0 && (
+            {server.env && Object.keys(server.env as Record<string, string>).length > 0 && (
               <div>
                 <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
                   Environment:
                 </span>
                 <div className="mt-1 space-y-1">
-                  {Object.entries(server.env).map(([key, value]) => (
+                  {Object.entries((server.env ?? {}) as Record<string, string>).map(([key, value]: [string, string]) => (
                     <div key={key} className="flex items-center gap-2">
                       <code className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
                         {key}={value}
@@ -313,13 +313,13 @@ export function ServerCard({
               </div>
             )}
 
-            {server.headers && Object.keys(server.headers).length > 0 && (
+            {server.headers && Object.keys(server.headers as Record<string, string>).length > 0 && (
               <div>
                 <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
                   Headers:
                 </span>
                 <div className="mt-1 space-y-1">
-                  {Object.entries(server.headers).map(([key, value]) => (
+                  {Object.entries((server.headers ?? {}) as Record<string, string>).map(([key, value]: [string, string]) => (
                     <div key={key} className="flex items-center gap-2">
                       <code className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
                         {key}: {value}

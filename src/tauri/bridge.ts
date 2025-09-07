@@ -1,99 +1,76 @@
-// Tauri v2 bridge: exports MCPService, SettingsService, and shared types.
+// Tauri v2 bridge: thin wrappers over generated bindings for ergonomics.
+import { commands, type Result, type MCPServerConfig, type Settings, type ClientStatus, type IncomingClient, type ToolInfo as Tool } from './bindings';
+// Keep a runtime constant for convenience while using the generated TransportType type.
+import type { TransportType as TransportTypeType } from './bindings';
 
-import { invoke } from '@tauri-apps/api/core';
+export const TransportType = {
+  Stdio: 'stdio',
+  Sse: 'sse',
+  StreamableHttp: 'streamable_http',
+} as const;
+export type TransportType = TransportTypeType;
 
-// Shared types for frontend-backend communication
-export enum TransportType {
-  Stdio = 'stdio',
-  Sse = 'sse',
-  StreamableHttp = 'streamable_http',
+// Re-export generated types for consumers of this module
+export type { MCPServerConfig, Settings, ClientStatus, IncomingClient, Tool };
+
+function unwrap<T, E>(res: Result<T, E>): T {
+  if ((res as any).status === 'ok') return (res as any).data as T;
+  // Convert backend error to Error for catch blocks
+  const err = (res as any).error;
+  throw new Error(typeof err === 'string' ? err : JSON.stringify(err));
 }
-
-export interface MCPServerConfig {
-  name: string;
-  description: string;
-  transport: TransportType | '';
-  command: string;
-  args?: string[];
-  env?: Record<string, string>;
-  endpoint?: string;
-  headers?: Record<string, string>;
-  requires_auth?: boolean;
-  enabled: boolean;
-}
-
-export interface Settings {
-  mcp_servers: MCPServerConfig[];
-  listen_addr: string;
-}
-
-export interface ClientStatus {
-  name: string;
-  state: 'disconnected' | 'connecting' | 'errored' | 'connected' | 'requires_authorization' | 'authorizing';
-  tools: number;
-  last_error?: string;
-  authorization_required: boolean;
-  oauth_authenticated: boolean;
-}
-
-export type IncomingClient = {
-  id: string;
-  name: string;
-  version: string;
-  title?: string;
-  connected_at: string | Date | null;
-};
 
 export const MCPService = {
   async List(): Promise<MCPServerConfig[]> {
-    return invoke('mcp_list');
+    return unwrap(await commands.mcpList());
   },
   async ListenAddr(): Promise<string> {
-    return invoke('mcp_listen_addr');
+    return unwrap(await commands.mcpListenAddr());
   },
   async IsActive(): Promise<boolean> {
-    return invoke('mcp_is_active');
+    return unwrap(await commands.mcpIsActive());
   },
   async GetClientStatus(): Promise<Record<string, ClientStatus>> {
-    return invoke('mcp_get_client_status');
+    // commands return Partial<Record<string, ClientStatus>>; coerce to regular record
+    return unwrap(await commands.mcpGetClientStatus()) as Record<string, ClientStatus>;
   },
   async GetIncomingClients(): Promise<IncomingClient[]> {
-    return invoke('mcp_get_incoming_clients');
+    return unwrap(await commands.mcpGetIncomingClients());
   },
   async AddMCPServer(config: MCPServerConfig): Promise<void> {
-    return invoke('mcp_add_server', { config });
+    unwrap(await commands.mcpAddServer(config));
   },
   async UpdateMCPServer(name: string, config: MCPServerConfig): Promise<void> {
-    return invoke('mcp_update_server', { name, config });
+    unwrap(await commands.mcpUpdateServer(name, config));
   },
   async RemoveMCPServer(name: string): Promise<void> {
-    return invoke('mcp_remove_server', { name });
+    unwrap(await commands.mcpRemoveServer(name));
   },
   async ToggleServerEnabled(name: string, enabled: boolean): Promise<void> {
-    return invoke('mcp_toggle_server_enabled', { name, enabled });
+    unwrap(await commands.mcpToggleServerEnabled(name, enabled));
   },
   async RestartClient(name: string): Promise<void> {
-    return invoke('mcp_restart_client', { name });
+    unwrap(await commands.mcpRestartClient(name));
   },
   async StartOAuth(name: string): Promise<void> {
-    return invoke('mcp_start_oauth', { name });
+    unwrap(await commands.mcpStartOauth(name));
   },
-  async GetClientTools(clientName: string): Promise<any[]> {
-    return invoke('mcp_get_client_tools', { clientName });
+  async GetClientTools(clientName: string): Promise<Tool[]> {
+    return unwrap(await commands.mcpGetClientTools(clientName));
   },
   async ToggleTool(clientName: string, toolName: string, enabled: boolean): Promise<void> {
-    return invoke('mcp_toggle_tool', { clientName, toolName, enabled });
+    unwrap(await commands.mcpToggleTool(clientName, toolName, enabled));
   },
 };
 
 export const SettingsService = {
   async GetSettings(): Promise<Settings | null> {
-    return invoke('settings_get_settings');
+    return unwrap(await commands.settingsGetSettings());
   },
   async OpenConfigDirectory(): Promise<void> {
-    return invoke('settings_open_config_directory');
+    unwrap(await commands.settingsOpenConfigDirectory());
   },
   async UpdateSettings(settings: Settings | null): Promise<void> {
-    return invoke('settings_update_settings', { settings });
+    unwrap(await commands.settingsUpdateSettings(settings));
   },
 };

@@ -16,20 +16,6 @@ interface ServerListProps {
   onRestartServer: (name: string) => Promise<void>;
   onRefreshStatus?: (serverName: string) => Promise<void>;
   onAuthorizeServer?: (name: string) => Promise<void>;
-  loadingStates: {
-    addServer: boolean;
-    updateServer: boolean;
-    removeServer: boolean;
-    toggleServer: { [key: string]: boolean };
-    restartServer: { [key: string]: boolean };
-  };
-  errors: {
-    addServer?: string;
-    updateServer?: string;
-    removeServer?: string;
-    general?: string;
-    toggleServer?: { [key: string]: string | undefined };
-  };
 }
 
 export function ServerList({
@@ -42,12 +28,15 @@ export function ServerList({
   onRestartServer,
   onAuthorizeServer,
   onRefreshStatus,
-  loadingStates,
-  errors,
 }: ServerListProps) {
   const [showAddServer, setShowAddServer] = useState<boolean>(false);
   const [editingServer, setEditingServer] = useState<MCPServerConfig | null>(null);
   const [toolsModalServer, setToolsModalServer] = useState<string | null>(null);
+  const [formLoading, setFormLoading] = useState(false);
+  const [toggleLoading, setToggleLoading] = useState<Record<string, boolean>>({});
+  const [restartLoading, setRestartLoading] = useState<Record<string, boolean>>({});
+  const [toggleErrors, setToggleErrors] = useState<Record<string, string | undefined>>({});
+  const [removeLoading, setRemoveLoading] = useState<Record<string, boolean>>({});
 
   // Optional debug logging in dev
   useEffect(() => {
@@ -61,6 +50,7 @@ export function ServerList({
 
   const handleSaveServer = async (serverConfig: MCPServerConfig) => {
     try {
+      setFormLoading(true);
       if (editingServer && editingServer.name) {
         await onUpdateServer(editingServer.name, serverConfig);
       } else {
@@ -71,6 +61,8 @@ export function ServerList({
     } catch (error) {
       console.error('Failed to save server:', error);
       // Keep modal open on error
+    } finally {
+      setFormLoading(false);
     }
   };
 
@@ -87,9 +79,33 @@ export function ServerList({
 
   const handleRemoveServer = async (serverName: string) => {
     try {
+      setRemoveLoading(prev => ({ ...prev, [serverName]: true }));
       await onRemoveServer(serverName);
     } catch (error) {
       console.error('Failed to remove server:', error);
+    } finally {
+      setRemoveLoading(prev => ({ ...prev, [serverName]: false }));
+    }
+  };
+
+  const handleToggle = async (serverName: string, enabled: boolean) => {
+    setToggleErrors(prev => ({ ...prev, [serverName]: undefined }));
+    setToggleLoading(prev => ({ ...prev, [serverName]: true }));
+    try {
+      await onToggleServer(serverName, enabled);
+    } catch (error) {
+      setToggleErrors(prev => ({ ...prev, [serverName]: `Failed to ${enabled ? 'enable' : 'disable'} server` }));
+    } finally {
+      setToggleLoading(prev => ({ ...prev, [serverName]: false }));
+    }
+  };
+
+  const handleRestart = async (serverName: string) => {
+    setRestartLoading(prev => ({ ...prev, [serverName]: true }));
+    try {
+      await onRestartServer(serverName);
+    } finally {
+      setRestartLoading(prev => ({ ...prev, [serverName]: false }));
     }
   };
 
@@ -111,14 +127,13 @@ export function ServerList({
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Check for Cmd+A (macOS) or Ctrl+A (other platforms)
-      if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
-        e.preventDefault(); // Prevent default "select all" behavior
-        if (!showAddServer && !editingServer && !toolsModalServer) {
+      if (!showAddServer && !editingServer && !toolsModalServer) {
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
+          e.preventDefault()
           handleAddServer();
         }
       }
-    };
+    }
 
     document.addEventListener('keydown', handleKeyDown);
     return () => {
@@ -132,7 +147,6 @@ export function ServerList({
         <h2 className="text-base font-semibold text-gray-900 dark:text-white">Servers</h2>
         <LoadingButton
           onClick={handleAddServer}
-          loading={loadingStates.addServer}
           size="sm"
           className="whitespace-nowrap flex-shrink-0 text-xs px-2 py-1 h-6"
         >
@@ -152,12 +166,7 @@ export function ServerList({
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
             Add your first MCP server to get started
           </p>
-          <LoadingButton
-            onClick={handleAddServer}
-            loading={loadingStates.addServer}
-            size="sm"
-            className="text-xs px-2 py-1 h-6"
-          >
+          <LoadingButton onClick={handleAddServer} size="sm" className="text-xs px-2 py-1 h-6">
             <PlusIcon className="h-3 w-3 inline-block" />
             Add Server
           </LoadingButton>
@@ -178,14 +187,14 @@ export function ServerList({
                 clientStatus={clientStatus[server.name] || {}}
                 onEdit={handleEditServer}
                 onRemove={handleRemoveServer}
-                onToggle={onToggleServer}
-                onRestart={() => onRestartServer(server.name)}
+                onToggle={handleToggle}
+                onRestart={() => handleRestart(server.name)}
                 onAuthorize={onAuthorizeServer ? () => onAuthorizeServer(server.name) : undefined}
                 onOpenTools={handleOpenTools}
-                loading={loadingStates.updateServer || loadingStates.removeServer}
-                toggleLoading={loadingStates.toggleServer[server.name] || false}
-                restartLoading={loadingStates.restartServer[server.name] || false}
-                toggleError={errors.toggleServer?.[server.name]}
+                loading={removeLoading[server.name] || false}
+                toggleLoading={toggleLoading[server.name] || false}
+                restartLoading={restartLoading[server.name] || false}
+                toggleError={toggleErrors[server.name]}
                 onRefreshStatus={onRefreshStatus}
               />
             </div>
@@ -198,7 +207,7 @@ export function ServerList({
           server={editingServer}
           onSave={handleSaveServer}
           onCancel={handleCancelServer}
-          loading={loadingStates.addServer || loadingStates.updateServer}
+          loading={formLoading}
           existingServers={servers}
         />
       )}

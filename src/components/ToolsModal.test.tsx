@@ -43,4 +43,21 @@ describe('ToolsModal', () => {
     await userEvent.click(bulk);
     expect((MCPService.ToggleTool as any).mock.calls.length).toBeGreaterThan(0);
   });
+
+  it('exposes dialog role and traps focus; Escape closes', async () => {
+    const onClose = vi.fn();
+    const { findByRole } = render(
+      <ToolsModal serverName="svc" isOpen={true} onClose={onClose} />,
+    );
+    const dialog = await findByRole('dialog', { name: /tools - svc/i });
+    expect(dialog).toBeInTheDocument();
+
+    // initial focus lands on the close button (data-initial-focus)
+    const active = document.activeElement as HTMLElement;
+    expect(active?.getAttribute('aria-label') || '').toMatch(/close tools modal/i);
+
+    // Press Escape closes
+    await userEvent.keyboard('{Escape}');
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });
