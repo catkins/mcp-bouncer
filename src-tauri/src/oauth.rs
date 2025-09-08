@@ -10,8 +10,18 @@ use crate::events::{EventEmitter, client_error, client_status_changed};
 use crate::overlay;
 use anyhow::{Context, Result};
 
+// Persist an absolute `expires_at` alongside the raw OAuth response JSON.
+
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
-struct OAuthFile(HashMap<String, OAuthTokenResponse>);
+struct OAuthFileV2(HashMap<String, PersistedCreds>);
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct PersistedCreds {
+    // Raw OAuth token response as JSON (keeps compatibility with upstream crate fields)
+    data: serde_json::Value,
+    // Absolute Unix timestamp (seconds) when access token expires
+    expires_at: Option<i64>,
+}
 
 fn oauth_path(cp: &dyn ConfigProvider) -> PathBuf {
     cp.base_dir().join("oauth.json")
@@ -23,8 +33,32 @@ pub fn load_credentials_for(cp: &dyn ConfigProvider, name: &str) -> Option<OAuth
         return None;
     }
     let bytes = std::fs::read(&p).ok()?;
-    let map: OAuthFile = serde_json::from_slice(&bytes).ok()?;
-    map.0.get(name).cloned()
+
+    // Parse new mandatory format
+    if let Ok(map) = serde_json::from_slice::<OAuthFileV2>(&bytes) {
+        if let Some(pc) = map.0.get(name) {
+            let mut data = pc.data.clone();
+            // Compute current relative expires_in from absolute expires_at
+            if let Some(expires_at) = pc.expires_at {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs() as i64)
+                    .unwrap_or(0);
+                let mut rel = expires_at - now;
+                if rel < 0 { rel = 0; }
+                if let Some(obj) = data.as_object_mut() {
+                    obj.insert(
+                        "expires_in".to_string(),
+                        serde_json::Value::Number(serde_json::Number::from(rel as u64)),
+                    );
+                }
+            }
+            return serde_json::from_value::<OAuthTokenResponse>(data).ok();
+        }
+        None
+    } else {
+        None
+    }
 }
 
 pub fn save_credentials_for(
@@ -33,13 +67,35 @@ pub fn save_credentials_for(
     creds: OAuthTokenResponse,
 ) -> Result<(), String> {
     let p = oauth_path(cp);
-    let mut map = if p.exists() {
-        let bytes = std::fs::read(&p).map_err(|e| e.to_string())?;
-        serde_json::from_slice::<OAuthFile>(&bytes).unwrap_or_default()
-    } else {
-        OAuthFile::default()
+
+    // Serialize creds to JSON to avoid relying on private struct fields
+    let data = serde_json::to_value(&creds).map_err(|e| e.to_string())?;
+
+    // Compute absolute expires_at from relative expires_in if present
+    let expires_at: Option<i64> = match data.get("expires_in").and_then(|v| v.as_i64()) {
+        Some(rel) if rel > 0 => {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0);
+            Some(now + rel)
+        }
+        _ => None,
     };
-    map.0.insert(name.to_string(), creds);
+
+    let mut map = if p.exists() {
+        // Read existing file or start fresh
+        let bytes = std::fs::read(&p).map_err(|e| e.to_string())?;
+        serde_json::from_slice::<OAuthFileV2>(&bytes).unwrap_or_default()
+    } else {
+        OAuthFileV2::default()
+    };
+
+    map.0.insert(
+        name.to_string(),
+        PersistedCreds { data, expires_at },
+    );
+
     if let Some(dir) = p.parent() {
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     }
