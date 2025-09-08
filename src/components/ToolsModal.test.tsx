@@ -14,6 +14,7 @@ vi.mock('../tauri/bridge', async () => {
         { name: 'a', description: 'A' },
         { name: 'b', description: 'B' },
       ]),
+      RefreshClientTools: vi.fn(async () => {}),
       ToggleTool: vi.fn(async () => {}),
     },
   };
@@ -42,6 +43,24 @@ describe('ToolsModal', () => {
     const bulk = getByRole('button', { name: /enable all|disable all/i });
     await userEvent.click(bulk);
     expect((MCPService.ToggleTool as any).mock.calls.length).toBeGreaterThan(0);
+  });
+
+  it('refresh button triggers refresh and reloads tools', async () => {
+    const { findByRole, getByRole } = render(
+      <ToolsModal serverName="svc" isOpen={true} onClose={() => {}} />,
+    );
+    await findByRole('dialog', { name: /tools - svc/i });
+
+    const before = (MCPService.GetClientTools as any).mock.calls.length;
+    // Next call after refresh returns a different set
+    (MCPService.GetClientTools as any).mockResolvedValueOnce([
+      { name: 'c', description: 'C' },
+    ]);
+
+    const refresh = getByRole('button', { name: /refresh tools for svc/i });
+    await userEvent.click(refresh);
+    expect(MCPService.RefreshClientTools).toHaveBeenCalledWith('svc');
+    expect((MCPService.GetClientTools as any).mock.calls.length).toBe(before + 1);
   });
 
   it('shows error and reverts state when toggle fails', async () => {

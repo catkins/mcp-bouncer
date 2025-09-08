@@ -14,7 +14,6 @@ use mcp_bouncer::oauth::start_oauth_for_server;
 use mcp_bouncer::server::{get_runtime_listen_addr, start_http_server};
 use mcp_bouncer::unauthorized;
 use serde::Serialize;
-use specta::Type;
 #[cfg(debug_assertions)]
 use specta_typescript::Typescript;
 #[cfg(debug_assertions)]
@@ -273,53 +272,46 @@ async fn mcp_start_oauth(app: tauri::AppHandle, name: String) -> Result<(), Stri
         .map_err(|e| e.to_string())
 }
 
-#[derive(Debug, Clone, Serialize, Type)]
-pub struct ToolInfo {
-    pub name: String,
-    #[specta(optional)]
-    pub description: Option<String>,
-    #[specta(optional)]
-    pub input_schema: Option<serde_json::Value>,
-}
+use mcp_bouncer::types::ToolInfo;
 
 #[tauri::command]
 #[specta::specta]
 async fn mcp_get_client_tools(client_name: String) -> Result<Vec<ToolInfo>, String> {
-    if let Some(cfg) = get_server_by_name(&client_name) {
-        let list = fetch_tools_for_cfg(&cfg).await.map_err(|e| e.to_string())?;
-        // Filter based on toggles
-        let state =
-            mcp_bouncer::config::load_tools_state_with(&mcp_bouncer::config::OsConfigProvider);
-        let mut out: Vec<ToolInfo> = Vec::new();
-        for v in list.into_iter() {
-            // keep only enabled tools
-            let name = v.get("name").and_then(|n| n.as_str()).unwrap_or("");
-            if !state
-                .0
-                .get(&client_name)
-                .and_then(|m| m.get(name))
-                .copied()
-                .unwrap_or(true)
-            {
-                continue;
-            }
-            let description = v
-                .get("description")
-                .and_then(|d| d.as_str())
-                .map(|s| s.to_string());
-            let input_schema = v
-                .get("input_schema")
-                .cloned()
-                .or_else(|| v.get("inputSchema").cloned());
-            out.push(ToolInfo {
-                name: name.to_string(),
-                description,
-                input_schema,
-            });
-        }
-        return Ok(out);
+    // Use cached tools to avoid re-fetching every modal open
+    let list = mcp_bouncer::tools_cache::get(&client_name).await.unwrap_or_default();
+    // Filter based on persisted toggles
+    Ok(mcp_bouncer::tools_cache::filter_enabled_with(
+        &mcp_bouncer::config::OsConfigProvider,
+        &client_name,
+        list,
+    ))
+}
+
+#[specta::specta]
+#[tauri::command]
+async fn mcp_refresh_client_tools(client_name: String) -> Result<(), String> {
+    let Some(cfg) = get_server_by_name(&client_name) else { return Err("server not found".into()); };
+    let raw = fetch_tools_for_cfg(&cfg).await.map_err(|e| e.to_string())?;
+    let mut out: Vec<ToolInfo> = Vec::new();
+    for v in raw.into_iter() {
+        let name = v.get("name").and_then(|n| n.as_str()).unwrap_or("");
+        let description = v
+            .get("description")
+            .and_then(|d| d.as_str())
+            .map(|s| s.to_string());
+        let input_schema = v
+            .get("input_schema")
+            .cloned()
+            .or_else(|| v.get("inputSchema").cloned());
+        out.push(ToolInfo {
+            name: name.to_string(),
+            description,
+            input_schema,
+        });
     }
-    Ok(Vec::new())
+    mcp_bouncer::tools_cache::set(&client_name, out.clone()).await;
+    mcp_bouncer::overlay::set_tools(&client_name, out.len() as u32).await;
+    Ok(())
 }
 
 async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
@@ -337,7 +329,17 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
             // list tools (forces initialize + verifies connection)
             match client.list_all_tools().await {
                 Ok(tools) => {
-                    ov::set_tools(name, tools.len() as u32).await;
+                    // Populate cache and tools count
+                    let mapped: Vec<ToolInfo> = tools
+                        .iter()
+                        .map(|t| ToolInfo {
+                            name: t.name.to_string(),
+                            description: t.description.clone().map(|s| s.to_string()),
+                            input_schema: None,
+                        })
+                        .collect();
+                    mcp_bouncer::tools_cache::set(name, mapped.clone()).await;
+                    ov::set_tools(name, mapped.len() as u32).await;
                     ov::set_state(name, ClientConnectionState::Connected).await;
                     // If HTTP and we have stored OAuth credentials, reflect authenticated badge
                     if matches!(
@@ -464,6 +466,7 @@ fn main() {
             mcp_restart_client,
             mcp_start_oauth,
             mcp_get_client_tools,
+            mcp_refresh_client_tools,
             mcp_toggle_tool,
             settings_get_settings,
             settings_open_config_directory,
@@ -506,6 +509,7 @@ fn main() {
             mcp_restart_client,
             mcp_start_oauth,
             mcp_get_client_tools,
+            mcp_refresh_client_tools,
             mcp_toggle_tool,
             settings_get_settings,
             settings_open_config_directory,

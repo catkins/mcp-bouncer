@@ -8,3 +8,5 @@ pub mod overlay;
 pub mod server;
 pub mod status;
 pub mod unauthorized;
+pub mod types;
+pub mod tools_cache;

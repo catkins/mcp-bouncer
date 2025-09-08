@@ -54,6 +54,9 @@ export const MCPService = {
   async GetClientTools(clientName: string): Promise<Tool[]> {
     return unwrap(await commands.mcpGetClientTools(clientName));
   },
+  async RefreshClientTools(clientName: string): Promise<void> {
+    unwrap(await commands.mcpRefreshClientTools(clientName));
+  },
   async ToggleTool(clientName: string, toolName: string, enabled: boolean): Promise<void> {
     unwrap(await commands.mcpToggleTool(clientName, toolName, enabled));
   },

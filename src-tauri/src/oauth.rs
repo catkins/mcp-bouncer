@@ -208,11 +208,21 @@ pub async fn start_oauth_for_server<E: EventEmitter>(
         match ensure_rmcp_client(name, &cfg).await {
             Ok(client) => match client.list_all_tools().await {
                 Ok(tools) => {
+                    // cache tools list and update count
+                    let mapped: Vec<crate::types::ToolInfo> = tools
+                        .iter()
+                        .map(|t| crate::types::ToolInfo {
+                            name: t.name.to_string(),
+                            description: t.description.clone().map(|s| s.to_string()),
+                            input_schema: None,
+                        })
+                        .collect();
+                    crate::tools_cache::set(name, mapped.clone()).await;
                     overlay::set_error(name, None).await;
                     overlay::set_state(name, ClientConnectionState::Connected).await;
                     overlay::set_oauth_authenticated(name, true).await;
                     overlay::set_auth_required(name, false).await;
-                    crate::overlay::set_tools(name, tools.len() as u32).await;
+                    crate::overlay::set_tools(name, mapped.len() as u32).await;
                     client_status_changed(emitter, name, "connected");
                 }
                 Err(e) => {

@@ -51,6 +51,24 @@ export function ToolsModal({ serverName, isOpen, onClose }: ToolsModalProps) {
     }
   };
 
+  const handleRefresh = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      await MCPService.RefreshClientTools(serverName);
+      const toolsData = await MCPService.GetClientTools(serverName);
+      setTools(toolsData);
+      const initialStates: { [key: string]: boolean } = {};
+      toolsData.forEach((tool) => { initialStates[tool.name] = true; });
+      setToolStates(initialStates);
+    } catch (err) {
+      console.error('Failed to refresh tools:', err);
+      setError(err instanceof Error ? err.message : 'Failed to refresh tools');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleToggleTool = async (toolName: string, enabled: boolean) => {
     try {
       setToggleLoading(prev => ({ ...prev, [toolName]: true }));
@@ -143,9 +161,14 @@ export function ToolsModal({ serverName, isOpen, onClose }: ToolsModalProps) {
             </h2>
             <span className="text-sm text-gray-500 dark:text-gray-400">({tools.length} tools)</span>
           </div>
-          <LoadingButton data-initial-focus onClick={onClose} variant="secondary" size="sm" className="p-1.5" ariaLabel="Close tools modal">
-            <XMarkIcon className="h-4 w-4" />
-          </LoadingButton>
+          <div className="flex items-center gap-2">
+            <LoadingButton data-initial-focus onClick={onClose} variant="secondary" size="sm" className="p-1.5" ariaLabel="Close tools modal">
+              <XMarkIcon className="h-4 w-4" />
+            </LoadingButton>
+            <LoadingButton onClick={handleRefresh} variant="secondary" size="sm" className="px-2 py-1" ariaLabel={`Refresh tools for ${serverName}`}>
+              Refresh
+            </LoadingButton>
+          </div>
         </div>
 
         {/* Content */}

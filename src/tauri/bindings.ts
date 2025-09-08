@@ -101,6 +101,14 @@ async mcpGetClientTools(clientName: string) : Promise<Result<ToolInfo[], string>
     else return { status: "error", error: e  as any };
 }
 },
+async mcpRefreshClientTools(clientName: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mcp_refresh_client_tools", { clientName }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async mcpToggleTool(clientName: string, toolName: string, enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("mcp_toggle_tool", { clientName, toolName, enabled }) };
