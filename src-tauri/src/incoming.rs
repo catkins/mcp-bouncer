@@ -55,16 +55,16 @@ mod tests {
 
     #[tokio::test]
     async fn records_and_lists_clients() {
+        // Other tests may record concurrently; make assertions resilient to races.
         clear_incoming().await;
+        let before = list_incoming().await.len();
         let id1 = record_connect("client-a".into(), "1.0".into(), None).await;
         let id2 = record_connect("client-b".into(), "2.0".into(), Some("Title".into())).await;
         assert_ne!(id1, id2);
         let list = list_incoming().await;
-        assert_eq!(list.len(), 2);
-        assert!(list.iter().any(|c| c.name == "client-a"));
-        assert!(
-            list.iter()
-                .any(|c| c.name == "client-b" && c.title.as_deref() == Some("Title"))
-        );
+        assert!(list.len() >= before + 2, "expected at least two new clients recorded");
+        // Assert the specific records we created are present, by id and fields
+        assert!(list.iter().any(|c| c.id == id1 && c.name == "client-a"));
+        assert!(list.iter().any(|c| c.id == id2 && c.name == "client-b" && c.title.as_deref() == Some("Title")));
     }
 }
