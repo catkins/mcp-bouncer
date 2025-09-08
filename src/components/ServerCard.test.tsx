@@ -42,10 +42,10 @@ describe('ServerCard', () => {
     expect(screen.getByText(/stdio/i)).toBeInTheDocument();
   });
 
-  it('shows authorize when required', () => {
+  it('makes Authorization required clickable for streamable_http', () => {
     const status: ClientStatus = {
       name: 'svc',
-      state: 'disconnected',
+      state: 'requires_authorization',
       tools: 0,
       authorization_required: true,
       oauth_authenticated: false,
@@ -53,7 +53,7 @@ describe('ServerCard', () => {
     const onAuthorize = vi.fn();
     render(
       <ServerCard
-        server={{ ...baseServer, enabled: true }}
+        server={{ ...baseServer, enabled: true, transport: 'streamable_http' as any, endpoint: 'http://localhost', headers: {} }}
         clientStatus={status}
         onEdit={() => {}}
         onRemove={async () => {}}
@@ -61,9 +61,8 @@ describe('ServerCard', () => {
         onAuthorize={async () => onAuthorize()}
       />,
     );
-    expect(
-      screen.getByRole('button', { name: /authorize svc/i }),
-    ).toBeInTheDocument();
+    const authChip = screen.getByRole('button', { name: /authorize svc/i });
+    expect(authChip).toBeInTheDocument();
   });
 
   it('shows requires_authorization badge and hides error banner on 401 state', () => {

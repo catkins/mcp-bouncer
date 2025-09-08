@@ -91,14 +91,20 @@ describe('ServerList', () => {
     await userEvent.click(restartBtns[0]!);
     expect(onRestartServer).toHaveBeenCalled();
 
-    // Rerender with requires authorization state
+    // Rerender with streamable_http + requires authorization state
+    const authServers = [
+      {
+        name: 'svc', description: '', transport: 'streamable_http', command: 'cmd', args: [], env: {},
+        endpoint: 'http://localhost', headers: {}, requires_auth: true, enabled: true,
+      },
+    ];
     const authStatus = {
       svc: { name: 'svc', state: 'requires_authorization', tools: 0, authorization_required: true, oauth_authenticated: false },
     } as const;
 
     rerender(
       <ServerList
-        servers={servers as any}
+        servers={authServers as any}
         clientStatus={authStatus as any}
         onAddServer={onAddServer}
         onUpdateServer={onUpdateServer}
@@ -109,8 +115,8 @@ describe('ServerList', () => {
       />,
     );
 
-    const authorizeBtn = await screen.findByRole('button', { name: /authorize svc/i });
-    await userEvent.click(authorizeBtn);
+    const authorizeChip = await screen.findByRole('button', { name: /authorize svc/i });
+    await userEvent.click(authorizeChip);
     expect(onAuthorizeServer).toHaveBeenCalled();
   });
 });
