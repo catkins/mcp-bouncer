@@ -11,7 +11,7 @@ Quality, safety, and coverage improvements
   - [x] Tighten `MCPServerConfig` (non-Option fields + serde defaults)
 - [x] Enable `noImplicitAny` and `strict` in `tsconfig.json`
 - [x] Strengthen TS strictness: enable `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `useUnknownInCatchVariables`, `noFallthroughCasesInSwitch`
-- [ ] Add ESLint (TypeScript + React) with sensible rules (`no-explicit-any`, `react-hooks/exhaustive-deps`, no console in prod) and wire into CI
+- [x] Add ESLint (TypeScript + React) and wire into CI (flat config with ignores for generated files)
 - [x] Temporary: disable TS `noUnusedLocals`; enforce via ESLint later, excluding generated `src/tauri/bindings.ts`
 - [ ] Remove remaining `any` in app code paths; prefer `unknown` or concrete types
 - [ ] Prefer narrowing at the bridge boundary using generated types and Rust-side validation (no `zod`)
