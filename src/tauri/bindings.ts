@@ -157,8 +157,9 @@ export type ClientConnectionState = "disconnected" | "connecting" | "errored" | 
 export type ClientStatus = { name: string; state: ClientConnectionState; tools: number; last_error?: string | null; authorization_required: boolean; oauth_authenticated: boolean }
 export type IncomingClient = { id: string; name: string; version: string; title?: string | null; connected_at?: string | null }
 export type JsonValue = null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>
+export type LoggingSettings = { enabled?: boolean; db_path?: string; redact_keys?: string[] }
 export type MCPServerConfig = { name: string; description: string; transport?: TransportType; command: string; args?: string[]; env?: Partial<{ [key in string]: string }>; endpoint?: string; headers?: Partial<{ [key in string]: string }>; requires_auth?: boolean; enabled: boolean }
-export type Settings = { mcp_servers: MCPServerConfig[]; listen_addr: string }
+export type Settings = { mcp_servers: MCPServerConfig[]; listen_addr: string; logging?: LoggingSettings | null }
 export type ToolInfo = { name: string; description?: string | null; input_schema?: JsonValue | null }
 export type TransportType = "stdio" | "sse" | "streamable_http"
 

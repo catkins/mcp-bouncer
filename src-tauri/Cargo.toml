@@ -33,6 +33,8 @@ rmcp = { version = "0.6.1", features = [
   "auth"
 ] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+duckdb = { version = "1.3.2", features = ["bundled", "chrono", "serde_json", "uuid", "r2d2"] }
+uuid = { version = "1", features = ["v4", "serde"] }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

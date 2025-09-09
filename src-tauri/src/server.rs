@@ -11,6 +11,7 @@ use crate::config::{ConfigProvider, MCPServerConfig, load_settings_with};
 use crate::events::EventEmitter;
 use crate::events::{client_status_changed, incoming_clients_updated};
 use crate::incoming::record_connect;
+use crate::logging;
 use crate::unauthorized;
 
 // Runtime-bound listen address storage
@@ -57,6 +58,7 @@ where
 {
     pub emitter: E,
     pub cp: CP,
+    pub session_id: std::sync::Arc<tokio::sync::RwLock<Option<String>>>,
 }
 
 impl<E, CP> McpService<RoleServer> for BouncerService<E, CP>
@@ -69,8 +71,13 @@ where
         request: mcp::ClientRequest,
         _context: rmcp::service::RequestContext<RoleServer>,
     ) -> Result<mcp::ServerResult, mcp::ErrorData> {
+        let start = std::time::Instant::now();
+        let mut method = String::new();
+        let mut req_json = serde_json::to_value(&request).ok();
+        let mut evt = None;
         match request {
             mcp::ClientRequest::InitializeRequest(req) => {
+                method = "initialize".into();
                 let capabilities = mcp::ServerCapabilities::builder()
                     .enable_logging()
                     .enable_tools()
@@ -86,11 +93,31 @@ where
                     instructions: None,
                 };
                 if let Ok(val) = serde_json::to_value(&req) {
-                    emit_incoming_from_initialize(&self.emitter, &val).await;
+                    if let Some(id) = emit_incoming_from_initialize(&self.emitter, &val).await {
+                        let mut guard = self.session_id.write().await;
+                        *guard = Some(id.clone());
+                        // create initialize event skeleton
+                        let mut e = logging::Event::new("initialize", id);
+                        // enrich client fields from the same val
+                        e.client_name = extract_str(&val, &["clientInfo.name", "client_info.name", "client.name", "params.clientInfo.name", "params.client_info.name", "params.client.name"]).map(|s| s.to_string());
+                        e.client_version = extract_str(&val, &["clientInfo.version", "client_info.version", "client.version", "params.clientInfo.version", "params.client_info.version", "params.client.version"]).map(|s| s.to_string());
+                        e.client_protocol = Some("jsonrpc-2.0".into());
+                        e.request_json = req_json.clone();
+                        evt = Some(e);
+                    }
                 }
-                Ok(mcp::ServerResult::InitializeResult(result))
+                let out = mcp::ServerResult::InitializeResult(result);
+                // log
+                if let Some(mut e) = evt.take() {
+                    e.response_json = serde_json::to_value(&out).ok();
+                    e.ok = true;
+                    e.duration_ms = Some(start.elapsed().as_millis() as i64);
+                    logging::log_rpc_event(e);
+                }
+                Ok(out)
             }
             mcp::ClientRequest::ListToolsRequest(_req) => {
+                method = "listTools".into();
                 let s = load_settings_with(&self.cp);
                 let servers: Vec<_> = s.mcp_servers.into_iter().filter(|c| c.enabled).collect();
                 const TOOL_LIST_TIMEOUT_SECS: u64 = 6;
@@ -113,17 +140,27 @@ where
                         true
                     }
                 });
-                Ok(mcp::ServerResult::ListToolsResult(mcp::ListToolsResult {
-                    tools,
-                    next_cursor: None,
-                }))
+                let out = mcp::ServerResult::ListToolsResult(mcp::ListToolsResult { tools, next_cursor: None });
+                // log
+                if let Some(sid) = self.session_id.read().await.as_ref().cloned() {
+                    let mut e = logging::Event::new(method, sid);
+                    e.server_name = Some("aggregate".into());
+                    e.request_json = req_json.take();
+                    e.response_json = serde_json::to_value(&out).ok();
+                    e.ok = true;
+                    e.duration_ms = Some(start.elapsed().as_millis() as i64);
+                    logging::log_rpc_event(e);
+                }
+                Ok(out)
             }
             mcp::ClientRequest::CallToolRequest(req) => {
+                method = "callTool".into();
                 let name = req.params.name.to_string();
-                let (server_name, tool_name) = name
+                let (mut server_name, tool_name) = name
                     .split_once("::")
                     .map(|(a, b)| (a.to_string(), b.to_string()))
                     .unwrap_or((String::new(), name.clone()));
+                let sid_opt = self.session_id.read().await.clone();
                 let args_obj = req
                     .params
                     .arguments
@@ -133,11 +170,23 @@ where
                 let cfg_opt = match select_target_server(&self.cp, &server_name) {
                     Ok(opt) => opt,
                     Err(msg) => {
-                        return Ok(mcp::ServerResult::CallToolResult(mcp::CallToolResult {
+                        let out = mcp::ServerResult::CallToolResult(mcp::CallToolResult {
                             content: vec![mcp::Content::text(msg)],
                             structured_content: None,
                             is_error: Some(true),
-                        }));
+                        });
+                        // log error
+                        if let Some(sid) = sid_opt {
+                            let mut e = logging::Event::new(method, sid);
+                            e.server_name = Some(server_name.clone());
+                            e.request_json = req_json.take();
+                            e.response_json = serde_json::to_value(&out).ok();
+                            e.ok = false;
+                            e.error = Some("multiple enabled servers; specify 'server::tool'".into());
+                            e.duration_ms = Some(start.elapsed().as_millis() as i64);
+                            logging::log_rpc_event(e);
+                        }
+                        return Ok(out);
                     }
                 };
                 if let Some(cfg) = cfg_opt {
@@ -149,7 +198,23 @@ where
                             })
                             .await
                         {
-                            Ok(res) => Ok(mcp::ServerResult::CallToolResult(res)),
+                            Ok(res) => {
+                                let out = mcp::ServerResult::CallToolResult(res.clone());
+                                if let Some(sid) = sid_opt {
+                                    let mut e = logging::Event::new(method, sid);
+                                    e.server_name = Some(cfg.name.clone());
+                                    e.request_json = req_json.take();
+                                    e.response_json = serde_json::to_value(&out).ok();
+                                    let ok = res.is_error != Some(true);
+                                    e.ok = ok;
+                                    e.duration_ms = Some(start.elapsed().as_millis() as i64);
+                                    if !ok {
+                                        e.error = Some("tool returned error".into());
+                                    }
+                                    logging::log_rpc_event(e);
+                                }
+                                Ok(out)
+                            }
                             Err(e) => {
                                 if matches!(cfg.transport, crate::config::TransportType::StreamableHttp) {
                                     unauthorized::on_possible_unauthorized(
@@ -164,30 +229,74 @@ where
                                         "requires_authorization",
                                     );
                                 }
-                                Ok(mcp::ServerResult::CallToolResult(mcp::CallToolResult {
+                                let out = mcp::ServerResult::CallToolResult(mcp::CallToolResult {
                                     content: vec![mcp::Content::text(format!("error: {e}"))],
                                     structured_content: None,
                                     is_error: Some(true),
-                                }))
+                                });
+                                if let Some(sid) = sid_opt {
+                                    let mut evt = logging::Event::new(method, sid);
+                                    evt.server_name = Some(cfg.name.clone());
+                                    evt.request_json = req_json.take();
+                                    evt.response_json = serde_json::to_value(&out).ok();
+                                    evt.ok = false;
+                                    evt.error = Some(e.to_string());
+                                    evt.duration_ms = Some(start.elapsed().as_millis() as i64);
+                                    logging::log_rpc_event(evt);
+                                }
+                                Ok(out)
                             }
                         },
-                        Err(e) => Ok(mcp::ServerResult::CallToolResult(mcp::CallToolResult {
+                        Err(e) => {
+                            let out = mcp::ServerResult::CallToolResult(mcp::CallToolResult {
                             content: vec![mcp::Content::text(format!("error: {e}"))],
                             structured_content: None,
                             is_error: Some(true),
-                        })),
+                            });
+                            if let Some(sid) = sid_opt {
+                                let mut evt = logging::Event::new(method, sid);
+                                evt.server_name = Some(cfg.name.clone());
+                                evt.request_json = req_json.take();
+                                evt.response_json = serde_json::to_value(&out).ok();
+                                evt.ok = false;
+                                evt.error = Some(e.to_string());
+                                evt.duration_ms = Some(start.elapsed().as_millis() as i64);
+                                logging::log_rpc_event(evt);
+                            }
+                            Ok(out)
+                        }
                     }
                 } else {
-                    Ok(mcp::ServerResult::CallToolResult(mcp::CallToolResult {
+                    let out = mcp::ServerResult::CallToolResult(mcp::CallToolResult {
                         content: vec![mcp::Content::text("no server".to_string())],
                         structured_content: None,
                         is_error: Some(true),
-                    }))
+                    });
+                    if let Some(sid) = sid_opt {
+                        let mut e = logging::Event::new(method, sid);
+                        e.server_name = Some(server_name.clone());
+                        e.request_json = req_json.take();
+                        e.response_json = serde_json::to_value(&out).ok();
+                        e.ok = false;
+                        e.error = Some("no server".into());
+                        e.duration_ms = Some(start.elapsed().as_millis() as i64);
+                        logging::log_rpc_event(e);
+                    }
+                    Ok(out)
                 }
             }
             other => {
                 let _ = other;
-                Ok(mcp::ServerResult::empty(()))
+                let out = mcp::ServerResult::empty(());
+                if let Some(sid) = self.session_id.read().await.as_ref().cloned() {
+                    let mut e = logging::Event::new("other", sid);
+                    e.request_json = req_json.take();
+                    e.response_json = serde_json::to_value(&out).ok();
+                    e.ok = true;
+                    e.duration_ms = Some(start.elapsed().as_millis() as i64);
+                    logging::log_rpc_event(e);
+                }
+                Ok(out)
             }
         }
     }
@@ -236,7 +345,10 @@ fn to_mcp_tool(server: &str, v: &serde_json::Value) -> Option<mcp::Tool> {
     ))
 }
 
-async fn emit_incoming_from_initialize<E: EventEmitter>(emitter: &E, val: &serde_json::Value) {
+async fn emit_incoming_from_initialize<E: EventEmitter>(
+    emitter: &E,
+    val: &serde_json::Value,
+) -> Option<String> {
     let name = extract_str(
         val,
         &[
@@ -273,8 +385,9 @@ async fn emit_incoming_from_initialize<E: EventEmitter>(emitter: &E, val: &serde
         ],
     )
     .map(|s| s.to_string());
-    record_connect(name.to_string(), version.to_string(), title).await;
+    let id = record_connect(name.to_string(), version.to_string(), title).await;
     incoming_clients_updated(emitter, "connect");
+    Some(id)
 }
 
 fn select_target_server<CP: ConfigProvider>(
@@ -447,7 +560,7 @@ mod tests {
         let val = serde_json::json!({
             "clientInfo": { "name": "X", "version": "1", "title": "T" }
         });
-        super::emit_incoming_from_initialize(&emitter, &val).await;
+        let _ = super::emit_incoming_from_initialize(&emitter, &val).await;
         let events = emitter.0.lock().unwrap().clone();
         let mut incoming = 0;
         for (ev, payload) in events {
@@ -484,12 +597,16 @@ where
     E: EventEmitter + Clone + Send + Sync + 'static,
     CP: ConfigProvider + Clone + Send + Sync + 'static,
 {
+    // Initialize logging (idempotent)
+    let settings = load_settings_with(&cp);
+    crate::logging::init_once_with(&cp, &settings);
     let service: StreamableHttpService<BouncerService<E, CP>, LocalSessionManager> =
         StreamableHttpService::new(
             move || {
                 Ok(BouncerService {
                     emitter: emitter.clone(),
                     cp: cp.clone(),
+                    session_id: std::sync::Arc::new(tokio::sync::RwLock::new(None)),
                 })
             },
             Default::default(),
