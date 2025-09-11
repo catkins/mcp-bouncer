@@ -73,29 +73,16 @@ pub struct LoggerHandle {
     pub cfg: Arc<LoggerCfg>,
 }
 
-pub fn init_once_with(cp: &dyn ConfigProvider, settings: &Settings) {
-    let enabled = settings
-        .logging
-        .as_ref()
-        .map(|l| l.enabled)
-        .unwrap_or(cfg!(debug_assertions));
-    if !enabled {
-        let _ = LOGGER.set(LoggerHandle {
-            tx: mpsc::channel::<Event>(1).0, // closed sender
-            cfg: Arc::new(LoggerCfg { enabled, db_path: default_db_path(cp), redact_keys: default_redact_list() }),
-        });
-        return;
-    }
-    let db_path = settings
-        .logging
-        .as_ref()
-        .and_then(|l| if l.db_path.is_empty() { None } else { Some(PathBuf::from(&l.db_path)) })
-        .unwrap_or_else(|| default_db_path(cp));
-    let redact_keys: Vec<String> = settings
-        .logging
-        .as_ref()
-        .map(|l| l.redact_keys.iter().map(|s| s.to_lowercase()).collect())
-        .unwrap_or_else(default_redact_list);
+// Expose current DB path for tests and diagnostics
+pub fn db_path() -> Option<PathBuf> {
+    LOGGER.get().map(|h| h.cfg.db_path.clone())
+}
+
+pub fn init_once_with(cp: &dyn ConfigProvider, _settings: &Settings) {
+    // Always-on logging: ignore app settings and create DB at default location.
+    let enabled = true;
+    let db_path = default_db_path(cp);
+    let redact_keys: Vec<String> = default_redact_list();
     let cfg = LoggerCfg { enabled, db_path: db_path.clone(), redact_keys };
     let (tx, rx) = mpsc::channel::<Event>(8_192);
     let handle = LoggerHandle { tx, cfg: Arc::new(cfg) };
@@ -146,9 +133,9 @@ async fn writer_task(cfg: Arc<LoggerCfg>, mut rx: mpsc::Receiver<Event>) {
         let mut last = Instant::now();
         loop {
             let deadline = Duration::from_millis(250);
-            let next = timeout(deadline, rx.recv()).await.ok().flatten();
-            match next {
-                Some(e) => {
+            match timeout(deadline, rx.recv()).await {
+                // Received an event
+                Ok(Some(e)) => {
                     buf.push(e);
                     if buf.len() >= 256 || last.elapsed() >= deadline {
                         if let Err(e) = flush_events(&mut conn, &buf) {
@@ -158,11 +145,25 @@ async fn writer_task(cfg: Arc<LoggerCfg>, mut rx: mpsc::Receiver<Event>) {
                         last = Instant::now();
                     }
                 }
-                None => {
+                // Channel closed: flush any pending and exit
+                Ok(None) => {
                     if !buf.is_empty() {
-                        let _ = flush_events(&mut conn, &buf);
+                        if let Err(e) = flush_events(&mut conn, &buf) {
+                            tracing::warn!(target = "logging", count=buf.len(), error=%e, "final_flush_failed");
+                        }
                     }
                     break;
+                }
+                // Idle timeout: flush if we have pending items, then continue
+                Err(_) => {
+                    if !buf.is_empty() {
+                        if let Err(e) = flush_events(&mut conn, &buf) {
+                            tracing::warn!(target = "logging", count=buf.len(), error=%e, "flush_failed");
+                        }
+                        buf.clear();
+                    }
+                    last = Instant::now();
+                    continue;
                 }
             }
         }

@@ -475,6 +475,10 @@ fn main() {
         let _ = builder
             .export(Typescript::default(), "../src/tauri/bindings.ts")
             .map_err(|e| eprintln!("[specta] export failed: {e}"));
+        // Optional fast-path: allow regenerating bindings without launching the app
+        if std::env::var("SPECTA_EXPORT_ONLY").ok().as_deref() == Some("1") {
+            return;
+        }
     }
 
     tauri::Builder::default()

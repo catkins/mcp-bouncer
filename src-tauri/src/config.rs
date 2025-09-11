@@ -41,8 +41,6 @@ fn default_transport() -> TransportType { TransportType::Stdio }
 pub struct Settings {
     pub mcp_servers: Vec<MCPServerConfig>,
     pub listen_addr: String,
-    #[serde(default)]
-    pub logging: Option<LoggingSettings>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Type)]
@@ -67,36 +65,7 @@ pub struct ClientStatus {
     pub oauth_authenticated: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
-pub struct LoggingSettings {
-    #[serde(default = "default_logging_enabled")]
-    pub enabled: bool,
-    #[serde(default)]
-    pub db_path: String,
-    #[serde(default = "default_redact_keys")] 
-    pub redact_keys: Vec<String>,
-}
-
-fn default_logging_enabled() -> bool { cfg!(debug_assertions) }
-
-fn default_redact_keys() -> Vec<String> {
-    vec![
-        "authorization".into(),
-        "token".into(),
-        "password".into(),
-        "secret".into(),
-        "api_key".into(),
-        "access_token".into(),
-    ]
-}
-
-pub fn default_logging_settings() -> LoggingSettings {
-    LoggingSettings {
-        enabled: default_logging_enabled(),
-        db_path: String::new(),
-        redact_keys: default_redact_keys(),
-    }
-}
+// Logging settings removed: logging is always on and unconfigurable.
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct IncomingClient {
@@ -130,7 +99,6 @@ pub fn default_settings() -> Settings {
     Settings {
         mcp_servers: Vec::new(),
         listen_addr: "http://localhost:8091/mcp".to_string(),
-        logging: Some(default_logging_settings()),
     }
 }
 

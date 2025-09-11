@@ -7,7 +7,7 @@ Scope (Phase 1)
 - Capture and persist: method, request payload, response payload (or error), timestamps, duration, event UUID, session id, client info (name, version, protocol), and upstream server info (name; version/protocol where available).
 - Storage: DuckDB embedded database on disk, under the app’s config directory.
 - Performance: Non-blocking capture in the request path via an async buffered writer task.
-- Config: Opt-in/opt-out flag (default: on for dev builds, off for release until we confirm UX), DB path override, and simple retention toggle (manual vacuum/purge TBD).
+- Config: none. Logging is always on and writes to a default path; retention/vacuum TBD.
 - Test coverage: unit + integration tests verifying writes and basic queries.
 
 Non-Goals (Phase 1)
@@ -37,10 +37,7 @@ High-Level Design
    - Redaction happens right before persistence (in the writer, not on the hot path), to keep capture overhead low.
 
 5) Configuration:
-   - Extend settings with:
-     - `logging.db_path: string` (default `${XDG_CONFIG_HOME}/mcp-bouncer/logs.duckdb`).
-     - `logging.redact_keys: string[]`.
-   - Emit `settings:updated` when changed (existing pattern).
+   - None for logging. The DB is created at `${XDG_CONFIG_HOME}/mcp-bouncer/logs.duckdb` by default.
 
 6) Schema (DuckDB)
 DuckDB types used: `TEXT`, `BIGINT`, `TIMESTAMP`, `BOOLEAN`, `JSON`, `UUID`.
@@ -94,16 +91,11 @@ Data flow & capture points
   - Capturing upstream `get_info()` when clients connect (if rmcp API provides it), storing in a cache keyed by upstream name and session, and attaching to events.
 
 Module layout (backend)
-- `src-tauri/src/logging.rs` (new)
-  - `init_logger(cp: &dyn ConfigProvider, enabled: bool, path_override: Option<&str>, redact_keys: &[&str]) -> Result<()>`
-    - Creates `duckdb::Connection` to `${base}/logs.duckdb`.
-    - Runs `CREATE TABLE IF NOT EXISTS …` statements and indexes.
-    - Spawns background writer task; stores a `Sender<Event>` in a global `OnceLock`.
-  - `log_rpc_event(evt: Event) -> Result<(), TrySendError>` — fast path enqueue.
-  - `record_session(session: SessionRow)` — enqueues a session upsert (or maintains a small cache so we don’t spam updates).
-  - `shutdown_logger()` — flush channel, join task (best-effort during app shutdown).
-  - `Event` struct: fields align with `rpc_events` schema; `request_json`/`response_json` are `serde_json::Value`.
-  - Minimal redaction helper: given a JSON value, mask known keys recursively.
+- `src-tauri/src/logging.rs`
+  - Always-on logger initialized at startup with default DB path.
+  - Creates `duckdb::Connection` to `${base}/logs.duckdb`, runs schema, and spawns background writer.
+  - `log_rpc_event(evt: Event)` — fast path enqueue.
+  - Minimal redaction helper masks known keys recursively.
 
 - Wire-up
   - In `main.rs::setup`, call `init_logger(&OsConfigProvider, /*enabled*/ cfg)`. Use `OnceLock` semantics to avoid double-init.
@@ -111,21 +103,7 @@ Module layout (backend)
   - In `server.rs::emit_incoming_from_initialize`, call `record_session` with parsed client fields and session id.
 
 Settings changes
-- Extend `src-tauri/src/config.rs`:
-  - Add:
-    ```rust
-    #[derive(Debug, Clone, Serialize, Deserialize, Type, Default)]
-    pub struct LoggingConfig {
-        pub enabled: bool,
-        #[serde(default)] pub db_path: Option<String>,
-        #[serde(default)] pub redact_keys: Vec<String>,
-    }
-
-    #[derive(Debug, Clone, Serialize, Deserialize, Type)]
-    pub struct Settings { /* existing */ pub logging: Option<LoggingConfig> }
-    ```
-  - Default for debug builds: `enabled=true`, `redact_keys` pre-populated. Release default: `enabled=false`.
-  - Update load/save with backward-compatible defaults.
+- None. Logging is not user-configurable.
 
 Concurrency & backpressure
 - Channel capacity (e.g., 8k events).
