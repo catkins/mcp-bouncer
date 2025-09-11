@@ -551,6 +551,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn initialize_emits_incoming_once() {
         use crate::events::{BufferingEventEmitter, EVENT_INCOMING_CLIENTS_UPDATED};
         let emitter = BufferingEventEmitter::default();

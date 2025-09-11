@@ -47,3 +47,4 @@ default = []
 [dev-dependencies]
 async-trait = "0.1"
 schemars = "0.8"
+serial_test = "3"

@@ -3,7 +3,7 @@ use std::sync::{Arc, OnceLock};
 
 use duckdb::{params, Connection as DuckConn};
 use serde_json::Value as JsonValue;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 use tokio::time::{timeout, Duration, Instant};
 use uuid::Uuid;
 
@@ -67,9 +67,14 @@ pub struct LoggerCfg {
 
 static LOGGER: OnceLock<LoggerHandle> = OnceLock::new();
 
+enum Msg {
+    Event(Event),
+    Flush(oneshot::Sender<()>),
+}
+
 #[derive(Clone)]
 pub struct LoggerHandle {
-    pub tx: mpsc::Sender<Event>,
+    pub tx: mpsc::Sender<Msg>,
     pub cfg: Arc<LoggerCfg>,
 }
 
@@ -84,7 +89,7 @@ pub fn init_once_with(cp: &dyn ConfigProvider, _settings: &Settings) {
     let db_path = default_db_path(cp);
     let redact_keys: Vec<String> = default_redact_list();
     let cfg = LoggerCfg { enabled, db_path: db_path.clone(), redact_keys };
-    let (tx, rx) = mpsc::channel::<Event>(8_192);
+    let (tx, rx) = mpsc::channel::<Msg>(8_192);
     let handle = LoggerHandle { tx, cfg: Arc::new(cfg) };
     if LOGGER.set(handle.clone()).is_ok() {
         // Spawn background writer
@@ -107,12 +112,20 @@ pub fn log_rpc_event(mut evt: Event) {
             evt.response_json = evt
                 .response_json
                 .map(|v| redact_json(v, &handle.cfg.redact_keys));
-            let _ = handle.tx.try_send(evt);
+            let _ = handle.tx.try_send(Msg::Event(evt));
         }
     }
 }
 
-async fn writer_task(cfg: Arc<LoggerCfg>, mut rx: mpsc::Receiver<Event>) {
+pub async fn force_flush_and_checkpoint() {
+    if let Some(handle) = LOGGER.get() {
+        let (tx_done, rx_done) = oneshot::channel();
+        let _ = handle.tx.send(Msg::Flush(tx_done)).await;
+        let _ = tokio::time::timeout(Duration::from_secs(2), rx_done).await;
+    }
+}
+
+async fn writer_task(cfg: Arc<LoggerCfg>, mut rx: mpsc::Receiver<Msg>) {
     {
         if let Some(parent) = cfg.db_path.parent() {
             let _ = std::fs::create_dir_all(parent);
@@ -131,11 +144,18 @@ async fn writer_task(cfg: Arc<LoggerCfg>, mut rx: mpsc::Receiver<Event>) {
 
         let mut buf: Vec<Event> = Vec::with_capacity(512);
         let mut last = Instant::now();
+        let mut last_checkpoint = Instant::now();
+        let mut maybe_checkpoint = |conn: &mut DuckConn| {
+            if last_checkpoint.elapsed() >= Duration::from_secs(1) {
+                let _ = conn.execute("CHECKPOINT", []);
+                last_checkpoint = Instant::now();
+            }
+        };
         loop {
             let deadline = Duration::from_millis(250);
             match timeout(deadline, rx.recv()).await {
-                // Received an event
-                Ok(Some(e)) => {
+                // Received a message
+                Ok(Some(Msg::Event(e))) => {
                     buf.push(e);
                     if buf.len() >= 256 || last.elapsed() >= deadline {
                         if let Err(e) = flush_events(&mut conn, &buf) {
@@ -143,7 +163,21 @@ async fn writer_task(cfg: Arc<LoggerCfg>, mut rx: mpsc::Receiver<Event>) {
                         }
                         buf.clear();
                         last = Instant::now();
+                        maybe_checkpoint(&mut conn);
                     }
+                }
+                Ok(Some(Msg::Flush(done))) => {
+                    if !buf.is_empty() {
+                        if let Err(e) = flush_events(&mut conn, &buf) {
+                            tracing::warn!(target = "logging", count=buf.len(), error=%e, "flush_failed");
+                        }
+                        buf.clear();
+                    }
+                    // Force a checkpoint so WAL is applied
+                    let _ = conn.execute("CHECKPOINT", []);
+                    let _ = done.send(());
+                    last = Instant::now();
+                    continue;
                 }
                 // Channel closed: flush any pending and exit
                 Ok(None) => {
@@ -151,6 +185,7 @@ async fn writer_task(cfg: Arc<LoggerCfg>, mut rx: mpsc::Receiver<Event>) {
                         if let Err(e) = flush_events(&mut conn, &buf) {
                             tracing::warn!(target = "logging", count=buf.len(), error=%e, "final_flush_failed");
                         }
+                        let _ = conn.execute("CHECKPOINT", []);
                     }
                     break;
                 }
@@ -163,6 +198,7 @@ async fn writer_task(cfg: Arc<LoggerCfg>, mut rx: mpsc::Receiver<Event>) {
                         buf.clear();
                     }
                     last = Instant::now();
+                    maybe_checkpoint(&mut conn);
                     continue;
                 }
             }
@@ -223,16 +259,14 @@ fn flush_events(conn: &mut DuckConn, events: &[Event]) -> duckdb::Result<()> {
         )?;
 
         for e in events {
-            // Upsert session (only create if initialize provided client info)
-            if e.client_name.is_some() || e.client_version.is_some() || e.client_protocol.is_some() {
-                let _ = up_sess.execute(params![
-                    &e.session_id,
-                    &e.client_name,
-                    &e.client_version,
-                    &e.client_protocol,
-                    &e.session_id,
-                ]);
-            }
+            // Ensure session row exists (create if missing), then bump last_seen
+            let _ = up_sess.execute(params![
+                &e.session_id,
+                &e.client_name,
+                &e.client_version,
+                &e.client_protocol,
+                &e.session_id,
+            ]);
             let _ = upd_seen.execute(params![&e.session_id]);
             let req = e.request_json.as_ref().map(|v| serde_json::to_string(v).unwrap_or_default());
             let res = e.response_json.as_ref().map(|v| serde_json::to_string(v).unwrap_or_default());

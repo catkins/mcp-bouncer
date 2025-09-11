@@ -1,6 +1,7 @@
 use mcp_bouncer::incoming::{list_incoming, record_connect};
 
 #[tokio::test]
+#[serial_test::serial]
 async fn recorded_clients_are_listed() {
     // Start with a clean slate by recording distinct IDs
     let _ = record_connect("tester-a".into(), "0.1".into(), None).await;
