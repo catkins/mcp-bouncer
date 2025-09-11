@@ -141,16 +141,21 @@ where
                     }
                 });
                 let out = mcp::ServerResult::ListToolsResult(mcp::ListToolsResult { tools, next_cursor: None });
-                // log
-                if let Some(sid) = self.session_id.read().await.as_ref().cloned() {
-                    let mut e = logging::Event::new(method, sid);
-                    e.server_name = Some("aggregate".into());
-                    e.request_json = req_json.take();
-                    e.response_json = serde_json::to_value(&out).ok();
-                    e.ok = true;
-                    e.duration_ms = Some(start.elapsed().as_millis() as i64);
-                    logging::log_rpc_event(e);
-                }
+                // log (ensure a session id exists even if initialize wasn't observed)
+                let sid = self
+                    .session_id
+                    .read()
+                    .await
+                    .as_ref()
+                    .cloned()
+                    .unwrap_or_else(|| "anon".into());
+                let mut e = logging::Event::new(method, sid);
+                e.server_name = Some("aggregate".into());
+                e.request_json = req_json.take();
+                e.response_json = serde_json::to_value(&out).ok();
+                e.ok = true;
+                e.duration_ms = Some(start.elapsed().as_millis() as i64);
+                logging::log_rpc_event(e);
                 Ok(out)
             }
             mcp::ClientRequest::CallToolRequest(req) => {
@@ -160,7 +165,12 @@ where
                     .split_once("::")
                     .map(|(a, b)| (a.to_string(), b.to_string()))
                     .unwrap_or((String::new(), name.clone()));
-                let sid_opt = self.session_id.read().await.clone();
+                let sid = self
+                    .session_id
+                    .read()
+                    .await
+                    .clone()
+                    .unwrap_or_else(|| "anon".into());
                 let args_obj = req
                     .params
                     .arguments
@@ -176,16 +186,14 @@ where
                             is_error: Some(true),
                         });
                         // log error
-                        if let Some(sid) = sid_opt {
-                            let mut e = logging::Event::new(method, sid);
-                            e.server_name = Some(server_name.clone());
-                            e.request_json = req_json.take();
-                            e.response_json = serde_json::to_value(&out).ok();
-                            e.ok = false;
-                            e.error = Some("multiple enabled servers; specify 'server::tool'".into());
-                            e.duration_ms = Some(start.elapsed().as_millis() as i64);
-                            logging::log_rpc_event(e);
-                        }
+                        let mut e = logging::Event::new(method, sid);
+                        e.server_name = Some(server_name.clone());
+                        e.request_json = req_json.take();
+                        e.response_json = serde_json::to_value(&out).ok();
+                        e.ok = false;
+                        e.error = Some("multiple enabled servers; specify 'server::tool'".into());
+                        e.duration_ms = Some(start.elapsed().as_millis() as i64);
+                        logging::log_rpc_event(e);
                         return Ok(out);
                     }
                 };
@@ -200,19 +208,17 @@ where
                         {
                             Ok(res) => {
                                 let out = mcp::ServerResult::CallToolResult(res.clone());
-                                if let Some(sid) = sid_opt {
-                                    let mut e = logging::Event::new(method, sid);
-                                    e.server_name = Some(cfg.name.clone());
-                                    e.request_json = req_json.take();
-                                    e.response_json = serde_json::to_value(&out).ok();
-                                    let ok = res.is_error != Some(true);
-                                    e.ok = ok;
-                                    e.duration_ms = Some(start.elapsed().as_millis() as i64);
-                                    if !ok {
-                                        e.error = Some("tool returned error".into());
-                                    }
-                                    logging::log_rpc_event(e);
+                                let mut e = logging::Event::new(method, sid);
+                                e.server_name = Some(cfg.name.clone());
+                                e.request_json = req_json.take();
+                                e.response_json = serde_json::to_value(&out).ok();
+                                let ok = res.is_error != Some(true);
+                                e.ok = ok;
+                                e.duration_ms = Some(start.elapsed().as_millis() as i64);
+                                if !ok {
+                                    e.error = Some("tool returned error".into());
                                 }
+                                logging::log_rpc_event(e);
                                 Ok(out)
                             }
                             Err(e) => {
@@ -234,16 +240,14 @@ where
                                     structured_content: None,
                                     is_error: Some(true),
                                 });
-                                if let Some(sid) = sid_opt {
-                                    let mut evt = logging::Event::new(method, sid);
-                                    evt.server_name = Some(cfg.name.clone());
-                                    evt.request_json = req_json.take();
-                                    evt.response_json = serde_json::to_value(&out).ok();
-                                    evt.ok = false;
-                                    evt.error = Some(e.to_string());
-                                    evt.duration_ms = Some(start.elapsed().as_millis() as i64);
-                                    logging::log_rpc_event(evt);
-                                }
+                                let mut evt = logging::Event::new(method, sid);
+                                evt.server_name = Some(cfg.name.clone());
+                                evt.request_json = req_json.take();
+                                evt.response_json = serde_json::to_value(&out).ok();
+                                evt.ok = false;
+                                evt.error = Some(e.to_string());
+                                evt.duration_ms = Some(start.elapsed().as_millis() as i64);
+                                logging::log_rpc_event(evt);
                                 Ok(out)
                             }
                         },
@@ -253,16 +257,14 @@ where
                             structured_content: None,
                             is_error: Some(true),
                             });
-                            if let Some(sid) = sid_opt {
-                                let mut evt = logging::Event::new(method, sid);
-                                evt.server_name = Some(cfg.name.clone());
-                                evt.request_json = req_json.take();
-                                evt.response_json = serde_json::to_value(&out).ok();
-                                evt.ok = false;
-                                evt.error = Some(e.to_string());
-                                evt.duration_ms = Some(start.elapsed().as_millis() as i64);
-                                logging::log_rpc_event(evt);
-                            }
+                            let mut evt = logging::Event::new(method, sid);
+                            evt.server_name = Some(cfg.name.clone());
+                            evt.request_json = req_json.take();
+                            evt.response_json = serde_json::to_value(&out).ok();
+                            evt.ok = false;
+                            evt.error = Some(e.to_string());
+                            evt.duration_ms = Some(start.elapsed().as_millis() as i64);
+                            logging::log_rpc_event(evt);
                             Ok(out)
                         }
                     }
@@ -272,30 +274,33 @@ where
                         structured_content: None,
                         is_error: Some(true),
                     });
-                    if let Some(sid) = sid_opt {
-                        let mut e = logging::Event::new(method, sid);
-                        e.server_name = Some(server_name.clone());
-                        e.request_json = req_json.take();
-                        e.response_json = serde_json::to_value(&out).ok();
-                        e.ok = false;
-                        e.error = Some("no server".into());
-                        e.duration_ms = Some(start.elapsed().as_millis() as i64);
-                        logging::log_rpc_event(e);
-                    }
+                    let mut e = logging::Event::new(method, sid);
+                    e.server_name = Some(server_name.clone());
+                    e.request_json = req_json.take();
+                    e.response_json = serde_json::to_value(&out).ok();
+                    e.ok = false;
+                    e.error = Some("no server".into());
+                    e.duration_ms = Some(start.elapsed().as_millis() as i64);
+                    logging::log_rpc_event(e);
                     Ok(out)
                 }
             }
             other => {
                 let _ = other;
                 let out = mcp::ServerResult::empty(());
-                if let Some(sid) = self.session_id.read().await.as_ref().cloned() {
-                    let mut e = logging::Event::new("other", sid);
-                    e.request_json = req_json.take();
-                    e.response_json = serde_json::to_value(&out).ok();
-                    e.ok = true;
-                    e.duration_ms = Some(start.elapsed().as_millis() as i64);
-                    logging::log_rpc_event(e);
-                }
+                let sid = self
+                    .session_id
+                    .read()
+                    .await
+                    .as_ref()
+                    .cloned()
+                    .unwrap_or_else(|| "anon".into());
+                let mut e = logging::Event::new("other", sid);
+                e.request_json = req_json.take();
+                e.response_json = serde_json::to_value(&out).ok();
+                e.ok = true;
+                e.duration_ms = Some(start.elapsed().as_millis() as i64);
+                logging::log_rpc_event(e);
                 Ok(out)
             }
         }

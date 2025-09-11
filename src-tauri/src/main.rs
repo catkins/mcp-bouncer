@@ -484,6 +484,13 @@ fn main() {
     tauri::Builder::default()
         // Shell plugin is commonly needed to open links, etc.
         .plugin(tauri_plugin_shell::init())
+        // Ensure logs are flushed on window close / app shutdown
+        .on_window_event(|_win, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                // Best-effort synchronous flush+checkpoint
+                let _ = tauri::async_runtime::block_on(mcp_bouncer::logging::force_flush_and_checkpoint());
+            }
+        })
         .setup(|app| {
             // start the proxy server (idempotent)
             spawn_mcp_proxy(app.app_handle());
