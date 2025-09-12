@@ -481,7 +481,7 @@ fn main() {
         }
     }
 
-    tauri::Builder::default()
+    let res = tauri::Builder::default()
         // Shell plugin is commonly needed to open links, etc.
         .plugin(tauri_plugin_shell::init())
         // Ensure logs are flushed on window close / app shutdown
@@ -526,6 +526,8 @@ fn main() {
             settings_open_config_directory,
             settings_update_settings
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .run(tauri::generate_context!());
+    // Final best-effort flush after event loop exits
+    let _ = tauri::async_runtime::block_on(mcp_bouncer::logging::force_flush_and_checkpoint());
+    res.expect("error while running tauri application");
 }
