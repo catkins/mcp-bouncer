@@ -13,7 +13,6 @@ use mcp_bouncer::incoming::list_incoming;
 use mcp_bouncer::oauth::start_oauth_for_server;
 use mcp_bouncer::server::{get_runtime_listen_addr, start_http_server};
 use mcp_bouncer::unauthorized;
-use serde::Serialize;
 #[cfg(debug_assertions)]
 use specta_typescript::Typescript;
 #[cfg(debug_assertions)]
@@ -475,11 +474,22 @@ fn main() {
         let _ = builder
             .export(Typescript::default(), "../src/tauri/bindings.ts")
             .map_err(|e| eprintln!("[specta] export failed: {e}"));
+        // Optional fast-path: allow regenerating bindings without launching the app
+        if std::env::var("SPECTA_EXPORT_ONLY").ok().as_deref() == Some("1") {
+            return;
+        }
     }
 
-    tauri::Builder::default()
+    let res = tauri::Builder::default()
         // Shell plugin is commonly needed to open links, etc.
         .plugin(tauri_plugin_shell::init())
+        // Ensure logs are flushed on window close / app shutdown
+        .on_window_event(|_win, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                // Best-effort synchronous flush+checkpoint
+                tauri::async_runtime::block_on(mcp_bouncer::logging::force_flush_and_checkpoint());
+            }
+        })
         .setup(|app| {
             // start the proxy server (idempotent)
             spawn_mcp_proxy(app.app_handle());
@@ -515,6 +525,8 @@ fn main() {
             settings_open_config_directory,
             settings_update_settings
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .run(tauri::generate_context!());
+    // Final best-effort flush after event loop exits
+    tauri::async_runtime::block_on(mcp_bouncer::logging::force_flush_and_checkpoint());
+    res.expect("error while running tauri application");
 }

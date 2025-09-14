@@ -57,6 +57,22 @@ This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the of
 - Settings JSON: `$XDG_CONFIG_HOME/mcp-bouncer/settings.json`
 - Incoming clients: recorded when rmcp Initialize is received; `connected_at` uses RFC3339 (ISO 8601) strings for robust JS parsing.
 
+#### JSON-RPC Logging (DuckDB)
+- Always-on: the backend persistently logs JSON-RPC requests/responses to a DuckDB database at `$XDG_CONFIG_HOME/mcp-bouncer/logs.duckdb`.
+- Schema:
+  - `sessions(session_id TEXT PRIMARY KEY, created_at TIMESTAMP, client_name TEXT, client_version TEXT, client_protocol TEXT, last_seen_at TIMESTAMP)`
+  - `rpc_events(id UUID PRIMARY KEY, ts TIMESTAMP, session_id TEXT, method TEXT, server_name TEXT, server_version TEXT, server_protocol TEXT, duration_ms BIGINT, ok BOOLEAN, error TEXT, request_json JSON, response_json JSON)`
+  - Indexes on `rpc_events(ts)` and `rpc_events(session_id)`.
+- Redaction: sensitive keys are masked recursively before persistence: `authorization`, `token`, `password`, `secret`, `api_key`, `access_token`.
+- Flushing & WAL:
+  - Events are buffered and flushed every ~250ms or when batches reach 256 items.
+  - A `CHECKPOINT` is issued roughly once per second and on explicit flush to apply the WAL to the main DB file.
+  - Tests may force a flush + checkpoint via `mcp_bouncer::logging::force_flush_and_checkpoint().await`.
+- Querying examples:
+  - `SELECT COUNT(*) FROM rpc_events;`
+  - `SELECT DISTINCT method FROM rpc_events;`
+  - `SELECT * FROM rpc_events WHERE method = 'callTool' ORDER BY ts DESC LIMIT 10;`
+
 #### Testability Notes (backend)
 
 - Avoid business logic in `main.rs`. Implement in `config.rs`, `client.rs`, `status.rs`, or a focused module and import from `main.rs`.

@@ -65,6 +65,8 @@ pub struct ClientStatus {
     pub oauth_authenticated: bool,
 }
 
+// Logging settings removed: logging is always on and unconfigurable.
+
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct IncomingClient {
     pub id: String,

@@ -1,7 +1,14 @@
 steps:
-  - label: ":test_tube: Backend Tests"
+  - label: ":cargo::clippy: Cargo Clippy"
     commands:
-      - cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+      - cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings
+    plugins:
+      - docker-compose#v5.10.0:
+          run: app
+          config: .buildkite/docker-compose.yml
+          progress: plain
+  - label: ":cargo::rust::test_tube: Backend Tests"
+    commands:
       - cargo test --manifest-path src-tauri/Cargo.toml --lib --tests
     plugins:
       - docker-compose#v5.10.0:
@@ -22,7 +29,7 @@ steps:
           config: .buildkite/docker-compose.yml
           progress: plain
 
-  - label: ":tauri: Tauri Build"
+  - label: ":rust::tauri: Tauri Build"
     command: |
       cargo tauri build --verbose
     plugins:

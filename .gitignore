@@ -20,3 +20,6 @@ src-tauri/gen/
 
 # OS
 .DS_Store
+
+# log db
+logs.duckdb

@@ -47,10 +47,10 @@ impl rmcp::handler::server::ServerHandler for TestHttpService {
     ) -> impl core::future::Future<Output = Result<mcp::CallToolResult, mcp::ErrorData>> + Send + '_
     {
         let mut observed = String::new();
-        if let Some(parts) = context.extensions.get::<axum::http::request::Parts>() {
-            if let Some(v) = parts.headers.get("x-test").and_then(|v| v.to_str().ok()) {
-                observed = v.to_string();
-            }
+        if let Some(parts) = context.extensions.get::<axum::http::request::Parts>()
+            && let Some(v) = parts.headers.get("x-test").and_then(|v| v.to_str().ok())
+        {
+            observed = v.to_string();
         }
         let text = if observed.is_empty() {
             "no-header".to_string()

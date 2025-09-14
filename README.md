@@ -52,6 +52,22 @@ MCP Bouncer acts as a centralized hub for managing Model Context Protocol server
 - Real-time connection status updates
 - Error reporting and debugging information
 
+### 🪵 JSON-RPC Logging (DuckDB)
+- Always-on logging of all JSON-RPC requests/responses handled by the proxy.
+- Location: `logs.duckdb` in the app config directory:
+  - macOS: `~/Library/Application Support/mcp-bouncer/logs.duckdb`
+  - Linux: `~/.config/mcp-bouncer/logs.duckdb`
+  - Windows: `%APPDATA%\\mcp-bouncer\\logs.duckdb`
+- Schema overview:
+  - `sessions(session_id, created_at, client_name, client_version, client_protocol, last_seen_at)`
+  - `rpc_events(id, ts, session_id, method, server_name, duration_ms, ok, error, request_json, response_json)`
+- Sensitive fields are masked recursively (authorization, token, password, secret, api_key, access_token).
+- The logger batches writes (~250ms) and periodically checkpoints so the WAL is applied to the main DB. On shutdown, a final flush+checkpoint is attempted.
+- Quick queries:
+  - `SELECT COUNT(*) FROM rpc_events;`
+  - `SELECT DISTINCT method FROM rpc_events;`
+  - `SELECT * FROM rpc_events ORDER BY ts DESC LIMIT 10;`
+
 ## Quick Start
 
 ### Prerequisites
@@ -122,7 +138,7 @@ The application automatically manages settings in platform-specific locations:
       "enabled": false
     }
   ],
-  "listen_addr": "http://localhost:8091/mcp",
+  "listen_addr": "http://localhost:8091/mcp"
 }
 ```
 
