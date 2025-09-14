@@ -13,6 +13,7 @@ import { ToastContainer } from './components/Toast';
 import { useToast } from './contexts/ToastContext';
 import { useState, useEffect } from 'react';
 import { useIncomingClients } from './hooks/useIncomingClients';
+import { on, safeUnlisten, EVENT_LOGS_RPC_EVENT } from './tauri/events';
 import LogsPage from './pages/LogsPage';
 import { MCPService } from './tauri/bridge';
 
@@ -69,6 +70,16 @@ function AppContent() {
     MCPService.LogsCount()
       .then(n => setLogsCount(Number(n) || 0))
       .catch(() => setLogsCount(0));
+  }, []);
+
+  // Increment badge on live log events (total DB count approximation)
+  useEffect(() => {
+    let cancelled = false;
+    const unsubP = on(EVENT_LOGS_RPC_EVENT, () => setLogsCount(c => c + 1));
+    return () => {
+      cancelled = true;
+      unsubP.then(u => (cancelled ? undefined : safeUnlisten(u))).catch(() => {});
+    };
   }, []);
 
   const handleRefreshStatus = async (serverName: string) => {

@@ -374,8 +374,17 @@ async fn mcp_refresh_client_tools(app: tauri::AppHandle, client_name: String) ->
     // Log listTools event for internal refresh + emit live update
     let mut evt = logging::Event::new("listTools", format!("internal::{client_name}"));
     evt.server_name = Some(client_name.clone());
-    evt.request_json = Some(serde_json::json!({ "source": "internal_refresh" }));
-    evt.response_json = Some(serde_json::json!({ "tools": raw }));
+    // Mirror the external JSON-RPC-ish shape used elsewhere
+    evt.request_json = Some(serde_json::json!({
+        "method": "tools/list",
+        "params": {}
+    }));
+    evt.response_json = Some(serde_json::json!({
+        "result": {
+            "tools": raw,
+            "nextCursor": null
+        }
+    }));
     evt.duration_ms = Some(start.elapsed().as_millis() as i64);
     logging::log_rpc_event(evt.clone());
     mcp_bouncer::events::logs_rpc_event(&mcp_bouncer::events::TauriEventEmitter(app), &evt);
@@ -397,8 +406,18 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
             // Emit a synthetic initialize event for internal connection
             let mut e = logging::Event::new("initialize", format!("internal::{name}"));
             e.server_name = Some(name.to_string());
-            e.request_json = Some(serde_json::json!({ "source": "internal_connect" }));
-            e.response_json = Some(serde_json::json!({ "connected": true }));
+            e.request_json = Some(serde_json::json!({
+                "method": "initialize",
+                "params": {
+                    "clientInfo": { "name": "MCP Bouncer UI", "version": env!("CARGO_PKG_VERSION") }
+                }
+            }));
+            e.response_json = Some(serde_json::json!({
+                "result": {
+                    "serverInfo": { "name": "MCP Bouncer", "version": env!("CARGO_PKG_VERSION") },
+                    "capabilities": { "logging": true, "tools": true, "toolListChanged": true }
+                }
+            }));
             e.ok = true;
             logging::log_rpc_event(e.clone());
             mcp_bouncer::events::logs_rpc_event(emitter, &e);
