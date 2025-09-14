@@ -21,10 +21,13 @@ Tip: From the repository root, prefer passing `--manifest-path` for Rust backend
 - Format: `npm run format` / `npm run format:check`
 
 #### Verify Changes (required)
-- Run `npm run build` to catch type errors and bundling issues.
+- Lint + type-check front-end: `npm run lint` and `npm run build`
 - Run ALL tests (no warnings allowed):
   - Rust: `cargo test --manifest-path src-tauri/Cargo.toml`
   - Frontend: `npm run test:run`
+- Clippy (must be clean; warnings are errors in CI):
+  - `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings`
+- Optional parity with CI build step: `cargo tauri build` (release build)
 
 ## Architecture Overview
 

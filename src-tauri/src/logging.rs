@@ -462,7 +462,6 @@ pub fn count_events(server: Option<&str>) -> Result<i64, String> {
     Ok(cnt)
 }
 
-fn binds_from<'a>(list: &'a [Box<dyn duckdb::ToSql>]) -> Vec<&'a dyn duckdb::ToSql> { list.iter().map(|b| &**b as &dyn duckdb::ToSql).collect() }
 
 pub fn query_events_since(
     since_ts_ms: i64,
