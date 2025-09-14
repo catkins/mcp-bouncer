@@ -403,24 +403,22 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
     client_status_changed(emitter, name, "connecting");
     match ensure_rmcp_client(name, cfg).await {
         Ok(client) => {
-            // Emit a synthetic initialize event for internal connection
-            let mut e = logging::Event::new("initialize", format!("internal::{name}"));
-            e.server_name = Some(name.to_string());
-            e.request_json = Some(serde_json::json!({
-                "method": "initialize",
-                "params": {
-                    "clientInfo": { "name": "MCP Bouncer UI", "version": env!("CARGO_PKG_VERSION") }
-                }
-            }));
-            e.response_json = Some(serde_json::json!({
-                "result": {
-                    "serverInfo": { "name": "MCP Bouncer", "version": env!("CARGO_PKG_VERSION") },
-                    "capabilities": { "logging": true, "tools": true, "toolListChanged": true }
-                }
-            }));
-            e.ok = true;
-            logging::log_rpc_event(e.clone());
-            mcp_bouncer::events::logs_rpc_event(emitter, &e);
+            // Log the actual upstream Initialize result if available
+            if let Some(init) = client.peer().peer_info() {
+                let mut e = logging::Event::new("initialize", format!("internal::{name}"));
+                e.server_name = Some(name.to_string());
+                e.request_json = Some(serde_json::json!({
+                    "method": "initialize",
+                    "params": {
+                        "clientInfo": { "name": "MCP Bouncer", "version": env!("CARGO_PKG_VERSION") }
+                    }
+                }));
+                e.response_json = serde_json::to_value(init).ok().map(|v| serde_json::json!({ "result": v }));
+                logging::log_rpc_event(e.clone());
+                mcp_bouncer::events::logs_rpc_event(emitter, &e);
+            }
+            // Note: do not emit a synthetic initialize event here to avoid confusion.
+            // Real initialize responses are logged when external clients connect via the proxy.
             // list tools (forces initialize + verifies connection)
             match client.list_all_tools().await {
                 Ok(tools) => {
