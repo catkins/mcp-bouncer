@@ -90,8 +90,9 @@ where
                     },
                     instructions: None,
                 };
-                if let Ok(val) = serde_json::to_value(&req) {
-                    if let Some(id) = emit_incoming_from_initialize(&self.emitter, &val).await {
+                if let Ok(val) = serde_json::to_value(&req)
+                    && let Some(id) = emit_incoming_from_initialize(&self.emitter, &val).await
+                {
                         let mut guard = self.session_id.write().await;
                         *guard = Some(id.clone());
                         // create initialize event skeleton
@@ -102,7 +103,6 @@ where
                         e.client_protocol = Some("jsonrpc-2.0".into());
                         e.request_json = req_json.clone();
                         evt = Some(e);
-                    }
                 }
                 let out = mcp::ServerResult::InitializeResult(result);
                 // log

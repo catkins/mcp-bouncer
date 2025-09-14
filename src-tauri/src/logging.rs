@@ -116,17 +116,17 @@ pub fn init_once() {
 }
 
 pub fn log_rpc_event(mut evt: Event) {
-    if let Some(handle) = LOGGER.get() {
-        if handle.cfg.enabled {
-            // Redact before sending
-            evt.request_json = evt
-                .request_json
-                .map(|v| redact_json(v, &handle.cfg.redact_keys));
-            evt.response_json = evt
-                .response_json
-                .map(|v| redact_json(v, &handle.cfg.redact_keys));
-            let _ = handle.tx.try_send(Msg::Event(Box::new(evt)));
-        }
+    if let Some(handle) = LOGGER.get()
+        && handle.cfg.enabled
+    {
+        // Redact before sending
+        evt.request_json = evt
+            .request_json
+            .map(|v| redact_json(v, &handle.cfg.redact_keys));
+        evt.response_json = evt
+            .response_json
+            .map(|v| redact_json(v, &handle.cfg.redact_keys));
+        let _ = handle.tx.try_send(Msg::Event(Box::new(evt)));
     }
 }
 
