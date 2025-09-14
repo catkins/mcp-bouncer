@@ -21,6 +21,12 @@ RUN apt-get update && apt-get install -y \
   patchelf \
   && rm -rf /var/lib/apt/lists/*
 
+# Use a more memory-efficient linker for large Rust link steps
+# lld dramatically reduces peak memory vs GNU ld for our dependency graph
+RUN apt-get update && apt-get install -y clang lld && rm -rf /var/lib/apt/lists/*
+ENV CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang
+ENV RUSTFLAGS="-C link-arg=-fuse-ld=lld"
+
 # Install Tauri CLI for cargo subcommand
 RUN cargo install tauri-cli --locked
 RUN rustup component add clippy
