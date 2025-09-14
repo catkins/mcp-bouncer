@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
+use std::sync::atomic::{AtomicI64, Ordering};
 
 use duckdb::{params, Connection as DuckConn};
 use serde_json::Value as JsonValue;
@@ -51,11 +52,23 @@ impl Event {
     }
 }
 
+// Monotonic-ish millisecond clock to ensure strictly increasing timestamps per-process
+static LAST_MS: AtomicI64 = AtomicI64::new(0);
 fn now_millis() -> i64 {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default();
-    now.as_millis() as i64
+        .unwrap_or_default()
+        .as_millis() as i64;
+    loop {
+        let prev = LAST_MS.load(Ordering::Relaxed);
+        let next = if now > prev { now } else { prev + 1 };
+        if LAST_MS
+            .compare_exchange(prev, next, Ordering::Relaxed, Ordering::Relaxed)
+            .is_ok()
+        {
+            return next;
+        }
+    }
 }
 
 #[derive(Clone)]
