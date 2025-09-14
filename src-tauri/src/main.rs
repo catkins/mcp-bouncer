@@ -348,11 +348,12 @@ async fn mcp_logs_count(server: Option<String>) -> Result<i64, String> {
 
 #[specta::specta]
 #[tauri::command]
-async fn mcp_refresh_client_tools(client_name: String) -> Result<(), String> {
+async fn mcp_refresh_client_tools(app: tauri::AppHandle, client_name: String) -> Result<(), String> {
     let Some(cfg) = get_server_by_name(&client_name) else { return Err("server not found".into()); };
+    let start = std::time::Instant::now();
     let raw = fetch_tools_for_cfg(&cfg).await.map_err(|e| e.to_string())?;
     let mut out: Vec<ToolInfo> = Vec::new();
-    for v in raw.into_iter() {
+    for v in raw.iter() {
         let name = v.get("name").and_then(|n| n.as_str()).unwrap_or("");
         let description = v
             .get("description")
@@ -370,6 +371,14 @@ async fn mcp_refresh_client_tools(client_name: String) -> Result<(), String> {
     }
     mcp_bouncer::tools_cache::set(&client_name, out.clone()).await;
     mcp_bouncer::overlay::set_tools(&client_name, out.len() as u32).await;
+    // Log listTools event for internal refresh + emit live update
+    let mut evt = logging::Event::new("listTools", format!("internal::{client_name}"));
+    evt.server_name = Some(client_name.clone());
+    evt.request_json = Some(serde_json::json!({ "source": "internal_refresh" }));
+    evt.response_json = Some(serde_json::json!({ "tools": raw }));
+    evt.duration_ms = Some(start.elapsed().as_millis() as i64);
+    logging::log_rpc_event(evt.clone());
+    mcp_bouncer::events::logs_rpc_event(&mcp_bouncer::events::TauriEventEmitter(app), &evt);
     Ok(())
 }
 
@@ -385,6 +394,14 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
     client_status_changed(emitter, name, "connecting");
     match ensure_rmcp_client(name, cfg).await {
         Ok(client) => {
+            // Emit a synthetic initialize event for internal connection
+            let mut e = logging::Event::new("initialize", format!("internal::{name}"));
+            e.server_name = Some(name.to_string());
+            e.request_json = Some(serde_json::json!({ "source": "internal_connect" }));
+            e.response_json = Some(serde_json::json!({ "connected": true }));
+            e.ok = true;
+            logging::log_rpc_event(e.clone());
+            mcp_bouncer::events::logs_rpc_event(emitter, &e);
             // list tools (forces initialize + verifies connection)
             match client.list_all_tools().await {
                 Ok(tools) => {

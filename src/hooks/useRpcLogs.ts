@@ -17,26 +17,17 @@ export function useRpcLogs(initial: LogsQueryParams & { method?: string; ok?: bo
     return last ? { ts_ms: last.ts_ms, id: last.id } : undefined;
   }, [items]);
 
-  const reset = useCallback(async (opts?: { server?: string }) => {
-    setItems([]);
-    setHasMore(true);
-    if (opts && 'server' in (opts as object)) {
-      setServer(opts.server);
-      await loadMore({ reset: true, ...(opts.server !== undefined ? { server: opts.server } : {}) });
-    } else {
-      await loadMore({ reset: true });
-    }
-  }, []);
-
-  const loadMore = useCallback(async (opts?: { reset?: boolean; server?: string }) => {
+  const loadMore = useCallback(async (opts?: { reset?: boolean; server?: string | undefined; method?: string | undefined; ok?: boolean | undefined }) => {
     if (loading || !hasMore) return;
     setLoading(true);
     try {
       const params: LogsQueryParams & { method?: string; ok?: boolean } = { limit: 50 } as any;
-      const effectiveServer = (opts && 'server' in (opts as object)) ? opts?.server : server;
+      const effectiveServer = opts && 'server' in (opts as object) ? opts.server : server;
+      const effectiveMethod = opts && 'method' in (opts as object) ? opts.method : method;
+      const effectiveOk = opts && 'ok' in (opts as object) ? opts.ok : okFlag;
       if (effectiveServer !== undefined) params.server = effectiveServer;
-      if (method !== undefined) (params as any).method = method;
-      if (okFlag !== undefined) (params as any).ok = okFlag;
+      if (effectiveMethod !== undefined) (params as any).method = effectiveMethod;
+      if (effectiveOk !== undefined) (params as any).ok = effectiveOk;
       if (!opts?.reset && cursor) params.after = cursor;
       const page = await MCPService.LogsList(params as any);
       if (opts?.reset) {
@@ -49,7 +40,19 @@ export function useRpcLogs(initial: LogsQueryParams & { method?: string; ok?: bo
     } finally {
       setLoading(false);
     }
-  }, [cursor, hasMore, loading, server]);
+  }, [cursor, hasMore, loading, server, method, okFlag]);
+
+  const reset = useCallback(async (opts?: { server?: string | undefined; method?: string | undefined; ok?: boolean | undefined }) => {
+    setItems([]);
+    setHasMore(true);
+    const nextServer = opts && 'server' in (opts as object) ? opts.server : server;
+    const nextMethod = opts && 'method' in (opts as object) ? opts.method : method;
+    const nextOk = opts && 'ok' in (opts as object) ? opts.ok : okFlag;
+    if (opts && 'server' in (opts as object)) setServer(opts.server);
+    if (opts && 'method' in (opts as object)) setMethod(opts.method);
+    if (opts && 'ok' in (opts as object)) setOkFlag(opts.ok);
+    await loadMore({ reset: true, server: nextServer, method: nextMethod, ok: nextOk });
+  }, [server, method, okFlag, loadMore]);
 
   useEffect(() => {
     // live updates: prepend matching events
@@ -58,6 +61,8 @@ export function useRpcLogs(initial: LogsQueryParams & { method?: string; ok?: bo
     on(EVENT_LOGS_RPC_EVENT, (e) => {
       const log = e.payload as unknown as RpcLog;
       if (server && log.server_name !== server) return;
+      if (method && log.method !== method) return;
+      if (okFlag !== undefined && log.ok !== okFlag) return;
       setItems(prev => [log, ...prev]);
       topTsRef.current = Math.max(topTsRef.current, log.ts_ms);
     }).then(u => (cancelled ? safeUnlisten(u) : unsubs.push(u))).catch(() => {});
@@ -68,7 +73,7 @@ export function useRpcLogs(initial: LogsQueryParams & { method?: string; ok?: bo
         if (u) safeUnlisten(u);
       }
     };
-  }, [server]);
+  }, [server, method, okFlag]);
 
   return {
     items,

@@ -19,9 +19,9 @@ export function LogsPage() {
           {...(server !== undefined ? { server } : {})}
           {...(method !== undefined ? { method } : {})}
           {...(okFlag !== undefined ? { ok: okFlag } : {})}
-          onServerChange={(s) => (s !== undefined ? reset({ server: s }) : reset())}
-          onMethodChange={(m) => { setMethod(m); reset({}); }}
-          onOkChange={(v) => { setOkFlag(v); reset({}); }}
+          onServerChange={(s) => reset({ server: s as string | undefined })}
+          onMethodChange={(m) => reset({ method: m as string | undefined })}
+          onOkChange={(v) => reset({ ok: v as boolean | undefined })}
         />
         <div className="text-xs text-gray-500">{count === null ? '—' : `${count} events`}</div>
       </div>
