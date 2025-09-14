@@ -1,6 +1,7 @@
 import { format } from 'date-fns';
 import { CheckCircleIcon, XCircleIcon, RocketLaunchIcon, WrenchScrewdriverIcon, PlayCircleIcon, EllipsisHorizontalCircleIcon } from '@heroicons/react/20/solid';
 import type { RpcLog } from '../../types/logs';
+import { HighlightedJson } from './HighlightedJson';
 
 function methodIcon(method: string) {
   switch (method) {
@@ -42,17 +43,13 @@ export function LogListItem({ item }: { item: RpcLog }) {
         {item.request_json != null && (
           <div>
             <div className="text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Request</div>
-            <pre className="text-xs bg-gray-50 dark:bg-gray-900/60 p-2 rounded border border-gray-200 dark:border-gray-700 overflow-auto max-h-64">
-              {JSON.stringify(item.request_json, null, 2)}
-            </pre>
+            <HighlightedJson value={item.request_json} collapsedByDefault />
           </div>
         )}
         {item.response_json != null && (
           <div>
             <div className="text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Response</div>
-            <pre className="text-xs bg-gray-50 dark:bg-gray-900/60 p-2 rounded border border-gray-200 dark:border-gray-700 overflow-auto max-h-64">
-              {JSON.stringify(item.response_json, null, 2)}
-            </pre>
+            <HighlightedJson value={item.response_json} collapsedByDefault />
           </div>
         )}
       </div>
@@ -62,4 +59,3 @@ export function LogListItem({ item }: { item: RpcLog }) {
     </div>
   );
 }
-

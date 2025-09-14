@@ -15,8 +15,8 @@ export interface RpcLog {
 
 export interface LogsQueryParams {
   server?: string;
+  method?: string;
   ok?: boolean;
   limit?: number;
   after?: { ts_ms: number; id: string };
 }
-

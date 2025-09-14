@@ -3,11 +3,13 @@ import { MCPService } from '../tauri/bridge';
 import type { RpcLog, LogsQueryParams } from '../types/logs';
 import { on, safeUnlisten, EVENT_LOGS_RPC_EVENT } from '../tauri/events';
 
-export function useRpcLogs(initial: LogsQueryParams = {}) {
+export function useRpcLogs(initial: LogsQueryParams & { method?: string; ok?: boolean } = {}) {
   const [items, setItems] = useState<RpcLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [server, setServer] = useState<string | undefined>(initial.server);
+  const [method, setMethod] = useState<string | undefined>((initial as any).method);
+  const [okFlag, setOkFlag] = useState<boolean | undefined>((initial as any).ok);
   const topTsRef = useRef<number>(0);
 
   const cursor = useMemo(() => {
@@ -30,9 +32,11 @@ export function useRpcLogs(initial: LogsQueryParams = {}) {
     if (loading || !hasMore) return;
     setLoading(true);
     try {
-      const params: LogsQueryParams = { limit: 50 };
+      const params: LogsQueryParams & { method?: string; ok?: boolean } = { limit: 50 } as any;
       const effectiveServer = (opts && 'server' in (opts as object)) ? opts?.server : server;
       if (effectiveServer !== undefined) params.server = effectiveServer;
+      if (method !== undefined) (params as any).method = method;
+      if (okFlag !== undefined) (params as any).ok = okFlag;
       if (!opts?.reset && cursor) params.after = cursor;
       const page = await MCPService.LogsList(params as any);
       if (opts?.reset) {
@@ -72,6 +76,10 @@ export function useRpcLogs(initial: LogsQueryParams = {}) {
     hasMore,
     server,
     setServer,
+    method,
+    setMethod,
+    okFlag,
+    setOkFlag,
     reset,
     loadMore,
   };
