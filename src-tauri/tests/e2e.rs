@@ -53,7 +53,10 @@ async fn e2e_list_and_echo_hermetic_http() {
                     .build(),
                 server_info: mcp::Implementation {
                     name: "up".into(),
+                    title: None,
                     version: "0.0.1".into(),
+                    icons: None,
+                    website_url: None,
                 },
                 instructions: None,
             }
@@ -88,6 +91,7 @@ async fn e2e_list_and_echo_hermetic_http() {
                 content: vec![mcp::Content::text(msg)],
                 structured_content: None,
                 is_error: None,
+                meta: None,
             }))
         }
     }

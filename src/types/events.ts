@@ -6,6 +6,7 @@ export const EVENT_CLIENT_ERROR = 'mcp:client_error' as const;
 export const EVENT_INCOMING_CLIENT_CONNECTED = 'mcp:incoming_client_connected' as const;
 export const EVENT_INCOMING_CLIENT_DISCONNECTED = 'mcp:incoming_client_disconnected' as const;
 export const EVENT_INCOMING_CLIENTS_UPDATED = 'mcp:incoming_clients_updated' as const;
+export const EVENT_LOGS_RPC_EVENT = 'logs:rpc_event' as const;
 
 export type EventName =
   | typeof EVENT_SERVERS_UPDATED
@@ -14,7 +15,8 @@ export type EventName =
   | typeof EVENT_CLIENT_ERROR
   | typeof EVENT_INCOMING_CLIENT_CONNECTED
   | typeof EVENT_INCOMING_CLIENT_DISCONNECTED
-  | typeof EVENT_INCOMING_CLIENTS_UPDATED;
+  | typeof EVENT_INCOMING_CLIENTS_UPDATED
+  | typeof EVENT_LOGS_RPC_EVENT;
 
 export interface ClientErrorPayload {
   server_name: string;

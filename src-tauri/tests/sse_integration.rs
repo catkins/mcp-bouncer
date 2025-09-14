@@ -17,7 +17,10 @@ impl rmcp::handler::server::ServerHandler for TestSseService {
                 .build(),
             server_info: mcp::Implementation {
                 name: "sse-test".into(),
+                title: None,
                 version: "0.0.1".into(),
+                icons: None,
+                website_url: None,
             },
             instructions: None,
         }
@@ -57,6 +60,7 @@ impl rmcp::handler::server::ServerHandler for TestSseService {
             content: vec![mcp::Content::text(text)],
             structured_content: None,
             is_error: None,
+            meta: None,
         }))
     }
 }

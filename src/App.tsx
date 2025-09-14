@@ -13,6 +13,8 @@ import { ToastContainer } from './components/Toast';
 import { useToast } from './contexts/ToastContext';
 import { useState, useEffect } from 'react';
 import { useIncomingClients } from './hooks/useIncomingClients';
+import LogsPage from './pages/LogsPage';
+import { MCPService } from './tauri/bridge';
 
 function AppContent() {
   const { servers, setServers, loadServers } = useServersState();
@@ -60,7 +62,14 @@ function AppContent() {
 
   const { theme, toggleTheme } = useTheme();
   const { toasts, removeToast } = useToast();
-  const [tab, setTab] = useState<'servers' | 'clients'>('servers');
+  const [tab, setTab] = useState<'servers' | 'clients' | 'logs'>('servers');
+  const [logsCount, setLogsCount] = useState<number>(0);
+
+  useEffect(() => {
+    MCPService.LogsCount()
+      .then(n => setLogsCount(Number(n) || 0))
+      .catch(() => setLogsCount(0));
+  }, []);
 
   const handleRefreshStatus = async (serverName: string) => {
     await loadClientStatus();
@@ -82,6 +91,7 @@ function AppContent() {
           onChange={setTab}
           serverCount={servers.length}
           clientCount={clients.length}
+          logsCount={logsCount}
         />
 
         {tab === 'servers' ? (
@@ -96,8 +106,10 @@ function AppContent() {
             onAuthorizeServer={authorizeServer}
             onRefreshStatus={handleRefreshStatus}
           />
-        ) : (
+        ) : tab === 'clients' ? (
           <ClientList />
+        ) : (
+          <LogsPage />
         )}
       </main>
     </div>

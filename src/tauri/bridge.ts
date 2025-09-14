@@ -1,5 +1,6 @@
 // Tauri v2 bridge: thin wrappers over generated bindings for ergonomics.
 import { commands, type Result, type MCPServerConfig, type Settings, type ClientStatus, type IncomingClient, type ToolInfo as Tool } from './bindings';
+import { invoke } from '@tauri-apps/api/core';
 // Keep a runtime constant for convenience while using the generated TransportType type.
 import type { TransportType as TransportTypeType } from './bindings';
 
@@ -59,6 +60,29 @@ export const MCPService = {
   },
   async ToggleTool(clientName: string, toolName: string, enabled: boolean): Promise<void> {
     unwrap(await commands.mcpToggleTool(clientName, toolName, enabled));
+  },
+  // Logs
+  async LogsList(params: {
+    server?: string;
+    method?: string;
+    ok?: boolean;
+    limit?: number;
+    after?: { ts_ms: number; id: string };
+  }): Promise<any[]> {
+    // Use invoke directly to avoid relying on generated bindings during early development
+    return await invoke('mcp_logs_list', { params });
+  },
+  async LogsListSince(params: {
+    since_ts_ms: number;
+    server?: string;
+    method?: string;
+    ok?: boolean;
+    limit?: number;
+  }): Promise<any[]> {
+    return await invoke('mcp_logs_list_since', { params });
+  },
+  async LogsCount(server?: string): Promise<number> {
+    return await invoke('mcp_logs_count', { server });
   },
 };
 

@@ -272,6 +272,7 @@ async fn mcp_start_oauth(app: tauri::AppHandle, name: String) -> Result<(), Stri
 }
 
 use mcp_bouncer::types::ToolInfo;
+use mcp_bouncer::logging;
 
 #[tauri::command]
 #[specta::specta]
@@ -284,6 +285,65 @@ async fn mcp_get_client_tools(client_name: String) -> Result<Vec<ToolInfo>, Stri
         &client_name,
         list,
     ))
+}
+
+// ---------------- Logs (DuckDB) UI commands ----------------
+
+#[derive(serde::Serialize, serde::Deserialize, specta::Type)]
+struct LogsCursor {
+    ts_ms: i64,
+    id: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, specta::Type)]
+struct LogsListParams {
+    server: Option<String>,
+    method: Option<String>,
+    ok: Option<bool>,
+    limit: Option<u32>,
+    after: Option<LogsCursor>,
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn mcp_logs_list(params: LogsListParams) -> Result<Vec<logging::EventRow>, String> {
+    let limit = params.limit.unwrap_or(50) as usize;
+    let after = params.after.as_ref().map(|c| (c.ts_ms, c.id.as_str()));
+    logging::query_events(logging::QueryParams {
+        server: params.server.as_deref(),
+        method: params.method.as_deref(),
+        ok: params.ok,
+        limit,
+        after,
+    })
+}
+
+#[derive(serde::Serialize, serde::Deserialize, specta::Type)]
+struct LogsSinceParams {
+    since_ts_ms: i64,
+    server: Option<String>,
+    method: Option<String>,
+    ok: Option<bool>,
+    limit: Option<u32>,
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn mcp_logs_list_since(params: LogsSinceParams) -> Result<Vec<logging::EventRow>, String> {
+    let limit = params.limit.unwrap_or(50) as usize;
+    logging::query_events_since(
+        params.since_ts_ms,
+        params.server.as_deref(),
+        params.method.as_deref(),
+        params.ok,
+        limit,
+    )
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn mcp_logs_count(server: Option<String>) -> Result<i64, String> {
+    logging::count_events(server.as_deref())
 }
 
 #[specta::specta]
@@ -467,6 +527,9 @@ fn main() {
             mcp_get_client_tools,
             mcp_refresh_client_tools,
             mcp_toggle_tool,
+            mcp_logs_list,
+            mcp_logs_list_since,
+            mcp_logs_count,
             settings_get_settings,
             settings_open_config_directory,
             settings_update_settings
@@ -521,6 +584,9 @@ fn main() {
             mcp_get_client_tools,
             mcp_refresh_client_tools,
             mcp_toggle_tool,
+            mcp_logs_list,
+            mcp_logs_list_since,
+            mcp_logs_count,
             settings_get_settings,
             settings_open_config_directory,
             settings_update_settings
