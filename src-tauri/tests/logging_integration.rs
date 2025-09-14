@@ -126,11 +126,11 @@ async fn logging_persists_events_to_duckdb() {
 
     // Verify DuckDB contains events
     let db_path = mcp_bouncer::logging::db_path().expect("logger should expose db_path");
-    assert!(db_path.exists(), "logs.duckdb should exist at {:?}", db_path);
+    assert!(db_path.exists(), "logs.duckdb should exist at {db_path:?}");
     let conn = duckdb::Connection::open(&db_path).expect("open duckdb");
     let mut stmt = conn.prepare("SELECT COUNT(*) FROM rpc_events").unwrap();
     let cnt: i64 = stmt.query_row([], |r| r.get::<_, i64>(0)).unwrap();
-    assert!(cnt >= 2, "expected at least 2 events, had {}", cnt);
+    assert!(cnt >= 2, "expected at least 2 events, had {cnt}");
 
     let mut mstmt = conn.prepare("SELECT DISTINCT method FROM rpc_events").unwrap();
     let mut rows = mstmt.query([]).unwrap();
@@ -248,9 +248,18 @@ async fn logging_persists_error_and_redacts_sensitive_fields() {
         .prepare("SELECT CAST(request_json AS VARCHAR) FROM rpc_events WHERE method='callTool' ORDER BY ts DESC LIMIT 1")
         .unwrap();
     let json_str: String = stmt.query_row([], |r| r.get(0)).unwrap();
-    assert!(json_str.contains("***"), "redacted value marker not found: {}", json_str);
-    assert!(!json_str.contains("s3cr3t"), "token value should be redacted: {}", json_str);
-    assert!(!json_str.contains("Bearer abc"), "Authorization value should be redacted: {}", json_str);
+    assert!(
+        json_str.contains("***"),
+        "redacted value marker not found: {json_str}"
+    );
+    assert!(
+        !json_str.contains("s3cr3t"),
+        "token value should be redacted: {json_str}"
+    );
+    assert!(
+        !json_str.contains("Bearer abc"),
+        "Authorization value should be redacted: {json_str}"
+    );
 }
 
 #[tokio::test]
@@ -350,5 +359,5 @@ async fn logging_persists_many_calltool_events_in_batches() {
         .unwrap()
         .query_row([], |r| r.get(0))
         .unwrap();
-    assert!(call_cnt >= 1, "expected at least one callTool event, had {}", call_cnt);
+    assert!(call_cnt >= 1, "expected at least one callTool event, had {call_cnt}");
 }

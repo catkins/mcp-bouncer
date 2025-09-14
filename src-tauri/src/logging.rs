@@ -68,13 +68,13 @@ pub struct LoggerCfg {
 static LOGGER: OnceLock<LoggerHandle> = OnceLock::new();
 
 enum Msg {
-    Event(Event),
+    Event(Box<Event>),
     Flush(oneshot::Sender<()>),
 }
 
 #[derive(Clone)]
 pub struct LoggerHandle {
-    pub tx: mpsc::Sender<Msg>,
+    tx: mpsc::Sender<Msg>,
     pub cfg: Arc<LoggerCfg>,
 }
 
@@ -112,7 +112,7 @@ pub fn log_rpc_event(mut evt: Event) {
             evt.response_json = evt
                 .response_json
                 .map(|v| redact_json(v, &handle.cfg.redact_keys));
-            let _ = handle.tx.try_send(Msg::Event(evt));
+            let _ = handle.tx.try_send(Msg::Event(Box::new(evt)));
         }
     }
 }
@@ -156,7 +156,7 @@ async fn writer_task(cfg: Arc<LoggerCfg>, mut rx: mpsc::Receiver<Msg>) {
             match timeout(deadline, rx.recv()).await {
                 // Received a message
                 Ok(Some(Msg::Event(e))) => {
-                    buf.push(e);
+                    buf.push(*e);
                     if buf.len() >= 256 || last.elapsed() >= deadline {
                         if let Err(e) = flush_events(&mut conn, &buf) {
                             tracing::warn!(target = "logging", count=buf.len(), error=%e, "flush_failed");
@@ -203,7 +203,7 @@ async fn writer_task(cfg: Arc<LoggerCfg>, mut rx: mpsc::Receiver<Msg>) {
                 }
             }
         }
-        return;
+        
     }
 }
 
@@ -287,33 +287,6 @@ fn flush_events(conn: &mut DuckConn, events: &[Event]) -> duckdb::Result<()> {
         }
     }
     tx.commit()?;
-    Ok(())
-}
-
-fn flush_jsonl(path: &PathBuf, events: &[Event]) -> std::io::Result<()> {
-    use std::io::Write;
-    let mut f = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)?;
-    for e in events {
-        let mut obj = serde_json::json!({
-            "id": e.id,
-            "ts_ms": e.ts_ms,
-            "session_id": e.session_id,
-            "method": e.method,
-            "server_name": e.server_name,
-            "duration_ms": e.duration_ms,
-            "ok": e.ok,
-            "error": e.error,
-        });
-        if let Some(req) = &e.request_json { obj["request_json"] = req.clone(); }
-        if let Some(res) = &e.response_json { obj["response_json"] = res.clone(); }
-        if let Some(n) = &e.client_name { obj["client_name"] = serde_json::json!(n); }
-        if let Some(v) = &e.client_version { obj["client_version"] = serde_json::json!(v); }
-        let line = serde_json::to_string(&obj).unwrap_or_default();
-        writeln!(f, "{}", line)?;
-    }
     Ok(())
 }
 

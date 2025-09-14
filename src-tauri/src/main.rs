@@ -13,7 +13,6 @@ use mcp_bouncer::incoming::list_incoming;
 use mcp_bouncer::oauth::start_oauth_for_server;
 use mcp_bouncer::server::{get_runtime_listen_addr, start_http_server};
 use mcp_bouncer::unauthorized;
-use serde::Serialize;
 #[cfg(debug_assertions)]
 use specta_typescript::Typescript;
 #[cfg(debug_assertions)]
@@ -488,7 +487,7 @@ fn main() {
         .on_window_event(|_win, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 // Best-effort synchronous flush+checkpoint
-                let _ = tauri::async_runtime::block_on(mcp_bouncer::logging::force_flush_and_checkpoint());
+                tauri::async_runtime::block_on(mcp_bouncer::logging::force_flush_and_checkpoint());
             }
         })
         .setup(|app| {
@@ -528,6 +527,6 @@ fn main() {
         ])
         .run(tauri::generate_context!());
     // Final best-effort flush after event loop exits
-    let _ = tauri::async_runtime::block_on(mcp_bouncer::logging::force_flush_and_checkpoint());
+    tauri::async_runtime::block_on(mcp_bouncer::logging::force_flush_and_checkpoint());
     res.expect("error while running tauri application");
 }

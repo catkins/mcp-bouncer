@@ -72,12 +72,10 @@ where
         _context: rmcp::service::RequestContext<RoleServer>,
     ) -> Result<mcp::ServerResult, mcp::ErrorData> {
         let start = std::time::Instant::now();
-        let mut method = String::new();
         let mut req_json = serde_json::to_value(&request).ok();
         let mut evt = None;
         match request {
             mcp::ClientRequest::InitializeRequest(req) => {
-                method = "initialize".into();
                 let capabilities = mcp::ServerCapabilities::builder()
                     .enable_logging()
                     .enable_tools()
@@ -117,7 +115,6 @@ where
                 Ok(out)
             }
             mcp::ClientRequest::ListToolsRequest(_req) => {
-                method = "listTools".into();
                 let s = load_settings_with(&self.cp);
                 let servers: Vec<_> = s.mcp_servers.into_iter().filter(|c| c.enabled).collect();
                 const TOOL_LIST_TIMEOUT_SECS: u64 = 6;
@@ -149,7 +146,7 @@ where
                     .as_ref()
                     .cloned()
                     .unwrap_or_else(|| "anon".into());
-                let mut e = logging::Event::new(method, sid);
+                let mut e = logging::Event::new("listTools", sid);
                 e.server_name = Some("aggregate".into());
                 e.request_json = req_json.take();
                 e.response_json = serde_json::to_value(&out).ok();
@@ -159,9 +156,8 @@ where
                 Ok(out)
             }
             mcp::ClientRequest::CallToolRequest(req) => {
-                method = "callTool".into();
                 let name = req.params.name.to_string();
-                let (mut server_name, tool_name) = name
+                let (server_name, tool_name) = name
                     .split_once("::")
                     .map(|(a, b)| (a.to_string(), b.to_string()))
                     .unwrap_or((String::new(), name.clone()));
@@ -186,7 +182,7 @@ where
                             is_error: Some(true),
                         });
                         // log error
-                        let mut e = logging::Event::new(method, sid);
+                        let mut e = logging::Event::new("callTool", sid);
                         e.server_name = Some(server_name.clone());
                         e.request_json = req_json.take();
                         e.response_json = serde_json::to_value(&out).ok();
@@ -208,7 +204,7 @@ where
                         {
                             Ok(res) => {
                                 let out = mcp::ServerResult::CallToolResult(res.clone());
-                                let mut e = logging::Event::new(method, sid);
+                                let mut e = logging::Event::new("callTool", sid);
                                 e.server_name = Some(cfg.name.clone());
                                 e.request_json = req_json.take();
                                 e.response_json = serde_json::to_value(&out).ok();
@@ -240,7 +236,7 @@ where
                                     structured_content: None,
                                     is_error: Some(true),
                                 });
-                                let mut evt = logging::Event::new(method, sid);
+                                let mut evt = logging::Event::new("callTool", sid);
                                 evt.server_name = Some(cfg.name.clone());
                                 evt.request_json = req_json.take();
                                 evt.response_json = serde_json::to_value(&out).ok();
@@ -257,7 +253,7 @@ where
                             structured_content: None,
                             is_error: Some(true),
                             });
-                            let mut evt = logging::Event::new(method, sid);
+                            let mut evt = logging::Event::new("callTool", sid);
                             evt.server_name = Some(cfg.name.clone());
                             evt.request_json = req_json.take();
                             evt.response_json = serde_json::to_value(&out).ok();
@@ -274,7 +270,7 @@ where
                         structured_content: None,
                         is_error: Some(true),
                     });
-                    let mut e = logging::Event::new(method, sid);
+                    let mut e = logging::Event::new("callTool", sid);
                     e.server_name = Some(server_name.clone());
                     e.request_json = req_json.take();
                     e.response_json = serde_json::to_value(&out).ok();
