@@ -161,14 +161,14 @@ export function ServerForm({
   const updateArg = (index: number, value: string) => {
     setFormData((prev: MCPServerConfig) => ({
       ...prev,
-      args: (prev.args || []).map((arg, i) => (i === index ? value : arg)),
+      args: (prev.args || []).map((arg: string, i: number) => (i === index ? value : arg)),
     }));
   };
 
   const removeArg = (index: number) => {
     setFormData((prev: MCPServerConfig) => ({
       ...prev,
-      args: (prev.args || []).filter((_, i) => i !== index),
+      args: (prev.args || []).filter((_v: string, i: number) => i !== index),
     }));
   };
 

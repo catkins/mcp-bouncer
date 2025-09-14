@@ -1,16 +1,34 @@
 // Tauri v2 bridge: thin wrappers over invoke for ergonomics.
 import { invoke } from '@tauri-apps/api/core';
-import type { MCPServerConfig, Settings, ClientStatus, IncomingClient, ToolInfo as Tool, TransportType as TransportTypeType } from './bindings';
+// Local type declarations (frontend-only). In dev Tauri builds, these align with specta-generated types.
+export type TransportType = 'stdio' | 'sse' | 'streamable_http';
+export type MCPServerConfig = {
+  name: string;
+  description: string;
+  transport?: TransportType;
+  command: string;
+  args?: string[];
+  env?: Partial<Record<string, string>>;
+  endpoint?: string;
+  headers?: Partial<Record<string, string>>;
+  requires_auth?: boolean;
+  enabled: boolean;
+};
+export type Settings = { mcp_servers: MCPServerConfig[]; listen_addr: string };
+export type ClientConnectionState = 'disconnected' | 'connecting' | 'errored' | 'connected' | 'requires_authorization' | 'authorizing';
+export type ClientStatus = { name: string; state: ClientConnectionState; tools: number; last_error?: string | null; authorization_required: boolean; oauth_authenticated: boolean };
+export type IncomingClient = { id: string; name: string; version: string; title?: string | null; connected_at?: string | null };
+export type Tool = { name: string; description?: string | null; input_schema?: unknown | null };
 
 export const TransportType = {
   Stdio: 'stdio',
   Sse: 'sse',
   StreamableHttp: 'streamable_http',
 } as const;
-export type TransportType = TransportTypeType;
+export type TransportTypeConst = typeof TransportType[keyof typeof TransportType];
 
 // Re-export generated types for consumers of this module
-export type { MCPServerConfig, Settings, ClientStatus, IncomingClient, Tool };
+// Types already exported above
 
 export const MCPService = {
   async List(): Promise<MCPServerConfig[]> {

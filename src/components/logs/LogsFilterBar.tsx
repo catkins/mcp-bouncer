@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { MCPService, type MCPServerConfig } from '../../tauri/bridge';
+import { ChevronDownIcon } from '@heroicons/react/24/outline';
 
 export function LogsFilterBar({ server, method, ok, onServerChange, onMethodChange, onOkChange }: {
   server?: string;
@@ -15,43 +16,55 @@ export function LogsFilterBar({ server, method, ok, onServerChange, onMethodChan
     MCPService.List().then(setServers).catch(() => {});
   }, []);
 
+  const selectClass =
+    'w-44 px-3 py-2 pr-10 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-purple-500 dark:focus:border-purple-400 text-sm appearance-none cursor-pointer transition-all duration-200 hover:border-gray-400 dark:hover:border-gray-600';
+
   return (
-    <div className="flex flex-wrap items-center gap-3 mb-3">
+    <div className="flex flex-wrap items-center gap-4 mb-3">
       <label className="text-sm text-gray-600 dark:text-gray-300">Server</label>
-      <select
-        className="px-2 py-1.5 rounded-md bg-white/70 dark:bg-gray-800/70 text-sm border border-gray-200 dark:border-gray-700"
-        value={server ?? ''}
-        onChange={(e) => onServerChange(e.target.value || undefined)}
-      >
-        <option value="">All</option>
-        {servers.map(s => (
-          <option key={s.name} value={s.name}>{s.name}</option>
-        ))}
-      </select>
+      <div className="relative">
+        <select
+          className={selectClass}
+          value={server ?? ''}
+          onChange={(e) => onServerChange(e.target.value || undefined)}
+        >
+          <option value="">All</option>
+          {servers.map(s => (
+            <option key={s.name} value={s.name}>{s.name}</option>
+          ))}
+        </select>
+        <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
+      </div>
 
       <label className="text-sm text-gray-600 dark:text-gray-300">Method</label>
-      <select
-        className="px-2 py-1.5 rounded-md bg-white/70 dark:bg-gray-800/70 text-sm border border-gray-200 dark:border-gray-700"
-        value={method ?? ''}
-        onChange={(e) => onMethodChange(e.target.value || undefined)}
-      >
-        <option value="">All</option>
-        <option value="initialize">initialize</option>
-        <option value="listTools">listTools</option>
-        <option value="callTool">callTool</option>
-        <option value="other">other</option>
-      </select>
+      <div className="relative">
+        <select
+          className={selectClass}
+          value={method ?? ''}
+          onChange={(e) => onMethodChange(e.target.value || undefined)}
+        >
+          <option value="">All</option>
+          <option value="initialize">initialize</option>
+          <option value="listTools">listTools</option>
+          <option value="callTool">callTool</option>
+          <option value="other">other</option>
+        </select>
+        <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
+      </div>
 
       <label className="text-sm text-gray-600 dark:text-gray-300">Status</label>
-      <select
-        className="px-2 py-1.5 rounded-md bg-white/70 dark:bg-gray-800/70 text-sm border border-gray-200 dark:border-gray-700"
-        value={ok === undefined ? '' : ok ? 'ok' : 'err'}
-        onChange={(e) => onOkChange(e.target.value === '' ? undefined : e.target.value === 'ok')}
-      >
-        <option value="">All</option>
-        <option value="ok">Success</option>
-        <option value="err">Errors</option>
-      </select>
+      <div className="relative">
+        <select
+          className={selectClass}
+          value={ok === undefined ? '' : ok ? 'ok' : 'err'}
+          onChange={(e) => onOkChange(e.target.value === '' ? undefined : e.target.value === 'ok')}
+        >
+          <option value="">All</option>
+          <option value="ok">Success</option>
+          <option value="err">Errors</option>
+        </select>
+        <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
+      </div>
     </div>
   );
 }
