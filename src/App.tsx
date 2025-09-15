@@ -18,9 +18,9 @@ import LogsPage from './pages/LogsPage';
 import { MCPService } from './tauri/bridge';
 
 function AppContent() {
-  const { servers, setServers, loadServers } = useServersState();
-  const { clientStatus, loadClientStatus } = useClientStatusState();
-  const { mcpUrl, isActive, loadMcpUrl, loadActive } = useServiceInfo();
+  const { servers, setServers, loadServers, loading: loadingServers } = useServersState();
+  const { clientStatus, loadClientStatus, loading: loadingStatus } = useClientStatusState();
+  const { mcpUrl, isActive, loadMcpUrl, loadActive, loadingUrl, loadingActive } = useServiceInfo();
   const { loadSettings, openConfigDirectory } = useSettingsState();
 
   const [, setLoadingStates] = useState<LoadingStates>({
@@ -114,6 +114,7 @@ function AppContent() {
           <ServerList
             servers={servers}
             clientStatus={clientStatus}
+            isLoading={loadingServers || loadingStatus || (isActive === null && (loadingUrl || loadingActive))}
             onAddServer={addServer}
             onUpdateServer={updateServer}
             onRemoveServer={removeServer}

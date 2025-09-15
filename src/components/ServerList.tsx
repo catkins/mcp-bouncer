@@ -9,6 +9,7 @@ import { LoadingButton } from './LoadingButton';
 interface ServerListProps {
   servers: MCPServerConfig[];
   clientStatus: { [key: string]: ClientStatus };
+  isLoading?: boolean;
   onAddServer: (server: MCPServerConfig) => Promise<void>;
   onUpdateServer: (name: string, server: MCPServerConfig) => Promise<void>;
   onRemoveServer: (name: string) => Promise<void>;
@@ -28,6 +29,7 @@ export function ServerList({
   onRestartServer,
   onAuthorizeServer,
   onRefreshStatus,
+  isLoading,
 }: ServerListProps) {
   const [showAddServer, setShowAddServer] = useState<boolean>(false);
   const [editingServer, setEditingServer] = useState<MCPServerConfig | null>(null);
@@ -155,7 +157,16 @@ export function ServerList({
         </LoadingButton>
       </div>
 
-      {servers.length === 0 ? (
+      {isLoading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-800/60 animate-pulse">
+              <div className="h-4 w-40 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+              <div className="h-3 w-64 bg-gray-200 dark:bg-gray-700 rounded" />
+            </div>
+          ))}
+        </div>
+      ) : servers.length === 0 ? (
         <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
           <div className="w-12 h-12 mx-auto mb-3 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
             <PlusIcon className="h-6 w-6 text-gray-400 dark:text-gray-500" />
