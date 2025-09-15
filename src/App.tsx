@@ -60,6 +60,7 @@ function AppContent() {
   const { toasts, removeToast } = useToast();
   const [tab, setTab] = useState<'servers' | 'clients' | 'logs'>('servers');
   const [logsCount, setLogsCount] = useState<number>(0);
+  const serversBootstrap = useBootstrapResource(loadServers, loadClientStatus);
 
   // Load logs count on startup (keeps parity with earlier behavior)
   useEffect(() => {
@@ -128,7 +129,7 @@ function AppContent() {
               authorizeServer={authorizeServer}
               onRefreshStatus={handleRefreshStatus}
               loadingFlags={{ loadingServers, loadingStatus, loadingUrl, loadingActive, isActive, serversLoaded, statusLoaded }}
-              bootstrapResource={useBootstrapResource(loadServers, loadClientStatus)}
+              bootstrapResource={serversBootstrap}
             />
           </Suspense>
         ) : tab === 'clients' ? (
