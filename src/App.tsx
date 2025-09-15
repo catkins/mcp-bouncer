@@ -11,12 +11,12 @@ import { useTheme } from './hooks/useTheme';
 import { ToastProvider } from './contexts/ToastContext';
 import { ToastContainer } from './components/Toast';
 import { useToast } from './contexts/ToastContext';
-import { useState, useEffect, Suspense, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useIncomingClients } from './hooks/useIncomingClients';
 import { on, safeUnlisten, EVENT_LOGS_RPC_EVENT } from './tauri/events';
 import LogsPage from './pages/LogsPage';
 import { MCPService } from './tauri/bridge';
-import { wrapPromise } from './utils/suspense';
+import ServersPage from './pages/ServersPage';
 
 function AppContent() {
   const { servers, setServers, loadServers, loading: loadingServers, loaded: serversLoaded } = useServersState();
@@ -60,7 +60,6 @@ function AppContent() {
   const { toasts, removeToast } = useToast();
   const [tab, setTab] = useState<'servers' | 'clients' | 'logs'>('servers');
   const [logsCount, setLogsCount] = useState<number>(0);
-  const serversBootstrap = useBootstrapResource(loadServers, loadClientStatus);
 
   // Load logs count on startup (keeps parity with earlier behavior)
   useEffect(() => {
@@ -103,35 +102,7 @@ function AppContent() {
         />
 
         {tab === 'servers' ? (
-          <Suspense fallback={
-            <ServerList
-              servers={[]}
-              clientStatus={{}}
-              isLoading={true}
-              onAddServer={addServer}
-              onUpdateServer={updateServer}
-              onRemoveServer={removeServer}
-              onToggleServer={toggleServer}
-              onRestartServer={restartServer}
-              onAuthorizeServer={authorizeServer}
-            />
-          }>
-            <ServersSection
-              servers={servers}
-              clientStatus={clientStatus}
-              loadServers={loadServers}
-              loadClientStatus={loadClientStatus}
-              addServer={addServer}
-              updateServer={updateServer}
-              removeServer={removeServer}
-              toggleServer={toggleServer}
-              restartServer={restartServer}
-              authorizeServer={authorizeServer}
-              onRefreshStatus={handleRefreshStatus}
-              loadingFlags={{ loadingServers, loadingStatus, loadingUrl, loadingActive, isActive, serversLoaded, statusLoaded }}
-              bootstrapResource={serversBootstrap}
-            />
-          </Suspense>
+          <ServersPage />
         ) : tab === 'clients' ? (
           <ClientList />
         ) : (
@@ -142,46 +113,6 @@ function AppContent() {
   );
 }
 
-function useBootstrapResource(loadServers: () => Promise<void>, loadClientStatus: () => Promise<void>) {
-  const ref = useRef<ReturnType<typeof wrapPromise> | null>(null);
-  if (!ref.current) {
-    ref.current = wrapPromise(Promise.allSettled([loadServers(), loadClientStatus()]));
-  }
-  return ref.current;
-}
-
-function ServersSection(props: {
-  servers: ReturnType<typeof useServersState>['servers'];
-  clientStatus: ReturnType<typeof useClientStatusState>['clientStatus'];
-  loadServers: () => Promise<void>;
-  loadClientStatus: () => Promise<void>;
-  addServer: Parameters<typeof ServerList>[0]['onAddServer'];
-  updateServer: Parameters<typeof ServerList>[0]['onUpdateServer'];
-  removeServer: Parameters<typeof ServerList>[0]['onRemoveServer'];
-  toggleServer: Parameters<typeof ServerList>[0]['onToggleServer'];
-  restartServer: Parameters<typeof ServerList>[0]['onRestartServer'];
-  authorizeServer: NonNullable<Parameters<typeof ServerList>[0]['onAuthorizeServer']>;
-  onRefreshStatus: NonNullable<Parameters<typeof ServerList>[0]['onRefreshStatus']>;
-  loadingFlags: { loadingServers: boolean; loadingStatus: boolean; loadingUrl: boolean; loadingActive: boolean; isActive: boolean | null; serversLoaded: boolean; statusLoaded: boolean };
-  bootstrapResource: ReturnType<typeof wrapPromise>;
-}) {
-  const { servers, clientStatus, addServer, updateServer, removeServer, toggleServer, restartServer, authorizeServer, onRefreshStatus, loadingFlags, bootstrapResource } = props as any;
-  bootstrapResource.read();
-  return (
-    <ServerList
-      servers={servers}
-      clientStatus={clientStatus}
-      isLoading={!loadingFlags.serversLoaded || !loadingFlags.statusLoaded}
-      onAddServer={addServer}
-      onUpdateServer={updateServer}
-      onRemoveServer={removeServer}
-      onToggleServer={toggleServer}
-      onRestartServer={restartServer}
-      onAuthorizeServer={authorizeServer}
-      onRefreshStatus={onRefreshStatus}
-    />
-  );
-}
 
 export default function App() {
   return (
