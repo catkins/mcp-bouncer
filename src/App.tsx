@@ -19,8 +19,8 @@ import { MCPService } from './tauri/bridge';
 import { wrapPromise } from './utils/suspense';
 
 function AppContent() {
-  const { servers, setServers, loadServers, loading: loadingServers } = useServersState();
-  const { clientStatus, loadClientStatus, loading: loadingStatus } = useClientStatusState();
+  const { servers, setServers, loadServers, loading: loadingServers, loaded: serversLoaded } = useServersState();
+  const { clientStatus, loadClientStatus, loading: loadingStatus, loaded: statusLoaded } = useClientStatusState();
   const { mcpUrl, isActive, loadMcpUrl, loadActive, loadingUrl, loadingActive } = useServiceInfo();
   const { loadSettings, openConfigDirectory } = useSettingsState();
 
@@ -137,7 +137,7 @@ function AppContent() {
               restartServer={restartServer}
               authorizeServer={authorizeServer}
               onRefreshStatus={handleRefreshStatus}
-              loadingFlags={{ loadingServers, loadingStatus, loadingUrl, loadingActive, isActive }}
+              loadingFlags={{ loadingServers, loadingStatus, loadingUrl, loadingActive, isActive, serversLoaded, statusLoaded }}
             />
           </Suspense>
         ) : tab === 'clients' ? (
@@ -162,7 +162,7 @@ function ServersSection(props: {
   restartServer: Parameters<typeof ServerList>[0]['onRestartServer'];
   authorizeServer: NonNullable<Parameters<typeof ServerList>[0]['onAuthorizeServer']>;
   onRefreshStatus: NonNullable<Parameters<typeof ServerList>[0]['onRefreshStatus']>;
-  loadingFlags: { loadingServers: boolean; loadingStatus: boolean; loadingUrl: boolean; loadingActive: boolean; isActive: boolean | null };
+  loadingFlags: { loadingServers: boolean; loadingStatus: boolean; loadingUrl: boolean; loadingActive: boolean; isActive: boolean | null; serversLoaded: boolean; statusLoaded: boolean };
 }) {
   const { servers, clientStatus, loadServers, loadClientStatus, addServer, updateServer, removeServer, toggleServer, restartServer, authorizeServer, onRefreshStatus, loadingFlags } = props as any;
   const bootstrap = useMemo(() => wrapPromise(Promise.all([loadServers(), loadClientStatus()])), [loadServers, loadClientStatus]);
@@ -171,7 +171,7 @@ function ServersSection(props: {
     <ServerList
       servers={servers}
       clientStatus={clientStatus}
-      isLoading={loadingFlags.loadingServers || loadingFlags.loadingStatus || (loadingFlags.isActive === null && (loadingFlags.loadingUrl || loadingFlags.loadingActive))}
+      isLoading={!loadingFlags.serversLoaded || !loadingFlags.statusLoaded}
       onAddServer={addServer}
       onUpdateServer={updateServer}
       onRemoveServer={removeServer}
