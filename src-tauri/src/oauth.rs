@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use axum::{Router, extract::Query, http::StatusCode, routing::get};
+use axum::response::Html;
 use rmcp::transport::auth::{OAuthState, OAuthTokenResponse};
 
 use crate::client::ensure_rmcp_client;
@@ -156,10 +157,33 @@ pub async fn start_oauth_for_server<E: EventEmitter>(
                     if let Some(sender) = tx_shared.lock().unwrap().take() {
                         let _ = sender.send(q);
                     }
-                    (
-                        StatusCode::OK,
-                        "Authorization complete. You can close this window.",
-                    )
+                    let html = r#"<!doctype html>
+<html lang=\"en\">
+  <head>
+    <meta charset=\"utf-8\" />
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
+    <title>Authorization Complete</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height: 1.5; padding: 24px; }
+    </style>
+    <script>
+      (function() {
+        function tryClose() {
+          try { window.open('', '_self'); } catch (e) {}
+          try { window.close(); } catch (e) {}
+        }
+        // Try immediately and after a short delay as a fallback
+        tryClose();
+        setTimeout(tryClose, 150);
+      })();
+    </script>
+  </head>
+  <body>
+    <h1>Authorization Complete</h1>
+    <p>You can close this window. It should close automatically.</p>
+  </body>
+</html>"#;
+                    (StatusCode::OK, Html(html.to_string()))
                 }
             }
         }),

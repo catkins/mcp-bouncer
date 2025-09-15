@@ -1,4 +1,3 @@
-import type { Settings } from '../../tauri/bridge';
 
 export interface LoadingStates {
   addServer: boolean;

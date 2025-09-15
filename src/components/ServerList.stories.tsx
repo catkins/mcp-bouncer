@@ -127,7 +127,6 @@ const meta: Meta<typeof ServerList> = {
     onRemoveServer: { action: 'removeServer' },
     onToggleServer: { action: 'toggleServer' },
     onRestartServer: { action: 'restartServer' },
-    onRefreshStatus: { action: 'refreshStatus' },
     onAuthorizeServer: { action: 'authorizeServer' },
   },
 };

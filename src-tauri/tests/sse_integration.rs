@@ -15,10 +15,7 @@ impl rmcp::handler::server::ServerHandler for TestSseService {
                 .enable_tools()
                 .enable_tool_list_changed()
                 .build(),
-            server_info: mcp::Implementation {
-                name: "sse-test".into(),
-                version: "0.0.1".into(),
-            },
+            server_info: mcp::Implementation { name: "sse-test".into(), version: "0.0.1".into(), title: None, website_url: None, icons: None },
             instructions: None,
         }
     }
@@ -53,11 +50,7 @@ impl rmcp::handler::server::ServerHandler for TestSseService {
         } else {
             format!("x-test:{observed}")
         };
-        std::future::ready(Ok(mcp::CallToolResult {
-            content: vec![mcp::Content::text(text)],
-            structured_content: None,
-            is_error: None,
-        }))
+        std::future::ready(Ok(mcp::CallToolResult { content: vec![mcp::Content::text(text)], structured_content: None, is_error: None, meta: None }))
     }
 }
 

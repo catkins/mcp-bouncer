@@ -72,7 +72,6 @@ const meta: Meta<typeof ServerCard> = {
     onRemove: { action: 'removed' },
     onToggle: { action: 'toggled' },
     onRestart: { action: 'restarted' },
-    onRefreshStatus: { action: 'refreshStatus' },
     onOpenTools: { action: 'openTools' },
     onAuthorize: { action: 'authorize' },
   },

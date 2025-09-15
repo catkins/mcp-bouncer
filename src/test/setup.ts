@@ -18,7 +18,6 @@ if (typeof window !== 'undefined' && !('matchMedia' in window)) {
 // Let React know the environment supports `act`
 // See https://react.dev/reference/test-utils/act#js-dom
 // and React 19 guidance for non-RTL setups.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 // Extend expect with jest-dom matchers for better DOM assertions
 import '@testing-library/jest-dom/vitest';

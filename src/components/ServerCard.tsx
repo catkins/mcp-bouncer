@@ -23,7 +23,6 @@ interface ServerCardProps {
   onRemove: (serverName: string) => Promise<void>;
   onToggle: (serverName: string, enabled: boolean) => Promise<void>;
   onRestart?: () => Promise<void>;
-  onRefreshStatus?: (serverName: string) => Promise<void>;
   onOpenTools?: (serverName: string) => void;
   onAuthorize?: (serverName: string) => Promise<void>;
   loading?: boolean;
@@ -236,7 +235,6 @@ export function ServerCard({
   onEdit,
   onRemove,
   onToggle,
-  onRefreshStatus,
   onRestart,
   onOpenTools,
   onAuthorize,

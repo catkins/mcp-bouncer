@@ -87,6 +87,9 @@ where
                     server_info: mcp::Implementation {
                         name: "MCP Bouncer".into(),
                         version: env!("CARGO_PKG_VERSION").into(),
+                        title: None,
+                        website_url: None,
+                        icons: None,
                     },
                     instructions: None,
                 };
@@ -180,6 +183,7 @@ where
                             content: vec![mcp::Content::text(msg)],
                             structured_content: None,
                             is_error: Some(true),
+                            meta: None,
                         });
                         // log error
                         let mut e = logging::Event::new("callTool", sid);
@@ -235,6 +239,7 @@ where
                                     content: vec![mcp::Content::text(format!("error: {e}"))],
                                     structured_content: None,
                                     is_error: Some(true),
+                                    meta: None,
                                 });
                                 let mut evt = logging::Event::new("callTool", sid);
                                 evt.server_name = Some(cfg.name.clone());
@@ -252,6 +257,7 @@ where
                             content: vec![mcp::Content::text(format!("error: {e}"))],
                             structured_content: None,
                             is_error: Some(true),
+                            meta: None,
                             });
                             let mut evt = logging::Event::new("callTool", sid);
                             evt.server_name = Some(cfg.name.clone());
@@ -269,6 +275,7 @@ where
                         content: vec![mcp::Content::text("no server".to_string())],
                         structured_content: None,
                         is_error: Some(true),
+                        meta: None,
                     });
                     let mut e = logging::Event::new("callTool", sid);
                     e.server_name = Some(server_name.clone());
@@ -321,6 +328,9 @@ where
             server_info: mcp::Implementation {
                 name: "MCP Bouncer".into(),
                 version: env!("CARGO_PKG_VERSION").into(),
+                title: None,
+                website_url: None,
+                icons: None,
             },
             instructions: None,
         }

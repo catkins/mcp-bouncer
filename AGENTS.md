@@ -19,9 +19,11 @@ Tip: From the repository root, prefer passing `--manifest-path` for Rust backend
 - Build: `npm run build`
 - Tests: `npm run test:run` (Vitest + React Testing Library)
 - Format: `npm run format` / `npm run format:check`
+ - Lint (no warnings allowed): `npm run lint` / auto-fix: `npm run lint:fix`
 
 #### Verify Changes (required)
 - Run `npm run build` to catch type errors and bundling issues.
+- Run `npm run lint` and ensure it reports 0 warnings.
 - Run ALL tests (no warnings allowed):
   - Rust: `cargo test --manifest-path src-tauri/Cargo.toml`
   - Frontend: `npm run test:run`

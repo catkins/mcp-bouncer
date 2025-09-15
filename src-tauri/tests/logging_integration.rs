@@ -52,7 +52,7 @@ async fn logging_persists_events_to_duckdb() {
                     .enable_tools()
                     .enable_tool_list_changed()
                     .build(),
-                server_info: mcp::Implementation { name: "up".into(), version: "0.0.1".into() },
+                server_info: mcp::Implementation { name: "up".into(), version: "0.0.1".into(), title: None, website_url: None, icons: None },
                 instructions: None,
             }
         }
@@ -73,7 +73,7 @@ async fn logging_persists_events_to_duckdb() {
                 .arguments
                 .and_then(|m| m.get("message").and_then(|v| v.as_str()).map(|s| s.to_string()))
                 .unwrap_or_default();
-            std::future::ready(Ok(mcp::CallToolResult { content: vec![mcp::Content::text(msg)], structured_content: None, is_error: None }))
+            std::future::ready(Ok(mcp::CallToolResult { content: vec![mcp::Content::text(msg)], structured_content: None, is_error: None, meta: None }))
         }
     }
 
@@ -162,7 +162,7 @@ async fn logging_persists_error_and_redacts_sensitive_fields() {
                     .enable_tools()
                     .enable_tool_list_changed()
                     .build(),
-                server_info: mcp::Implementation { name: "err".into(), version: "0.0.1".into() },
+                server_info: mcp::Implementation { name: "err".into(), version: "0.0.1".into(), title: None, website_url: None, icons: None },
                 instructions: None,
             }
         }
@@ -180,7 +180,7 @@ async fn logging_persists_error_and_redacts_sensitive_fields() {
             _context: rmcp::service::RequestContext<rmcp::RoleServer>,
         ) -> impl core::future::Future<Output = Result<mcp::CallToolResult, mcp::ErrorData>> + Send + '_ {
             // Return an error-like result (is_error=true)
-            let res = mcp::CallToolResult { content: vec![mcp::Content::text("boom")], structured_content: None, is_error: Some(true) };
+            let res = mcp::CallToolResult { content: vec![mcp::Content::text("boom")], structured_content: None, is_error: Some(true), meta: None };
             std::future::ready(Ok(res))
         }
     }
@@ -276,7 +276,7 @@ async fn logging_persists_many_calltool_events_in_batches() {
                     .enable_tools()
                     .enable_tool_list_changed()
                     .build(),
-                server_info: mcp::Implementation { name: "batch".into(), version: "0.0.1".into() },
+                server_info: mcp::Implementation { name: "batch".into(), version: "0.0.1".into(), title: None, website_url: None, icons: None },
                 instructions: None,
             }
         }
@@ -297,7 +297,7 @@ async fn logging_persists_many_calltool_events_in_batches() {
                 .arguments
                 .and_then(|m| m.get("message").and_then(|v| v.as_str()).map(|s| s.to_string()))
                 .unwrap_or_default();
-            std::future::ready(Ok(mcp::CallToolResult { content: vec![mcp::Content::text(msg)], structured_content: None, is_error: None }))
+            std::future::ready(Ok(mcp::CallToolResult { content: vec![mcp::Content::text(msg)], structured_content: None, is_error: None, meta: None }))
         }
     }
 

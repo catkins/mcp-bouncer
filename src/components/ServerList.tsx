@@ -14,7 +14,6 @@ interface ServerListProps {
   onRemoveServer: (name: string) => Promise<void>;
   onToggleServer: (name: string, enabled: boolean) => Promise<void>;
   onRestartServer: (name: string) => Promise<void>;
-  onRefreshStatus?: (serverName: string) => Promise<void>;
   onAuthorizeServer?: (name: string) => Promise<void>;
 }
 
@@ -27,7 +26,6 @@ export function ServerList({
   onToggleServer,
   onRestartServer,
   onAuthorizeServer,
-  onRefreshStatus,
 }: ServerListProps) {
   const [showAddServer, setShowAddServer] = useState<boolean>(false);
   const [editingServer, setEditingServer] = useState<MCPServerConfig | null>(null);
@@ -93,7 +91,7 @@ export function ServerList({
     setToggleLoading(prev => ({ ...prev, [serverName]: true }));
     try {
       await onToggleServer(serverName, enabled);
-    } catch (error) {
+    } catch {
       setToggleErrors(prev => ({ ...prev, [serverName]: `Failed to ${enabled ? 'enable' : 'disable'} server` }));
     } finally {
       setToggleLoading(prev => ({ ...prev, [serverName]: false }));
@@ -197,7 +195,6 @@ export function ServerList({
                 {...(toggleErrors[server.name]
                   ? { toggleError: toggleErrors[server.name] as string }
                   : {})}
-                {...(onRefreshStatus ? { onRefreshStatus } : {})}
               />
             </div>
           ))}

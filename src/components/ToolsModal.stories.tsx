@@ -125,7 +125,7 @@ const mockMCPService = {
     return toolsData[serverName as keyof typeof toolsData] || [];
   },
 
-  ToggleTool: async (serverName: string, toolName: string, enabled: boolean) => {
+  ToggleTool: async (_serverName: string, toolName: string, _enabled: boolean) => {
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -281,9 +281,9 @@ export const LoadingState = () => {
     // Override the mock to simulate slower loading
     const slowMockService = {
       ...mockMCPService,
-      GetClientTools: async (serverName: string) => {
+      GetClientTools: async (_serverName: string) => {
         await new Promise(resolve => setTimeout(resolve, 3000));
-        return mockMCPService.GetClientTools(serverName);
+        return mockMCPService.GetClientTools(_serverName);
       },
     };
 
@@ -331,7 +331,7 @@ export const ManyTools = () => {
     // Override mock to return many tools
     const manyToolsService = {
       ...mockMCPService,
-      GetClientTools: async (serverName: string) => {
+      GetClientTools: async (_serverName: string) => {
         await new Promise(resolve => setTimeout(resolve, 1000));
         return Array.from({ length: 25 }, (_, i) => ({
           name: `tool_${i + 1}`,

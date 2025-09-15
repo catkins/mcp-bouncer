@@ -62,9 +62,7 @@ function AppContent() {
   const { toasts, removeToast } = useToast();
   const [tab, setTab] = useState<'servers' | 'clients'>('servers');
 
-  const handleRefreshStatus = async (serverName: string) => {
-    await loadClientStatus();
-  };
+  // no-op refresh; list updates are event-driven
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-radial dark:from-gray-800 dark:via-gray-800 dark:to-gray-900">
@@ -94,7 +92,6 @@ function AppContent() {
             onToggleServer={toggleServer}
             onRestartServer={restartServer}
             onAuthorizeServer={authorizeServer}
-            onRefreshStatus={handleRefreshStatus}
           />
         ) : (
           <ClientList />
