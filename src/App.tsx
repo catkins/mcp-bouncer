@@ -11,11 +11,12 @@ import { useTheme } from './hooks/useTheme';
 import { ToastProvider } from './contexts/ToastContext';
 import { ToastContainer } from './components/Toast';
 import { useToast } from './contexts/ToastContext';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense, useMemo } from 'react';
 import { useIncomingClients } from './hooks/useIncomingClients';
 import { on, safeUnlisten, EVENT_LOGS_RPC_EVENT } from './tauri/events';
 import LogsPage from './pages/LogsPage';
 import { MCPService } from './tauri/bridge';
+import { wrapPromise } from './utils/suspense';
 
 function AppContent() {
   const { servers, setServers, loadServers, loading: loadingServers } = useServersState();
@@ -111,18 +112,34 @@ function AppContent() {
         />
 
         {tab === 'servers' ? (
-          <ServerList
-            servers={servers}
-            clientStatus={clientStatus}
-            isLoading={loadingServers || loadingStatus || (isActive === null && (loadingUrl || loadingActive))}
-            onAddServer={addServer}
-            onUpdateServer={updateServer}
-            onRemoveServer={removeServer}
-            onToggleServer={toggleServer}
-            onRestartServer={restartServer}
-            onAuthorizeServer={authorizeServer}
-            onRefreshStatus={handleRefreshStatus}
-          />
+          <Suspense fallback={
+            <ServerList
+              servers={[]}
+              clientStatus={{}}
+              isLoading={true}
+              onAddServer={addServer}
+              onUpdateServer={updateServer}
+              onRemoveServer={removeServer}
+              onToggleServer={toggleServer}
+              onRestartServer={restartServer}
+              onAuthorizeServer={authorizeServer}
+            />
+          }>
+            <ServersSection
+              servers={servers}
+              clientStatus={clientStatus}
+              loadServers={loadServers}
+              loadClientStatus={loadClientStatus}
+              addServer={addServer}
+              updateServer={updateServer}
+              removeServer={removeServer}
+              toggleServer={toggleServer}
+              restartServer={restartServer}
+              authorizeServer={authorizeServer}
+              onRefreshStatus={handleRefreshStatus}
+              loadingFlags={{ loadingServers, loadingStatus, loadingUrl, loadingActive, isActive }}
+            />
+          </Suspense>
         ) : tab === 'clients' ? (
           <ClientList />
         ) : (
@@ -130,6 +147,39 @@ function AppContent() {
         )}
       </main>
     </div>
+  );
+}
+
+function ServersSection(props: {
+  servers: ReturnType<typeof useServersState>['servers'];
+  clientStatus: ReturnType<typeof useClientStatusState>['clientStatus'];
+  loadServers: () => Promise<void>;
+  loadClientStatus: () => Promise<void>;
+  addServer: Parameters<typeof ServerList>[0]['onAddServer'];
+  updateServer: Parameters<typeof ServerList>[0]['onUpdateServer'];
+  removeServer: Parameters<typeof ServerList>[0]['onRemoveServer'];
+  toggleServer: Parameters<typeof ServerList>[0]['onToggleServer'];
+  restartServer: Parameters<typeof ServerList>[0]['onRestartServer'];
+  authorizeServer: NonNullable<Parameters<typeof ServerList>[0]['onAuthorizeServer']>;
+  onRefreshStatus: NonNullable<Parameters<typeof ServerList>[0]['onRefreshStatus']>;
+  loadingFlags: { loadingServers: boolean; loadingStatus: boolean; loadingUrl: boolean; loadingActive: boolean; isActive: boolean | null };
+}) {
+  const { servers, clientStatus, loadServers, loadClientStatus, addServer, updateServer, removeServer, toggleServer, restartServer, authorizeServer, onRefreshStatus, loadingFlags } = props as any;
+  const bootstrap = useMemo(() => wrapPromise(Promise.all([loadServers(), loadClientStatus()])), [loadServers, loadClientStatus]);
+  bootstrap.read();
+  return (
+    <ServerList
+      servers={servers}
+      clientStatus={clientStatus}
+      isLoading={loadingFlags.loadingServers || loadingFlags.loadingStatus || (loadingFlags.isActive === null && (loadingFlags.loadingUrl || loadingFlags.loadingActive))}
+      onAddServer={addServer}
+      onUpdateServer={updateServer}
+      onRemoveServer={removeServer}
+      onToggleServer={toggleServer}
+      onRestartServer={restartServer}
+      onAuthorizeServer={authorizeServer}
+      onRefreshStatus={onRefreshStatus}
+    />
   );
 }
 
