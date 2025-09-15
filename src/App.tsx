@@ -22,11 +22,11 @@ function AppContent() {
 
   // Keep service info in sync on settings updates
   useMCPSubscriptions({
-    loadServers: async () => {},
+    loadServers: async () => { },
     loadActive,
     loadSettings,
     loadMcpUrl,
-    loadClientStatus: async () => {},
+    loadClientStatus: async () => { },
   });
 
   // Initial bootstrap for global settings + URL/active; servers/status are loaded via Suspense resource
@@ -53,7 +53,7 @@ function AppContent() {
     const unsubP = on(EVENT_LOGS_RPC_EVENT, () => setLogsCount(c => c + 1));
     return () => {
       cancelled = true;
-      unsubP.then(u => (cancelled ? undefined : safeUnlisten(u))).catch(() => {});
+      unsubP.then(u => (cancelled ? undefined : safeUnlisten(u))).catch(() => { });
     };
   }, []);
 
@@ -77,6 +77,7 @@ function AppContent() {
           clientCount={clients.length}
           logsCount={logsCount}
         />
+
 
         {tab === 'servers' ? (
           <ServersPage />
