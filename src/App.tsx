@@ -49,15 +49,15 @@ function AppContent() {
     loadClientStatus,
   });
 
-  // Initial bootstrap
+  // Initial bootstrap: fire in parallel so UI renders immediately
   useEffect(() => {
-    (async () => {
-      await loadSettings();
-      await loadMcpUrl();
-      await loadServers();
-      await loadActive();
-      await loadClientStatus();
-    })();
+    Promise.allSettled([
+      loadSettings(),
+      loadMcpUrl(),
+      loadServers(),
+      loadActive(),
+      loadClientStatus(),
+    ]);
   }, []);
   const { clients } = useIncomingClients();
 
@@ -66,11 +66,16 @@ function AppContent() {
   const [tab, setTab] = useState<'servers' | 'clients' | 'logs'>('servers');
   const [logsCount, setLogsCount] = useState<number>(0);
 
+  // Load logs count only when Logs tab is viewed the first time
+  const [loadedLogsCount, setLoadedLogsCount] = useState(false);
   useEffect(() => {
-    MCPService.LogsCount()
-      .then(n => setLogsCount(Number(n) || 0))
-      .catch(() => setLogsCount(0));
-  }, []);
+    if (tab === 'logs' && !loadedLogsCount) {
+      MCPService.LogsCount()
+        .then(n => setLogsCount(Number(n) || 0))
+        .catch(() => setLogsCount(0))
+        .finally(() => setLoadedLogsCount(true));
+    }
+  }, [tab, loadedLogsCount]);
 
   // Increment badge on live log events (total DB count approximation)
   useEffect(() => {
