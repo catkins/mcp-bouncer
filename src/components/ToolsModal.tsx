@@ -231,7 +231,7 @@ export function ToolsModal({ serverName, isOpen, onClose }: ToolsModalProps) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
-                    {tools.map((tool, index) => (
+                    {tools.map((tool, _index) => (
                       <tr
                         key={tool.name}
                         className={`hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors duration-150 ${

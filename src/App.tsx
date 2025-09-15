@@ -1,11 +1,8 @@
-import { ServerList, Header, ClientList, TabSwitcher } from './components';
+import { Header, ClientList, TabSwitcher } from './components';
 import { useServersState } from './hooks/mcp/useServersState';
-import { useClientStatusState } from './hooks/mcp/useClientStatusState';
 import { useServiceInfo } from './hooks/mcp/useServiceInfo';
 import { useSettingsState } from './hooks/mcp/useSettingsState';
 // Prefer the richer actions hook that supports loading/error state wiring
-import { useMCPActions } from './hooks/mcp/useMCPActions';
-import type { LoadingStates, ErrorStates } from './hooks/mcp/types';
 import { useMCPSubscriptions } from './hooks/mcp/useMCPSubscriptions';
 import { useTheme } from './hooks/useTheme';
 import { ToastProvider } from './contexts/ToastContext';
@@ -19,35 +16,17 @@ import { MCPService } from './tauri/bridge';
 import ServersPage from './pages/ServersPage';
 
 function AppContent() {
-  const { servers, setServers, loadServers, loading: loadingServers, loaded: serversLoaded } = useServersState();
-  const { clientStatus, loadClientStatus, loading: loadingStatus, loaded: statusLoaded } = useClientStatusState();
-  const { mcpUrl, isActive, loadMcpUrl, loadActive, loadingUrl, loadingActive } = useServiceInfo();
+  const { servers, loadServers } = useServersState();
+  const { mcpUrl, isActive, loadMcpUrl, loadActive } = useServiceInfo();
   const { loadSettings, openConfigDirectory } = useSettingsState();
 
-  const [, setLoadingStates] = useState<LoadingStates>({
-    addServer: false,
-    updateServer: false,
-    removeServer: false,
-    general: false,
-    restartServer: {},
-    toggleServer: {},
-  });
-  const [, setErrors] = useState<ErrorStates>({});
-  const { addServer, updateServer, removeServer, toggleServer, restartServer, authorizeServer } = useMCPActions({
-    servers,
-    setServers: updater => setServers(prev => updater(prev)),
-    setLoadingStates,
-    setErrors,
-    loadServers,
-    loadClientStatus,
-  });
-
+  // Keep service info in sync on settings updates
   useMCPSubscriptions({
-    loadServers,
+    loadServers: async () => {},
     loadActive,
     loadSettings,
     loadMcpUrl,
-    loadClientStatus,
+    loadClientStatus: async () => {},
   });
 
   // Initial bootstrap for global settings + URL/active; servers/status are loaded via Suspense resource
@@ -78,9 +57,7 @@ function AppContent() {
     };
   }, []);
 
-  const handleRefreshStatus = async (serverName: string) => {
-    await loadClientStatus();
-  };
+  useEffect(() => { loadServers(); }, []);
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-radial dark:from-gray-800 dark:via-gray-800 dark:to-gray-900">

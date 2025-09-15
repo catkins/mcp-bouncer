@@ -95,7 +95,7 @@ export function ServerList({
     setToggleLoading(prev => ({ ...prev, [serverName]: true }));
     try {
       await onToggleServer(serverName, enabled);
-    } catch (error) {
+    } catch {
       setToggleErrors(prev => ({ ...prev, [serverName]: `Failed to ${enabled ? 'enable' : 'disable'} server` }));
     } finally {
       setToggleLoading(prev => ({ ...prev, [serverName]: false }));

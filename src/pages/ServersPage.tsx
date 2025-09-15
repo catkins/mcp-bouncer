@@ -3,10 +3,11 @@ import { ServerList } from '../components';
 import { useServersState } from '../hooks/mcp/useServersState';
 import { useClientStatusState } from '../hooks/mcp/useClientStatusState';
 import { useMCPActions } from '../hooks/mcp/useMCPActions';
+import { useMCPSubscriptions } from '../hooks/mcp/useMCPSubscriptions';
 
 export default function ServersPage() {
-  const { servers, setServers, loadServers, loading: loadingServers, loaded: serversLoaded } = useServersState();
-  const { clientStatus, loadClientStatus, loading: loadingStatus, loaded: statusLoaded } = useClientStatusState();
+  const { servers, setServers, loadServers, loaded: serversLoaded } = useServersState();
+  const { clientStatus, loadClientStatus, loaded: statusLoaded } = useClientStatusState();
 
   const { addServer, updateServer, removeServer, toggleServer, restartServer, authorizeServer } = useMCPActions({
     servers,
@@ -20,12 +21,18 @@ export default function ServersPage() {
 
   useEffect(() => {
     // Kick initial loads (in parallel)
-    let mounted = true;
     Promise.allSettled([loadServers(), loadClientStatus()]);
-    return () => {
-      mounted = false;
-    };
+    return () => {};
   }, [loadServers, loadClientStatus]);
+
+  // Subscribe to MCP events to keep servers/status in sync
+  useMCPSubscriptions({
+    loadServers,
+    loadActive: async () => {},
+    loadSettings: async () => {},
+    loadMcpUrl: async () => {},
+    loadClientStatus,
+  });
 
   const handleRefreshStatus = async (_: string) => {
     await loadClientStatus();

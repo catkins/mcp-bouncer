@@ -5,7 +5,7 @@ import { useRpcLogs } from '../hooks/useRpcLogs';
 import { MCPService } from '../tauri/bridge';
 
 export function LogsPage() {
-  const { items, loading, hasMore, server, setServer, method, setMethod, okFlag, setOkFlag, reset, loadMore } = useRpcLogs();
+  const { items, loading, hasMore, server, method, okFlag, reset, loadMore } = useRpcLogs();
   const [count, setCount] = useState<number | null>(null);
 
   useEffect(() => {

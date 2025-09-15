@@ -236,7 +236,7 @@ export function ServerCard({
   onEdit,
   onRemove,
   onToggle,
-  onRefreshStatus,
+  onRefreshStatus: _onRefreshStatus,
   onRestart,
   onOpenTools,
   onAuthorize,
