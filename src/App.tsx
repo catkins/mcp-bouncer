@@ -11,7 +11,7 @@ import { useTheme } from './hooks/useTheme';
 import { ToastProvider } from './contexts/ToastContext';
 import { ToastContainer } from './components/Toast';
 import { useToast } from './contexts/ToastContext';
-import { useState, useEffect, Suspense, useMemo } from 'react';
+import { useState, useEffect, Suspense, useRef } from 'react';
 import { useIncomingClients } from './hooks/useIncomingClients';
 import { on, safeUnlisten, EVENT_LOGS_RPC_EVENT } from './tauri/events';
 import LogsPage from './pages/LogsPage';
@@ -50,15 +50,9 @@ function AppContent() {
     loadClientStatus,
   });
 
-  // Initial bootstrap: fire in parallel so UI renders immediately
+  // Initial bootstrap for global settings + URL/active; servers/status are loaded via Suspense resource
   useEffect(() => {
-    Promise.allSettled([
-      loadSettings(),
-      loadMcpUrl(),
-      loadServers(),
-      loadActive(),
-      loadClientStatus(),
-    ]);
+    Promise.allSettled([loadSettings(), loadMcpUrl(), loadActive()]);
   }, []);
   const { clients } = useIncomingClients();
 
@@ -67,16 +61,12 @@ function AppContent() {
   const [tab, setTab] = useState<'servers' | 'clients' | 'logs'>('servers');
   const [logsCount, setLogsCount] = useState<number>(0);
 
-  // Load logs count only when Logs tab is viewed the first time
-  const [loadedLogsCount, setLoadedLogsCount] = useState(false);
+  // Load logs count on startup (keeps parity with earlier behavior)
   useEffect(() => {
-    if (tab === 'logs' && !loadedLogsCount) {
-      MCPService.LogsCount()
-        .then(n => setLogsCount(Number(n) || 0))
-        .catch(() => setLogsCount(0))
-        .finally(() => setLoadedLogsCount(true));
-    }
-  }, [tab, loadedLogsCount]);
+    MCPService.LogsCount()
+      .then(n => setLogsCount(Number(n) || 0))
+      .catch(() => setLogsCount(0));
+  }, []);
 
   // Increment badge on live log events (total DB count approximation)
   useEffect(() => {
@@ -138,6 +128,7 @@ function AppContent() {
               authorizeServer={authorizeServer}
               onRefreshStatus={handleRefreshStatus}
               loadingFlags={{ loadingServers, loadingStatus, loadingUrl, loadingActive, isActive, serversLoaded, statusLoaded }}
+              bootstrapResource={useBootstrapResource(loadServers, loadClientStatus)}
             />
           </Suspense>
         ) : tab === 'clients' ? (
@@ -148,6 +139,14 @@ function AppContent() {
       </main>
     </div>
   );
+}
+
+function useBootstrapResource(loadServers: () => Promise<void>, loadClientStatus: () => Promise<void>) {
+  const ref = useRef<ReturnType<typeof wrapPromise> | null>(null);
+  if (!ref.current) {
+    ref.current = wrapPromise(Promise.allSettled([loadServers(), loadClientStatus()]));
+  }
+  return ref.current;
 }
 
 function ServersSection(props: {
@@ -163,10 +162,10 @@ function ServersSection(props: {
   authorizeServer: NonNullable<Parameters<typeof ServerList>[0]['onAuthorizeServer']>;
   onRefreshStatus: NonNullable<Parameters<typeof ServerList>[0]['onRefreshStatus']>;
   loadingFlags: { loadingServers: boolean; loadingStatus: boolean; loadingUrl: boolean; loadingActive: boolean; isActive: boolean | null; serversLoaded: boolean; statusLoaded: boolean };
+  bootstrapResource: ReturnType<typeof wrapPromise>;
 }) {
-  const { servers, clientStatus, loadServers, loadClientStatus, addServer, updateServer, removeServer, toggleServer, restartServer, authorizeServer, onRefreshStatus, loadingFlags } = props as any;
-  const bootstrap = useMemo(() => wrapPromise(Promise.all([loadServers(), loadClientStatus()])), [loadServers, loadClientStatus]);
-  bootstrap.read();
+  const { servers, clientStatus, addServer, updateServer, removeServer, toggleServer, restartServer, authorizeServer, onRefreshStatus, loadingFlags, bootstrapResource } = props as any;
+  bootstrapResource.read();
   return (
     <ServerList
       servers={servers}
