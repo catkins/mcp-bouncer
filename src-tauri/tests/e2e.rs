@@ -51,7 +51,13 @@ async fn e2e_list_and_echo_hermetic_http() {
                     .enable_tools()
                     .enable_tool_list_changed()
                     .build(),
-                server_info: mcp::Implementation { name: "up".into(), version: "0.0.1".into(), title: None, website_url: None, icons: None },
+                server_info: mcp::Implementation {
+                    name: "up".into(),
+                    title: None,
+                    version: "0.0.1".into(),
+                    icons: None,
+                    website_url: None,
+                },
                 instructions: None,
             }
         }
@@ -81,7 +87,12 @@ async fn e2e_list_and_echo_hermetic_http() {
                         .map(|s| s.to_string())
                 })
                 .unwrap_or_default();
-            std::future::ready(Ok(mcp::CallToolResult { content: vec![mcp::Content::text(msg)], structured_content: None, is_error: None, meta: None }))
+            std::future::ready(Ok(mcp::CallToolResult {
+                content: vec![mcp::Content::text(msg)],
+                structured_content: None,
+                is_error: None,
+                meta: None,
+            }))
         }
     }
 

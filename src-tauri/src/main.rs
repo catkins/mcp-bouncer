@@ -131,8 +131,10 @@ async fn mcp_update_server(
             && enabling
         {
             // If HTTP transport requires auth and no credentials, gate and mark unauthorized
-            if matches!(cfg.transport, mcp_bouncer::config::TransportType::StreamableHttp)
-                && cfg.requires_auth
+            if matches!(
+                cfg.transport,
+                mcp_bouncer::config::TransportType::StreamableHttp
+            ) && cfg.requires_auth
                 && mcp_bouncer::oauth::load_credentials_for(
                     &mcp_bouncer::config::OsConfigProvider,
                     &server_name,
@@ -185,8 +187,10 @@ async fn mcp_toggle_server_enabled(
         save_settings(&s)?;
         if enabled {
             if let Some(cfg) = get_server_by_name(&server_name) {
-                if matches!(cfg.transport, mcp_bouncer::config::TransportType::StreamableHttp)
-                    && cfg.requires_auth
+                if matches!(
+                    cfg.transport,
+                    mcp_bouncer::config::TransportType::StreamableHttp
+                ) && cfg.requires_auth
                     && mcp_bouncer::oauth::load_credentials_for(
                         &mcp_bouncer::config::OsConfigProvider,
                         &server_name,
@@ -271,13 +275,16 @@ async fn mcp_start_oauth(app: tauri::AppHandle, name: String) -> Result<(), Stri
         .map_err(|e| e.to_string())
 }
 
+use mcp_bouncer::logging;
 use mcp_bouncer::types::ToolInfo;
 
 #[tauri::command]
 #[specta::specta]
 async fn mcp_get_client_tools(client_name: String) -> Result<Vec<ToolInfo>, String> {
     // Use cached tools to avoid re-fetching every modal open
-    let list = mcp_bouncer::tools_cache::get(&client_name).await.unwrap_or_default();
+    let list = mcp_bouncer::tools_cache::get(&client_name)
+        .await
+        .unwrap_or_default();
     // Filter based on persisted toggles
     Ok(mcp_bouncer::tools_cache::filter_enabled_with(
         &mcp_bouncer::config::OsConfigProvider,
@@ -286,13 +293,78 @@ async fn mcp_get_client_tools(client_name: String) -> Result<Vec<ToolInfo>, Stri
     ))
 }
 
+// ---------------- Logs (DuckDB) UI commands ----------------
+
+#[derive(serde::Serialize, serde::Deserialize, specta::Type)]
+struct LogsCursor {
+    ts_ms: i64,
+    id: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, specta::Type)]
+struct LogsListParams {
+    server: Option<String>,
+    method: Option<String>,
+    ok: Option<bool>,
+    limit: Option<u32>,
+    after: Option<LogsCursor>,
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn mcp_logs_list(params: LogsListParams) -> Result<Vec<logging::EventRow>, String> {
+    let limit = params.limit.unwrap_or(50) as usize;
+    let after = params.after.as_ref().map(|c| (c.ts_ms, c.id.as_str()));
+    logging::query_events(logging::QueryParams {
+        server: params.server.as_deref(),
+        method: params.method.as_deref(),
+        ok: params.ok,
+        limit,
+        after,
+    })
+}
+
+#[derive(serde::Serialize, serde::Deserialize, specta::Type)]
+struct LogsSinceParams {
+    since_ts_ms: i64,
+    server: Option<String>,
+    method: Option<String>,
+    ok: Option<bool>,
+    limit: Option<u32>,
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn mcp_logs_list_since(params: LogsSinceParams) -> Result<Vec<logging::EventRow>, String> {
+    let limit = params.limit.unwrap_or(50) as usize;
+    logging::query_events_since(
+        params.since_ts_ms,
+        params.server.as_deref(),
+        params.method.as_deref(),
+        params.ok,
+        limit,
+    )
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn mcp_logs_count(server: Option<String>) -> Result<i64, String> {
+    logging::count_events(server.as_deref())
+}
+
 #[specta::specta]
 #[tauri::command]
-async fn mcp_refresh_client_tools(client_name: String) -> Result<(), String> {
-    let Some(cfg) = get_server_by_name(&client_name) else { return Err("server not found".into()); };
+async fn mcp_refresh_client_tools(
+    app: tauri::AppHandle,
+    client_name: String,
+) -> Result<(), String> {
+    let Some(cfg) = get_server_by_name(&client_name) else {
+        return Err("server not found".into());
+    };
+    let start = std::time::Instant::now();
     let raw = fetch_tools_for_cfg(&cfg).await.map_err(|e| e.to_string())?;
     let mut out: Vec<ToolInfo> = Vec::new();
-    for v in raw.into_iter() {
+    for v in raw.iter() {
         let name = v.get("name").and_then(|n| n.as_str()).unwrap_or("");
         let description = v
             .get("description")
@@ -310,6 +382,23 @@ async fn mcp_refresh_client_tools(client_name: String) -> Result<(), String> {
     }
     mcp_bouncer::tools_cache::set(&client_name, out.clone()).await;
     mcp_bouncer::overlay::set_tools(&client_name, out.len() as u32).await;
+    // Log listTools event for internal refresh + emit live update
+    let mut evt = logging::Event::new("listTools", format!("internal::{client_name}"));
+    evt.server_name = Some(client_name.clone());
+    // Mirror the external JSON-RPC-ish shape used elsewhere
+    evt.request_json = Some(serde_json::json!({
+        "method": "tools/list",
+        "params": {}
+    }));
+    evt.response_json = Some(serde_json::json!({
+        "result": {
+            "tools": raw,
+            "nextCursor": null
+        }
+    }));
+    evt.duration_ms = Some(start.elapsed().as_millis() as i64);
+    logging::log_rpc_event(evt.clone());
+    mcp_bouncer::events::logs_rpc_event(&mcp_bouncer::events::TauriEventEmitter(app), &evt);
     Ok(())
 }
 
@@ -325,6 +414,24 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
     client_status_changed(emitter, name, "connecting");
     match ensure_rmcp_client(name, cfg).await {
         Ok(client) => {
+            // Log the actual upstream Initialize result if available
+            if let Some(init) = client.peer().peer_info() {
+                let mut e = logging::Event::new("initialize", format!("internal::{name}"));
+                e.server_name = Some(name.to_string());
+                e.request_json = Some(serde_json::json!({
+                    "method": "initialize",
+                    "params": {
+                        "clientInfo": { "name": "MCP Bouncer", "version": env!("CARGO_PKG_VERSION") }
+                    }
+                }));
+                e.response_json = serde_json::to_value(init)
+                    .ok()
+                    .map(|v| serde_json::json!({ "result": v }));
+                logging::log_rpc_event(e.clone());
+                mcp_bouncer::events::logs_rpc_event(emitter, &e);
+            }
+            // Note: do not emit a synthetic initialize event here to avoid confusion.
+            // Real initialize responses are logged when external clients connect via the proxy.
             // list tools (forces initialize + verifies connection)
             match client.list_all_tools().await {
                 Ok(tools) => {
@@ -357,7 +464,10 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
                     client_status_changed(emitter, name, "connected");
                 }
                 Err(e) => {
-                    if matches!(cfg.transport, mcp_bouncer::config::TransportType::StreamableHttp) {
+                    if matches!(
+                        cfg.transport,
+                        mcp_bouncer::config::TransportType::StreamableHttp
+                    ) {
                         unauthorized::on_possible_unauthorized(name, Some(&cfg.endpoint)).await;
                     }
                     let snap = mcp_bouncer::overlay::snapshot().await;
@@ -467,6 +577,9 @@ fn main() {
             mcp_get_client_tools,
             mcp_refresh_client_tools,
             mcp_toggle_tool,
+            mcp_logs_list,
+            mcp_logs_list_since,
+            mcp_logs_count,
             settings_get_settings,
             settings_open_config_directory,
             settings_update_settings
@@ -521,6 +634,9 @@ fn main() {
             mcp_get_client_tools,
             mcp_refresh_client_tools,
             mcp_toggle_tool,
+            mcp_logs_list,
+            mcp_logs_list_since,
+            mcp_logs_count,
             settings_get_settings,
             settings_open_config_directory,
             settings_update_settings

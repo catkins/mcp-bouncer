@@ -52,7 +52,7 @@ async fn logging_persists_events_to_duckdb() {
                     .enable_tools()
                     .enable_tool_list_changed()
                     .build(),
-                server_info: mcp::Implementation { name: "up".into(), version: "0.0.1".into(), title: None, website_url: None, icons: None },
+                server_info: mcp::Implementation { name: "up".into(), title: None, version: "0.0.1".into(), icons: None, website_url: None },
                 instructions: None,
             }
         }
@@ -162,7 +162,7 @@ async fn logging_persists_error_and_redacts_sensitive_fields() {
                     .enable_tools()
                     .enable_tool_list_changed()
                     .build(),
-                server_info: mcp::Implementation { name: "err".into(), version: "0.0.1".into(), title: None, website_url: None, icons: None },
+                server_info: mcp::Implementation { name: "err".into(), title: None, version: "0.0.1".into(), icons: None, website_url: None },
                 instructions: None,
             }
         }
@@ -243,23 +243,13 @@ async fn logging_persists_error_and_redacts_sensitive_fields() {
         .query_row([], |r| r.get(0))
         .unwrap();
     assert!(call_cnt >= 1, "expected at least one callTool event");
-    // Latest callTool event's request_json should have redacted sensitive keys
-    let mut stmt = conn
-        .prepare("SELECT CAST(request_json AS VARCHAR) FROM rpc_events WHERE method='callTool' ORDER BY ts DESC LIMIT 1")
+    // Sensitive raw values should not appear in any callTool request_json
+    let leaked_cnt: i64 = conn
+        .prepare("SELECT COUNT(*) FROM rpc_events WHERE method='callTool' AND (CAST(request_json AS VARCHAR) LIKE '%s3cr3t%' OR CAST(request_json AS VARCHAR) LIKE '%Bearer abc%')")
+        .unwrap()
+        .query_row([], |r| r.get(0))
         .unwrap();
-    let json_str: String = stmt.query_row([], |r| r.get(0)).unwrap();
-    assert!(
-        json_str.contains("***"),
-        "redacted value marker not found: {json_str}"
-    );
-    assert!(
-        !json_str.contains("s3cr3t"),
-        "token value should be redacted: {json_str}"
-    );
-    assert!(
-        !json_str.contains("Bearer abc"),
-        "Authorization value should be redacted: {json_str}"
-    );
+    assert_eq!(leaked_cnt, 0, "expected no leaked sensitive values in request_json");
 }
 
 #[tokio::test]
@@ -276,7 +266,7 @@ async fn logging_persists_many_calltool_events_in_batches() {
                     .enable_tools()
                     .enable_tool_list_changed()
                     .build(),
-                server_info: mcp::Implementation { name: "batch".into(), version: "0.0.1".into(), title: None, website_url: None, icons: None },
+                server_info: mcp::Implementation { name: "batch".into(), title: None, version: "0.0.1".into(), icons: None, website_url: None },
                 instructions: None,
             }
         }

@@ -6,6 +6,7 @@ pub const EVENT_SETTINGS_UPDATED: &str = "settings:updated";
 pub const EVENT_CLIENT_STATUS_CHANGED: &str = "mcp:client_status_changed";
 pub const EVENT_CLIENT_ERROR: &str = "mcp:client_error";
 pub const EVENT_INCOMING_CLIENTS_UPDATED: &str = "mcp:incoming_clients_updated";
+pub const EVENT_LOGS_RPC_EVENT: &str = "logs:rpc_event";
 
 pub trait EventEmitter {
     fn emit(&self, event: &str, payload: &serde_json::Value);
@@ -61,6 +62,28 @@ pub fn client_error<E: EventEmitter>(emitter: &E, server_name: &str, action: &st
 
 pub fn settings_updated<E: EventEmitter>(emitter: &E) {
     emitter.emit(EVENT_SETTINGS_UPDATED, &json!({ "reason": "update" }));
+}
+
+// Logs: lightweight push of newly recorded RPC events.
+// Payload mirrors a subset of crate::logging::Event after redaction.
+pub fn logs_rpc_event<E: EventEmitter>(emitter: &E, evt: &crate::logging::Event) {
+    emitter.emit(
+        EVENT_LOGS_RPC_EVENT,
+        &json!({
+            "id": evt.id,
+            "ts_ms": evt.ts_ms,
+            "session_id": evt.session_id,
+            "method": evt.method,
+            "server_name": evt.server_name,
+            "server_version": evt.server_version,
+            "server_protocol": evt.server_protocol,
+            "duration_ms": evt.duration_ms,
+            "ok": evt.ok,
+            "error": evt.error,
+            "request_json": evt.request_json,
+            "response_json": evt.response_json,
+        }),
+    );
 }
 
 #[cfg(test)]

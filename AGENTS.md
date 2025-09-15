@@ -27,6 +27,9 @@ Tip: From the repository root, prefer passing `--manifest-path` for Rust backend
 - Run ALL tests (no warnings allowed):
   - Rust: `cargo test --manifest-path src-tauri/Cargo.toml`
   - Frontend: `npm run test:run`
+- Clippy (must be clean; warnings are errors in CI):
+  - `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings`
+- Optional parity with CI build step: `cargo tauri build` (release build)
 
 ## Architecture Overview
 

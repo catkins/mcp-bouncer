@@ -86,10 +86,10 @@ where
                     capabilities,
                     server_info: mcp::Implementation {
                         name: "MCP Bouncer".into(),
-                        version: env!("CARGO_PKG_VERSION").into(),
                         title: None,
-                        website_url: None,
+                        version: env!("CARGO_PKG_VERSION").into(),
                         icons: None,
+                        website_url: None,
                     },
                     instructions: None,
                 };
@@ -113,7 +113,9 @@ where
                     e.response_json = serde_json::to_value(&out).ok();
                     e.ok = true;
                     e.duration_ms = Some(start.elapsed().as_millis() as i64);
+                    let cloned = e.clone();
                     logging::log_rpc_event(e);
+                    crate::events::logs_rpc_event(&self.emitter, &cloned);
                 }
                 Ok(out)
             }
@@ -155,7 +157,9 @@ where
                 e.response_json = serde_json::to_value(&out).ok();
                 e.ok = true;
                 e.duration_ms = Some(start.elapsed().as_millis() as i64);
+                let cloned = e.clone();
                 logging::log_rpc_event(e);
+                crate::events::logs_rpc_event(&self.emitter, &cloned);
                 Ok(out)
             }
             mcp::ClientRequest::CallToolRequest(req) => {
@@ -218,7 +222,9 @@ where
                                 if !ok {
                                     e.error = Some("tool returned error".into());
                                 }
+                                let cloned = e.clone();
                                 logging::log_rpc_event(e);
+                                crate::events::logs_rpc_event(&self.emitter, &cloned);
                                 Ok(out)
                             }
                             Err(e) => {
@@ -248,16 +254,18 @@ where
                                 evt.ok = false;
                                 evt.error = Some(e.to_string());
                                 evt.duration_ms = Some(start.elapsed().as_millis() as i64);
+                                let cloned = evt.clone();
                                 logging::log_rpc_event(evt);
+                                crate::events::logs_rpc_event(&self.emitter, &cloned);
                                 Ok(out)
                             }
                         },
                         Err(e) => {
                             let out = mcp::ServerResult::CallToolResult(mcp::CallToolResult {
-                            content: vec![mcp::Content::text(format!("error: {e}"))],
-                            structured_content: None,
-                            is_error: Some(true),
-                            meta: None,
+                                content: vec![mcp::Content::text(format!("error: {e}"))],
+                                structured_content: None,
+                                is_error: Some(true),
+                                meta: None,
                             });
                             let mut evt = logging::Event::new("callTool", sid);
                             evt.server_name = Some(cfg.name.clone());
@@ -266,7 +274,9 @@ where
                             evt.ok = false;
                             evt.error = Some(e.to_string());
                             evt.duration_ms = Some(start.elapsed().as_millis() as i64);
+                            let cloned = evt.clone();
                             logging::log_rpc_event(evt);
+                            crate::events::logs_rpc_event(&self.emitter, &cloned);
                             Ok(out)
                         }
                     }
@@ -284,7 +294,9 @@ where
                     e.ok = false;
                     e.error = Some("no server".into());
                     e.duration_ms = Some(start.elapsed().as_millis() as i64);
+                    let cloned = e.clone();
                     logging::log_rpc_event(e);
+                    crate::events::logs_rpc_event(&self.emitter, &cloned);
                     Ok(out)
                 }
             }
@@ -303,7 +315,9 @@ where
                 e.response_json = serde_json::to_value(&out).ok();
                 e.ok = true;
                 e.duration_ms = Some(start.elapsed().as_millis() as i64);
+                let cloned = e.clone();
                 logging::log_rpc_event(e);
+                crate::events::logs_rpc_event(&self.emitter, &cloned);
                 Ok(out)
             }
         }
@@ -327,10 +341,10 @@ where
                 .build(),
             server_info: mcp::Implementation {
                 name: "MCP Bouncer".into(),
-                version: env!("CARGO_PKG_VERSION").into(),
                 title: None,
-                website_url: None,
+                version: env!("CARGO_PKG_VERSION").into(),
                 icons: None,
+                website_url: None,
             },
             instructions: None,
         }

@@ -1,72 +1,105 @@
-// Tauri v2 bridge: thin wrappers over generated bindings for ergonomics.
-import { commands, type Result, type MCPServerConfig, type Settings, type ClientStatus, type IncomingClient, type ToolInfo as Tool } from './bindings';
-// Keep a runtime constant for convenience while using the generated TransportType type.
-import type { TransportType as TransportTypeType } from './bindings';
+// Tauri v2 bridge: thin wrappers over invoke for ergonomics.
+import { invoke } from '@tauri-apps/api/core';
+// Local type declarations (frontend-only). In dev Tauri builds, these align with specta-generated types.
+export type TransportType = 'stdio' | 'sse' | 'streamable_http';
+export type MCPServerConfig = {
+  name: string;
+  description: string;
+  transport?: TransportType;
+  command: string;
+  args?: string[];
+  env?: Partial<Record<string, string>>;
+  endpoint?: string;
+  headers?: Partial<Record<string, string>>;
+  requires_auth?: boolean;
+  enabled: boolean;
+};
+export type Settings = { mcp_servers: MCPServerConfig[]; listen_addr: string };
+export type ClientConnectionState = 'disconnected' | 'connecting' | 'errored' | 'connected' | 'requires_authorization' | 'authorizing';
+export type ClientStatus = { name: string; state: ClientConnectionState; tools: number; last_error?: string | null; authorization_required: boolean; oauth_authenticated: boolean };
+export type IncomingClient = { id: string; name: string; version: string; title?: string | null; connected_at?: string | null };
+export type Tool = { name: string; description?: string | null; input_schema?: unknown | null };
 
 export const TransportType = {
   Stdio: 'stdio',
   Sse: 'sse',
   StreamableHttp: 'streamable_http',
 } as const;
-export type TransportType = TransportTypeType;
+export type TransportTypeConst = typeof TransportType[keyof typeof TransportType];
 
 // Re-export generated types for consumers of this module
-export type { MCPServerConfig, Settings, ClientStatus, IncomingClient, Tool };
-
-function unwrap<T, E>(res: Result<T, E>): T {
-  if (res.status === 'ok') return res.data;
-  const err = res.error;
-  throw new Error(typeof err === 'string' ? err : JSON.stringify(err));
-}
+// Types already exported above
 
 export const MCPService = {
   async List(): Promise<MCPServerConfig[]> {
-    return unwrap(await commands.mcpList());
+    return await invoke('mcp_list');
   },
   async ListenAddr(): Promise<string> {
-    return unwrap(await commands.mcpListenAddr());
+    return await invoke('mcp_listen_addr');
   },
   async IsActive(): Promise<boolean> {
-    return unwrap(await commands.mcpIsActive());
+    return await invoke('mcp_is_active');
   },
   async GetClientStatus(): Promise<Record<string, ClientStatus>> {
-    // commands return Partial<Record<string, ClientStatus>>; coerce to regular record
-    return unwrap(await commands.mcpGetClientStatus()) as Record<string, ClientStatus>;
+    return await invoke('mcp_get_client_status');
   },
   async GetIncomingClients(): Promise<IncomingClient[]> {
-    return unwrap(await commands.mcpGetIncomingClients());
+    return await invoke('mcp_get_incoming_clients');
   },
   async AddMCPServer(config: MCPServerConfig): Promise<void> {
-    unwrap(await commands.mcpAddServer(config));
+    await invoke('mcp_add_server', { config });
   },
   async UpdateMCPServer(name: string, config: MCPServerConfig): Promise<void> {
-    unwrap(await commands.mcpUpdateServer(name, config));
+    await invoke('mcp_update_server', { name, config });
   },
   async RemoveMCPServer(name: string): Promise<void> {
-    unwrap(await commands.mcpRemoveServer(name));
+    await invoke('mcp_remove_server', { name });
   },
   async RestartClient(name: string): Promise<void> {
-    unwrap(await commands.mcpRestartClient(name));
+    await invoke('mcp_restart_client', { name });
   },
   async StartOAuth(name: string): Promise<void> {
-    unwrap(await commands.mcpStartOauth(name));
+    await invoke('mcp_start_oauth', { name });
   },
   async GetClientTools(clientName: string): Promise<Tool[]> {
-    return unwrap(await commands.mcpGetClientTools(clientName));
+    return await invoke('mcp_get_client_tools', { clientName });
   },
   async RefreshClientTools(clientName: string): Promise<void> {
-    unwrap(await commands.mcpRefreshClientTools(clientName));
+    await invoke('mcp_refresh_client_tools', { clientName });
   },
   async ToggleTool(clientName: string, toolName: string, enabled: boolean): Promise<void> {
-    unwrap(await commands.mcpToggleTool(clientName, toolName, enabled));
+    await invoke('mcp_toggle_tool', { clientName, toolName, enabled });
+  },
+  // Logs
+  async LogsList(params: {
+    server?: string;
+    method?: string;
+    ok?: boolean;
+    limit?: number;
+    after?: { ts_ms: number; id: string };
+  }): Promise<any[]> {
+    // Use invoke directly to avoid relying on generated bindings during early development
+    return await invoke('mcp_logs_list', { params });
+  },
+  async LogsListSince(params: {
+    since_ts_ms: number;
+    server?: string;
+    method?: string;
+    ok?: boolean;
+    limit?: number;
+  }): Promise<any[]> {
+    return await invoke('mcp_logs_list_since', { params });
+  },
+  async LogsCount(server?: string): Promise<number> {
+    return await invoke('mcp_logs_count', { server });
   },
 };
 
 export const SettingsService = {
   async GetSettings(): Promise<Settings | null> {
-    return unwrap(await commands.settingsGetSettings());
+    return await invoke('settings_get_settings');
   },
   async OpenConfigDirectory(): Promise<void> {
-    unwrap(await commands.settingsOpenConfigDirectory());
+    await invoke('settings_open_config_directory');
   },
 };

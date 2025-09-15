@@ -125,11 +125,11 @@ const mockMCPService = {
     return toolsData[serverName as keyof typeof toolsData] || [];
   },
 
-  ToggleTool: async (_serverName: string, toolName: string, _enabled: boolean) => {
+  ToggleTool: async (_serverName: string, _toolName: string, _enabled: boolean) => {
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    if (toolName === 'error-tool') {
+    if (_toolName === 'error-tool') {
       throw new Error('Failed to toggle tool: Permission denied');
     }
 
@@ -283,7 +283,7 @@ export const LoadingState = () => {
       ...mockMCPService,
       GetClientTools: async (_serverName: string) => {
         await new Promise(resolve => setTimeout(resolve, 3000));
-        return mockMCPService.GetClientTools(_serverName);
+        return mockMCPService.GetClientTools('fetch');
       },
     };
 

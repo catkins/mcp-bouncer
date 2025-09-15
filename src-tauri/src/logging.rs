@@ -342,6 +342,197 @@ pub fn redact_json(mut v: JsonValue, keys_lc: &[String]) -> JsonValue {
     v
 }
 
+// ---------------- Query helpers for UI ----------------
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+pub struct EventRow {
+    pub id: String,
+    pub ts_ms: i64,
+    pub session_id: String,
+    pub method: String,
+    pub server_name: Option<String>,
+    pub server_version: Option<String>,
+    pub server_protocol: Option<String>,
+    pub duration_ms: Option<i64>,
+    pub ok: bool,
+    pub error: Option<String>,
+    pub request_json: Option<JsonValue>,
+    pub response_json: Option<JsonValue>,
+}
+
+pub struct QueryParams<'a> {
+    pub server: Option<&'a str>,
+    pub method: Option<&'a str>,
+    pub ok: Option<bool>,
+    pub limit: usize,
+    pub after: Option<(i64, &'a str)>, // (ts_ms, id)
+}
+
+pub fn query_events(params: QueryParams) -> Result<Vec<EventRow>, String> {
+    let Some(path) = db_path() else { return Ok(vec![]); };
+    let conn = DuckConn::open(path).map_err(|e| format!("open db: {e}"))?;
+    // Build SQL with optional filters and keyset pagination (most recent first)
+    let mut sql = String::from(
+        "SELECT id::VARCHAR, CAST(epoch(ts) * 1000 AS BIGINT) AS ts_ms, session_id, method, server_name, server_version, server_protocol, duration_ms, ok, error, CAST(request_json AS VARCHAR), CAST(response_json AS VARCHAR) FROM rpc_events",
+    );
+    let mut where_clauses: Vec<String> = Vec::new();
+    let mut binds: Vec<Box<dyn duckdb::ToSql>> = Vec::new();
+    if let Some(s) = params.server {
+        where_clauses.push("server_name = ?".into());
+        binds.push(Box::new(s.to_string()));
+    }
+    if let Some(m) = params.method {
+        where_clauses.push("method = ?".into());
+        binds.push(Box::new(m.to_string()));
+    }
+    if let Some(ok) = params.ok {
+        where_clauses.push("ok = ?".into());
+        binds.push(Box::new(ok));
+    }
+    if let Some((ts_ms, id)) = params.after {
+        // keyset: (ts,id) < (after.ts, after.id) for DESC order
+        where_clauses.push("(ts < TO_TIMESTAMP(?/1000.0) OR (ts = TO_TIMESTAMP(?/1000.0) AND id < ?::UUID))".into());
+        binds.push(Box::new(ts_ms));
+        binds.push(Box::new(ts_ms));
+        binds.push(Box::new(id.to_string()));
+    }
+    if !where_clauses.is_empty() {
+        sql.push_str(" WHERE ");
+        sql.push_str(&where_clauses.join(" AND "));
+    }
+    sql.push_str(" ORDER BY ts DESC, id DESC LIMIT ?");
+    let limit = if params.limit == 0 { 50 } else { params.limit.min(200) } as i64;
+    binds.push(Box::new(limit));
+
+    let mut stmt = conn.prepare(&sql).map_err(|e| format!("prepare: {e}"))?;
+    let rows = stmt
+        .query_map(duckdb::params_from_iter(binds.iter().map(|b| &**b as &dyn duckdb::ToSql)), |row| {
+            let id: String = row.get(0)?;
+            let ts_ms: i64 = row.get(1)?;
+            let session_id: String = row.get(2)?;
+            let method: String = row.get(3)?;
+            let server_name: Option<String> = row.get(4).ok();
+            let server_version: Option<String> = row.get(5).ok();
+            let server_protocol: Option<String> = row.get(6).ok();
+            let duration_ms: Option<i64> = row.get(7).ok();
+            let ok: bool = row.get(8)?;
+            let error: Option<String> = row.get(9).ok();
+            let req_s: Option<String> = row.get(10).ok();
+            let res_s: Option<String> = row.get(11).ok();
+            let request_json = req_s
+                .and_then(|s| serde_json::from_str::<JsonValue>(&s).ok());
+            let response_json = res_s
+                .and_then(|s| serde_json::from_str::<JsonValue>(&s).ok());
+            Ok(EventRow {
+                id,
+                ts_ms,
+                session_id,
+                method,
+                server_name,
+                server_version,
+                server_protocol,
+                duration_ms,
+                ok,
+                error,
+                request_json,
+                response_json,
+            })
+        })
+        .map_err(|e| format!("query: {e}"))?;
+    let mut out = Vec::new();
+    for r in rows {
+        out.push(r.map_err(|e| format!("row: {e}"))?);
+    }
+    Ok(out)
+}
+
+pub fn count_events(server: Option<&str>) -> Result<i64, String> {
+    let Some(path) = db_path() else { return Ok(0); };
+    let conn = DuckConn::open(path).map_err(|e| format!("open db: {e}"))?;
+    let mut sql = String::from("SELECT COUNT(*) FROM rpc_events");
+    let mut binds: Vec<Box<dyn duckdb::ToSql>> = Vec::new();
+    if let Some(s) = server {
+        sql.push_str(" WHERE server_name = ?");
+        binds.push(Box::new(s.to_string()));
+    }
+    let mut stmt = conn.prepare(&sql).map_err(|e| format!("prepare: {e}"))?;
+    let cnt: i64 = stmt
+        .query_row(duckdb::params_from_iter(binds.iter().map(|b| &**b as &dyn duckdb::ToSql)), |row| row.get(0))
+        .map_err(|e| format!("query: {e}"))?;
+    Ok(cnt)
+}
+
+
+pub fn query_events_since(
+    since_ts_ms: i64,
+    server: Option<&str>,
+    method: Option<&str>,
+    ok_flag: Option<bool>,
+    limit: usize,
+) -> Result<Vec<EventRow>, String> {
+    let Some(path) = db_path() else { return Ok(vec![]); };
+    let conn = DuckConn::open(path).map_err(|e| format!("open db: {e}"))?;
+    let mut sql = String::from(
+        "SELECT id::VARCHAR, CAST(epoch(ts) * 1000 AS BIGINT) AS ts_ms, session_id, method, server_name, server_version, server_protocol, duration_ms, ok, error, CAST(request_json AS VARCHAR), CAST(response_json AS VARCHAR) FROM rpc_events WHERE ts > TO_TIMESTAMP(?/1000.0)",
+    );
+    let mut binds: Vec<Box<dyn duckdb::ToSql>> = vec![Box::new(since_ts_ms)];
+    if let Some(s) = server {
+        sql.push_str(" AND server_name = ?");
+        binds.push(Box::new(s.to_string()));
+    }
+    if let Some(m) = method {
+        sql.push_str(" AND method = ?");
+        binds.push(Box::new(m.to_string()));
+    }
+    if let Some(ok) = ok_flag {
+        sql.push_str(" AND ok = ?");
+        binds.push(Box::new(ok));
+    }
+    sql.push_str(" ORDER BY ts DESC, id DESC LIMIT ?");
+    let limit = if limit == 0 { 50 } else { limit.min(200) } as i64;
+    binds.push(Box::new(limit));
+    let mut stmt = conn.prepare(&sql).map_err(|e| format!("prepare: {e}"))?;
+    let rows = stmt
+        .query_map(duckdb::params_from_iter(binds.iter().map(|b| &**b as &dyn duckdb::ToSql)), |row| {
+            let id: String = row.get(0)?;
+            let ts_ms: i64 = row.get(1)?;
+            let session_id: String = row.get(2)?;
+            let method: String = row.get(3)?;
+            let server_name: Option<String> = row.get(4).ok();
+            let server_version: Option<String> = row.get(5).ok();
+            let server_protocol: Option<String> = row.get(6).ok();
+            let duration_ms: Option<i64> = row.get(7).ok();
+            let ok: bool = row.get(8)?;
+            let error: Option<String> = row.get(9).ok();
+            let req_s: Option<String> = row.get(10).ok();
+            let res_s: Option<String> = row.get(11).ok();
+            let request_json = req_s
+                .and_then(|s| serde_json::from_str::<JsonValue>(&s).ok());
+            let response_json = res_s
+                .and_then(|s| serde_json::from_str::<JsonValue>(&s).ok());
+            Ok(EventRow {
+                id,
+                ts_ms,
+                session_id,
+                method,
+                server_name,
+                server_version,
+                server_protocol,
+                duration_ms,
+                ok,
+                error,
+                request_json,
+                response_json,
+            })
+        })
+        .map_err(|e| format!("query: {e}"))?;
+    let mut out = Vec::new();
+    for r in rows {
+        out.push(r.map_err(|e| format!("row: {e}"))?);
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -152,36 +152,41 @@ export function ServerForm({
   };
 
   const addArg = () => {
-    setFormData(prev => ({
+    setFormData((prev: MCPServerConfig) => ({
       ...prev,
       args: [...(prev.args || []), ''],
     }));
   };
 
   const updateArg = (index: number, value: string) => {
-    setFormData(prev => ({
+    setFormData((prev: MCPServerConfig) => ({
       ...prev,
-      args: (prev.args || []).map((arg, i) => (i === index ? value : arg)),
+      args: (prev.args || []).map((arg: string, i: number) => (i === index ? value : arg)),
     }));
   };
 
   const removeArg = (index: number) => {
-    setFormData(prev => ({
+    setFormData((prev: MCPServerConfig) => ({
       ...prev,
-      args: (prev.args || []).filter((_, i) => i !== index),
+      args: (prev.args || []).filter((_v: string, i: number) => i !== index),
     }));
   };
 
   const addEnvVar = () => {
-    setEnvList(prev => [...prev, { id: nextId(), key: '', value: '' }]);
+    setEnvList((prev: Array<{ id: string; key: string; value: string }>) => [
+      ...prev,
+      { id: nextId(), key: '', value: '' },
+    ]);
   };
 
   const updateEnvVar = (index: number, _oldKey: string, newKey: string, value: string) => {
-    setEnvList(prev => prev.map((row, i) => (i === index ? { ...row, key: newKey, value } : row)));
+    setEnvList((prev: Array<{ id: string; key: string; value: string }>) =>
+      prev.map((row, i) => (i === index ? { ...row, key: newKey, value } : row))
+    );
   };
 
   const removeEnvVar = (key: string) => {
-    setEnvList(prev => {
+    setEnvList((prev: Array<{ id: string; key: string; value: string }>) => {
       const idx = prev.findIndex(r => r.key === key);
       if (idx === -1) return prev;
       return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
@@ -189,15 +194,20 @@ export function ServerForm({
   };
 
   const addHeader = () => {
-    setHeaderList(prev => [...prev, { id: nextId(), key: '', value: '' }]);
+    setHeaderList((prev: Array<{ id: string; key: string; value: string }>) => [
+      ...prev,
+      { id: nextId(), key: '', value: '' },
+    ]);
   };
 
   const updateHeader = (index: number, _oldKey: string, newKey: string, value: string) => {
-    setHeaderList(prev => prev.map((row, i) => (i === index ? { ...row, key: newKey, value } : row)));
+    setHeaderList((prev: Array<{ id: string; key: string; value: string }>) =>
+      prev.map((row, i) => (i === index ? { ...row, key: newKey, value } : row))
+    );
   };
 
   const removeHeader = (key: string) => {
-    setHeaderList(prev => {
+    setHeaderList((prev: Array<{ id: string; key: string; value: string }>) => {
       const idx = prev.findIndex(r => r.key === key);
       if (idx === -1) return prev;
       return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
@@ -235,9 +245,9 @@ export function ServerForm({
             label="Name"
             value={formData.name}
             onChange={value => {
-              setFormData(prev => ({ ...prev, name: value }));
+              setFormData((prev: MCPServerConfig) => ({ ...prev, name: value }));
               if (errors.name) {
-                setErrors(prev => ({ ...prev, name: '' }));
+                setErrors((prev: Record<string, string>) => ({ ...prev, name: '' }));
               }
             }}
             {...(errors.name ? { error: errors.name } : {})}
@@ -248,7 +258,7 @@ export function ServerForm({
             id="server-description"
             label="Description"
             value={formData.description}
-            onChange={value => setFormData(prev => ({ ...prev, description: value }))}
+            onChange={value => setFormData((prev: MCPServerConfig) => ({ ...prev, description: value }))}
           />
 
           <div>
@@ -260,17 +270,17 @@ export function ServerForm({
                 value={formData.transport}
                 onChange={e => {
                   const newTransport = e.target.value as TransportType;
-                  setFormData(prev => ({ ...prev, transport: newTransport }));
+                  setFormData((prev: MCPServerConfig) => ({ ...prev, transport: newTransport }));
                   // Clear validation errors when switching transport types
-                  setErrors(prev => {
+                  setErrors((prev: Record<string, string>) => {
                     const newErrors = { ...prev };
                   if (newTransport !== TransportType.Stdio) {
-                      delete newErrors.command;
-                    }
-                    if (newTransport === TransportType.Stdio) {
-                      delete newErrors.endpoint;
-                    }
-                    return newErrors;
+                        delete newErrors.command;
+                      }
+                      if (newTransport === TransportType.Stdio) {
+                        delete newErrors.endpoint;
+                      }
+                      return newErrors;
                   });
                 }}
                 className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-purple-500 dark:focus:border-purple-400 text-sm appearance-none cursor-pointer transition-all duration-200 hover:border-gray-400 dark:hover:border-gray-600"
@@ -290,9 +300,9 @@ export function ServerForm({
               label="Endpoint"
               value={formData.endpoint || ''}
               onChange={value => {
-                setFormData(prev => ({ ...prev, endpoint: value }));
+                setFormData((prev: MCPServerConfig) => ({ ...prev, endpoint: value }));
                 if (errors.endpoint) {
-                  setErrors(prev => ({ ...prev, endpoint: '' }));
+                  setErrors((prev: Record<string, string>) => ({ ...prev, endpoint: '' }));
                 }
               }}
               {...(errors.endpoint ? { error: errors.endpoint } : {})}
@@ -309,9 +319,9 @@ export function ServerForm({
               label="Command"
               value={formData.command}
               onChange={value => {
-                setFormData(prev => ({ ...prev, command: value }));
+                setFormData((prev: MCPServerConfig) => ({ ...prev, command: value }));
                 if (errors.command) {
-                  setErrors(prev => ({ ...prev, command: '' }));
+                  setErrors((prev: Record<string, string>) => ({ ...prev, command: '' }));
                 }
               }}
               {...(errors.command ? { error: errors.command } : {})}
@@ -393,7 +403,7 @@ export function ServerForm({
           <div className="pt-1">
             <ToggleSwitch
               checked={formData.enabled}
-              onChange={checked => setFormData(prev => ({ ...prev, enabled: checked }))}
+              onChange={checked => setFormData((prev: MCPServerConfig) => ({ ...prev, enabled: checked }))}
               label="Enable server"
               size="sm"
             />
