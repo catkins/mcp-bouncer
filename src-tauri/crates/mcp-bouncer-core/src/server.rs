@@ -601,7 +601,7 @@ mod tests {
         let (handle, _addr) = super::start_http_server(
             emitter.clone(),
             cp.clone(),
-            NoopLogger::default(),
+            NoopLogger,
             "127.0.0.1:0".parse().unwrap(),
         )
         .await
