@@ -10,4 +10,3 @@ pub struct ToolInfo {
     #[specta(optional)]
     pub input_schema: Option<serde_json::Value>,
 }
-

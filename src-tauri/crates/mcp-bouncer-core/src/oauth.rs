@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use axum::{Router, extract::Query, http::StatusCode, routing::get};
 use axum::response::Html;
+use axum::{Router, extract::Query, http::StatusCode, routing::get};
 use rmcp::transport::auth::{OAuthState, OAuthTokenResponse};
 
 use crate::client::ensure_rmcp_client;
@@ -46,7 +46,9 @@ pub fn load_credentials_for(cp: &dyn ConfigProvider, name: &str) -> Option<OAuth
                     .map(|d| d.as_secs() as i64)
                     .unwrap_or(0);
                 let mut rel = expires_at - now;
-                if rel < 0 { rel = 0; }
+                if rel < 0 {
+                    rel = 0;
+                }
                 if let Some(obj) = data.as_object_mut() {
                     obj.insert(
                         "expires_in".to_string(),
@@ -92,10 +94,8 @@ pub fn save_credentials_for(
         OAuthFileV2::default()
     };
 
-    map.0.insert(
-        name.to_string(),
-        PersistedCreds { data, expires_at },
-    );
+    map.0
+        .insert(name.to_string(), PersistedCreds { data, expires_at });
 
     if let Some(dir) = p.parent() {
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;

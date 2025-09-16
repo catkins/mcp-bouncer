@@ -1,7 +1,7 @@
 use mcp_bouncer::config::{
     ConfigProvider, MCPServerConfig, TransportType, default_settings, save_settings_with,
 };
-use mcp_bouncer::{events::EventEmitter, server::start_http_server};
+use mcp_bouncer::{events::EventEmitter, logging::DuckDbPublisher, server::start_http_server};
 use rmcp::ServiceExt;
 use rmcp::model as mcp;
 use rmcp::transport::{
@@ -122,11 +122,7 @@ async fn e2e_list_and_echo_hermetic_http() {
         command: String::new(),
         args: vec![],
         env: Default::default(),
-        endpoint: format!(
-            "http://{}:{}/mcp",
-            upstream_addr.ip(),
-            upstream_addr.port()
-        ),
+        endpoint: format!("http://{}:{}/mcp", upstream_addr.ip(), upstream_addr.port()),
         headers: Default::default(),
         requires_auth: false,
         enabled: true,
@@ -140,7 +136,7 @@ async fn e2e_list_and_echo_hermetic_http() {
     impl EventEmitter for NoopEmitter {
         fn emit(&self, _e: &str, _p: &serde_json::Value) {}
     }
-    let (_handle, bound) = start_http_server(NoopEmitter, cp.clone(), addr)
+    let (_handle, bound) = start_http_server(NoopEmitter, cp.clone(), DuckDbPublisher, addr)
         .await
         .expect("start http server");
     let url = format!("http://{}:{}/mcp", bound.ip(), bound.port());

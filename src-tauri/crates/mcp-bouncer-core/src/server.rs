@@ -11,7 +11,7 @@ use crate::config::{ConfigProvider, MCPServerConfig, load_settings_with};
 use crate::events::EventEmitter;
 use crate::events::{client_status_changed, incoming_clients_updated};
 use crate::incoming::record_connect;
-use crate::logging;
+use crate::logging::{Event, RpcEventPublisher};
 use crate::unauthorized;
 
 // Runtime-bound listen address storage
@@ -51,20 +51,23 @@ fn extract_str<'a>(val: &'a serde_json::Value, paths: &[&str]) -> Option<&'a str
 }
 
 #[derive(Clone)]
-pub struct BouncerService<E, CP>
+pub struct BouncerService<E, CP, L>
 where
     E: EventEmitter + Clone + Send + Sync + 'static,
     CP: ConfigProvider + Clone + Send + Sync + 'static,
+    L: RpcEventPublisher,
 {
     pub emitter: E,
     pub cp: CP,
+    pub logger: L,
     pub session_id: std::sync::Arc<tokio::sync::RwLock<Option<String>>>,
 }
 
-impl<E, CP> McpService<RoleServer> for BouncerService<E, CP>
+impl<E, CP, L> McpService<RoleServer> for BouncerService<E, CP, L>
 where
     E: EventEmitter + Clone + Send + Sync + 'static,
     CP: ConfigProvider + Clone + Send + Sync + 'static,
+    L: RpcEventPublisher,
 {
     async fn handle_request(
         &self,
@@ -96,16 +99,38 @@ where
                 if let Ok(val) = serde_json::to_value(&req)
                     && let Some(id) = emit_incoming_from_initialize(&self.emitter, &val).await
                 {
-                        let mut guard = self.session_id.write().await;
-                        *guard = Some(id.clone());
-                        // create initialize event skeleton
-                        let mut e = logging::Event::new("initialize", id);
-                        // enrich client fields from the same val
-                        e.client_name = extract_str(&val, &["clientInfo.name", "client_info.name", "client.name", "params.clientInfo.name", "params.client_info.name", "params.client.name"]).map(|s| s.to_string());
-                        e.client_version = extract_str(&val, &["clientInfo.version", "client_info.version", "client.version", "params.clientInfo.version", "params.client_info.version", "params.client.version"]).map(|s| s.to_string());
-                        e.client_protocol = Some("jsonrpc-2.0".into());
-                        e.request_json = req_json.clone();
-                        evt = Some(e);
+                    let mut guard = self.session_id.write().await;
+                    *guard = Some(id.clone());
+                    // create initialize event skeleton
+                    let mut e = Event::new("initialize", id);
+                    // enrich client fields from the same val
+                    e.client_name = extract_str(
+                        &val,
+                        &[
+                            "clientInfo.name",
+                            "client_info.name",
+                            "client.name",
+                            "params.clientInfo.name",
+                            "params.client_info.name",
+                            "params.client.name",
+                        ],
+                    )
+                    .map(|s| s.to_string());
+                    e.client_version = extract_str(
+                        &val,
+                        &[
+                            "clientInfo.version",
+                            "client_info.version",
+                            "client.version",
+                            "params.clientInfo.version",
+                            "params.client_info.version",
+                            "params.client.version",
+                        ],
+                    )
+                    .map(|s| s.to_string());
+                    e.client_protocol = Some("jsonrpc-2.0".into());
+                    e.request_json = req_json.clone();
+                    evt = Some(e);
                 }
                 let out = mcp::ServerResult::InitializeResult(result);
                 // log
@@ -113,9 +138,7 @@ where
                     e.response_json = serde_json::to_value(&out).ok();
                     e.ok = true;
                     e.duration_ms = Some(start.elapsed().as_millis() as i64);
-                    let cloned = e.clone();
-                    logging::log_rpc_event(e);
-                    crate::events::logs_rpc_event(&self.emitter, &cloned);
+                    self.logger.log_and_emit(&self.emitter, e);
                 }
                 Ok(out)
             }
@@ -142,7 +165,10 @@ where
                         true
                     }
                 });
-                let out = mcp::ServerResult::ListToolsResult(mcp::ListToolsResult { tools, next_cursor: None });
+                let out = mcp::ServerResult::ListToolsResult(mcp::ListToolsResult {
+                    tools,
+                    next_cursor: None,
+                });
                 // log (ensure a session id exists even if initialize wasn't observed)
                 let sid = self
                     .session_id
@@ -151,15 +177,13 @@ where
                     .as_ref()
                     .cloned()
                     .unwrap_or_else(|| "anon".into());
-                let mut e = logging::Event::new("listTools", sid);
+                let mut e = Event::new("listTools", sid);
                 e.server_name = Some("aggregate".into());
                 e.request_json = req_json.take();
                 e.response_json = serde_json::to_value(&out).ok();
                 e.ok = true;
                 e.duration_ms = Some(start.elapsed().as_millis() as i64);
-                let cloned = e.clone();
-                logging::log_rpc_event(e);
-                crate::events::logs_rpc_event(&self.emitter, &cloned);
+                self.logger.log_and_emit(&self.emitter, e);
                 Ok(out)
             }
             mcp::ClientRequest::CallToolRequest(req) => {
@@ -190,14 +214,14 @@ where
                             meta: None,
                         });
                         // log error
-                        let mut e = logging::Event::new("callTool", sid);
+                        let mut e = Event::new("callTool", sid);
                         e.server_name = Some(server_name.clone());
                         e.request_json = req_json.take();
                         e.response_json = serde_json::to_value(&out).ok();
                         e.ok = false;
                         e.error = Some("multiple enabled servers; specify 'server::tool'".into());
                         e.duration_ms = Some(start.elapsed().as_millis() as i64);
-                        logging::log_rpc_event(e);
+                        self.logger.log(e);
                         return Ok(out);
                     }
                 };
@@ -212,7 +236,7 @@ where
                         {
                             Ok(res) => {
                                 let out = mcp::ServerResult::CallToolResult(res.clone());
-                                let mut e = logging::Event::new("callTool", sid);
+                                let mut e = Event::new("callTool", sid);
                                 e.server_name = Some(cfg.name.clone());
                                 e.request_json = req_json.take();
                                 e.response_json = serde_json::to_value(&out).ok();
@@ -222,13 +246,14 @@ where
                                 if !ok {
                                     e.error = Some("tool returned error".into());
                                 }
-                                let cloned = e.clone();
-                                logging::log_rpc_event(e);
-                                crate::events::logs_rpc_event(&self.emitter, &cloned);
+                                self.logger.log_and_emit(&self.emitter, e);
                                 Ok(out)
                             }
                             Err(e) => {
-                                if matches!(cfg.transport, crate::config::TransportType::StreamableHttp) {
+                                if matches!(
+                                    cfg.transport,
+                                    crate::config::TransportType::StreamableHttp
+                                ) {
                                     unauthorized::on_possible_unauthorized(
                                         &cfg.name,
                                         Some(&cfg.endpoint),
@@ -247,16 +272,14 @@ where
                                     is_error: Some(true),
                                     meta: None,
                                 });
-                                let mut evt = logging::Event::new("callTool", sid);
+                                let mut evt = Event::new("callTool", sid);
                                 evt.server_name = Some(cfg.name.clone());
                                 evt.request_json = req_json.take();
                                 evt.response_json = serde_json::to_value(&out).ok();
                                 evt.ok = false;
                                 evt.error = Some(e.to_string());
                                 evt.duration_ms = Some(start.elapsed().as_millis() as i64);
-                                let cloned = evt.clone();
-                                logging::log_rpc_event(evt);
-                                crate::events::logs_rpc_event(&self.emitter, &cloned);
+                                self.logger.log_and_emit(&self.emitter, evt);
                                 Ok(out)
                             }
                         },
@@ -267,16 +290,14 @@ where
                                 is_error: Some(true),
                                 meta: None,
                             });
-                            let mut evt = logging::Event::new("callTool", sid);
+                            let mut evt = Event::new("callTool", sid);
                             evt.server_name = Some(cfg.name.clone());
                             evt.request_json = req_json.take();
                             evt.response_json = serde_json::to_value(&out).ok();
                             evt.ok = false;
                             evt.error = Some(e.to_string());
                             evt.duration_ms = Some(start.elapsed().as_millis() as i64);
-                            let cloned = evt.clone();
-                            logging::log_rpc_event(evt);
-                            crate::events::logs_rpc_event(&self.emitter, &cloned);
+                            self.logger.log_and_emit(&self.emitter, evt);
                             Ok(out)
                         }
                     }
@@ -287,16 +308,14 @@ where
                         is_error: Some(true),
                         meta: None,
                     });
-                    let mut e = logging::Event::new("callTool", sid);
+                    let mut e = Event::new("callTool", sid);
                     e.server_name = Some(server_name.clone());
                     e.request_json = req_json.take();
                     e.response_json = serde_json::to_value(&out).ok();
                     e.ok = false;
                     e.error = Some("no server".into());
                     e.duration_ms = Some(start.elapsed().as_millis() as i64);
-                    let cloned = e.clone();
-                    logging::log_rpc_event(e);
-                    crate::events::logs_rpc_event(&self.emitter, &cloned);
+                    self.logger.log_and_emit(&self.emitter, e);
                     Ok(out)
                 }
             }
@@ -310,14 +329,12 @@ where
                     .as_ref()
                     .cloned()
                     .unwrap_or_else(|| "anon".into());
-                let mut e = logging::Event::new("other", sid);
+                let mut e = Event::new("other", sid);
                 e.request_json = req_json.take();
                 e.response_json = serde_json::to_value(&out).ok();
                 e.ok = true;
                 e.duration_ms = Some(start.elapsed().as_millis() as i64);
-                let cloned = e.clone();
-                logging::log_rpc_event(e);
-                crate::events::logs_rpc_event(&self.emitter, &cloned);
+                self.logger.log_and_emit(&self.emitter, e);
                 Ok(out)
             }
         }
@@ -468,7 +485,7 @@ async fn aggregate_tools(
 #[allow(clippy::items_after_test_module)]
 mod tests {
     use super::*;
-    use crate::config::{ConfigProvider, default_settings, save_settings_with};
+    use crate::config::{ConfigProvider, Settings, default_settings, save_settings_with};
     use std::fs;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -495,6 +512,22 @@ mod tests {
     impl ConfigProvider for TestProvider {
         fn base_dir(&self) -> PathBuf {
             self.base.clone()
+        }
+    }
+
+    #[derive(Clone, Default)]
+    struct NoopLogger;
+
+    impl crate::logging::RpcEventPublisher for NoopLogger {
+        fn init_with(&self, _cp: &dyn ConfigProvider, _settings: &Settings) {}
+
+        fn log(&self, _event: crate::logging::Event) {}
+
+        fn log_and_emit<E: crate::events::EventEmitter>(
+            &self,
+            _emitter: &E,
+            _event: crate::logging::Event,
+        ) {
         }
     }
 
@@ -565,10 +598,14 @@ mod tests {
     async fn stop_server_aborts_task() {
         let emitter = crate::events::BufferingEventEmitter::default();
         let cp = TestProvider::new();
-        let (handle, _addr) =
-            super::start_http_server(emitter.clone(), cp.clone(), "127.0.0.1:0".parse().unwrap())
-                .await
-                .unwrap();
+        let (handle, _addr) = super::start_http_server(
+            emitter.clone(),
+            cp.clone(),
+            NoopLogger::default(),
+            "127.0.0.1:0".parse().unwrap(),
+        )
+        .await
+        .unwrap();
         // Abort the server handle and ensure task finishes promptly
         super::stop_http_server(&handle);
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
@@ -614,24 +651,27 @@ mod tests {
     }
 }
 
-pub async fn start_http_server<E, CP>(
+pub async fn start_http_server<E, CP, L>(
     emitter: E,
     cp: CP,
+    logger: L,
     addr: std::net::SocketAddr,
 ) -> Result<(tokio::task::JoinHandle<()>, std::net::SocketAddr), String>
 where
     E: EventEmitter + Clone + Send + Sync + 'static,
     CP: ConfigProvider + Clone + Send + Sync + 'static,
+    L: RpcEventPublisher,
 {
     // Initialize logging (idempotent)
     let settings = load_settings_with(&cp);
-    crate::logging::init_once_with(&cp, &settings);
-    let service: StreamableHttpService<BouncerService<E, CP>, LocalSessionManager> =
+    logger.init_with(&cp, &settings);
+    let service: StreamableHttpService<BouncerService<E, CP, L>, LocalSessionManager> =
         StreamableHttpService::new(
             move || {
                 Ok(BouncerService {
                     emitter: emitter.clone(),
                     cp: cp.clone(),
+                    logger: logger.clone(),
                     session_id: std::sync::Arc::new(tokio::sync::RwLock::new(None)),
                 })
             },

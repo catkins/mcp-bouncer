@@ -35,7 +35,9 @@ pub struct MCPServerConfig {
     pub enabled: bool,
 }
 
-fn default_transport() -> TransportType { TransportType::Stdio }
+fn default_transport() -> TransportType {
+    TransportType::Stdio
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct Settings {

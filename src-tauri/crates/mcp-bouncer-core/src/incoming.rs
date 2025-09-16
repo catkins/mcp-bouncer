@@ -63,6 +63,10 @@ mod tests {
         let list = list_incoming().await;
         // Assert the specific records we created are present, by id and fields
         assert!(list.iter().any(|c| c.id == id1 && c.name == "client-a"));
-        assert!(list.iter().any(|c| c.id == id2 && c.name == "client-b" && c.title.as_deref() == Some("Title")));
+        assert!(
+            list.iter().any(|c| c.id == id2
+                && c.name == "client-b"
+                && c.title.as_deref() == Some("Title"))
+        );
     }
 }
