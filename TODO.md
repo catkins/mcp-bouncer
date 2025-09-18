@@ -25,7 +25,7 @@
   - Justification: Commands like `mcp_add_server` and `mcp_get_client_tools` call the loaders frequently, which can stall responsiveness on slower disks and complicate testing. A cache with invalidation on save keeps UX snappy.
   - Trade-offs: Need to manage cache invalidation carefully (e.g., after external edits) and provide hooks for tests to flush the cache.
 
-- [ ] Harden and test the OAuth callback flow
+- [x] Harden and test the OAuth callback flow
   - Summary: Add unit/integration tests for `load_credentials_for`/`save_credentials_for` and refactor `start_oauth_for_server` (`oauth.rs:69-189`) to keep a handle to the Axum task, apply request timeouts, and surface clearer errors/events.
   - Justification: OAuth is a high-risk path with minimal coverage today; failures can silently hang because we drop the server handle and rely on default client timeouts.
   - Trade-offs: Tests will need mock transports or a local HTTP harness, and we must ensure new timeout defaults don’t break slow-but-valid providers.
@@ -44,4 +44,3 @@
   - Summary: Add tests around `connect_and_initialize` success/error paths, DuckDB flushing (`logging.rs:133-199`), and unauthorized probes to increase confidence in failure handling.
   - Justification: These flows currently rely on manual testing even though regressions would break core UX; structured tests improve maintainability and catch race conditions early.
   - Trade-offs: More test harness code and potentially slower CI, especially if DuckDB remains in-process; we may need to add feature-gated mocks.
-

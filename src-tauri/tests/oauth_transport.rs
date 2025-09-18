@@ -49,7 +49,14 @@ async fn auth_client_attaches_bearer_header() {
             }),
         );
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let listener = match tokio::net::TcpListener::bind("127.0.0.1:0").await {
+        Ok(l) => l,
+        Err(err) if err.kind() == std::io::ErrorKind::PermissionDenied => {
+            eprintln!("skipping auth_client_attaches_bearer_header: {err}");
+            return;
+        }
+        Err(err) => panic!("failed to bind oauth transport listener: {err}"),
+    };
     let addr = listener.local_addr().unwrap();
     tokio::spawn(async move {
         axum::serve(listener, app).await.unwrap();
