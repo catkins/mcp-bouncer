@@ -315,13 +315,13 @@ pub fn redact_json(mut v: JsonValue, keys_lc: &[String]) -> JsonValue {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
 pub struct EventRow {
     pub id: String,
-    pub ts_ms: i64,
+    pub ts_ms: f64,
     pub session_id: String,
     pub method: String,
     pub server_name: Option<String>,
     pub server_version: Option<String>,
     pub server_protocol: Option<String>,
-    pub duration_ms: Option<i64>,
+    pub duration_ms: Option<f64>,
     pub ok: bool,
     pub error: Option<String>,
     pub request_json: Option<JsonValue>,
@@ -387,19 +387,21 @@ pub fn query_events(params: QueryParams) -> Result<Vec<EventRow>, String> {
             duckdb::params_from_iter(binds.iter().map(|b| &**b as &dyn duckdb::ToSql)),
             |row| {
                 let id: String = row.get(0)?;
-                let ts_ms: i64 = row.get(1)?;
+                let ts_ms_raw: i64 = row.get(1)?;
                 let session_id: String = row.get(2)?;
                 let method: String = row.get(3)?;
                 let server_name: Option<String> = row.get(4).ok();
                 let server_version: Option<String> = row.get(5).ok();
                 let server_protocol: Option<String> = row.get(6).ok();
-                let duration_ms: Option<i64> = row.get(7).ok();
+                let duration_ms_raw: Option<i64> = row.get(7).ok();
                 let ok: bool = row.get(8)?;
                 let error: Option<String> = row.get(9).ok();
                 let req_s: Option<String> = row.get(10).ok();
                 let res_s: Option<String> = row.get(11).ok();
                 let request_json = req_s.and_then(|s| serde_json::from_str::<JsonValue>(&s).ok());
                 let response_json = res_s.and_then(|s| serde_json::from_str::<JsonValue>(&s).ok());
+                let ts_ms = ts_ms_raw as f64;
+                let duration_ms = duration_ms_raw.map(|val| val as f64);
                 Ok(EventRow {
                     id,
                     ts_ms,
@@ -424,9 +426,9 @@ pub fn query_events(params: QueryParams) -> Result<Vec<EventRow>, String> {
     Ok(out)
 }
 
-pub fn count_events(server: Option<&str>) -> Result<i64, String> {
+pub fn count_events(server: Option<&str>) -> Result<f64, String> {
     let Some(path) = db_path() else {
-        return Ok(0);
+        return Ok(0.0);
     };
     let conn = DuckConn::open(path).map_err(|e| format!("open db: {e}"))?;
     let mut sql = String::from("SELECT COUNT(*) FROM rpc_events");
@@ -442,7 +444,7 @@ pub fn count_events(server: Option<&str>) -> Result<i64, String> {
             |row| row.get(0),
         )
         .map_err(|e| format!("query: {e}"))?;
-    Ok(cnt)
+    Ok(cnt as f64)
 }
 
 pub fn query_events_since(
@@ -481,19 +483,21 @@ pub fn query_events_since(
             duckdb::params_from_iter(binds.iter().map(|b| &**b as &dyn duckdb::ToSql)),
             |row| {
                 let id: String = row.get(0)?;
-                let ts_ms: i64 = row.get(1)?;
+                let ts_ms_raw: i64 = row.get(1)?;
                 let session_id: String = row.get(2)?;
                 let method: String = row.get(3)?;
                 let server_name: Option<String> = row.get(4).ok();
                 let server_version: Option<String> = row.get(5).ok();
                 let server_protocol: Option<String> = row.get(6).ok();
-                let duration_ms: Option<i64> = row.get(7).ok();
+                let duration_ms_raw: Option<i64> = row.get(7).ok();
                 let ok: bool = row.get(8)?;
                 let error: Option<String> = row.get(9).ok();
                 let req_s: Option<String> = row.get(10).ok();
                 let res_s: Option<String> = row.get(11).ok();
                 let request_json = req_s.and_then(|s| serde_json::from_str::<JsonValue>(&s).ok());
                 let response_json = res_s.and_then(|s| serde_json::from_str::<JsonValue>(&s).ok());
+                let ts_ms = ts_ms_raw as f64;
+                let duration_ms = duration_ms_raw.map(|val| val as f64);
                 Ok(EventRow {
                     id,
                     ts_ms,
