@@ -284,15 +284,15 @@ async fn start_oauth_inner<E: EventEmitter>(
         }
 
         // Try to export credentials for persistence if supported
-        if let Ok((_, Some(creds))) = state.get_credentials().await {
-            if let Err(err) = save_credentials_for(&OsConfigProvider, name, creds) {
-                tracing::warn!(
-                    target = "oauth",
-                    "failed to persist oauth credentials for {}: {}",
-                    name,
-                    err
-                );
-            }
+        if let Ok((_, Some(creds))) = state.get_credentials().await
+            && let Err(err) = save_credentials_for(&OsConfigProvider, name, creds)
+        {
+            tracing::warn!(
+                target = "oauth",
+                "failed to persist oauth credentials for {}: {}",
+                name,
+                err
+            );
         }
 
         // Update overlay state: authorized, no auth required, clear error (in-memory only)
