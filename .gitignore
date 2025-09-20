@@ -17,6 +17,7 @@ src-tauri/src-tauri/target/
 src-tauri/.cargo/
 src-tauri/.tauri/
 src-tauri/gen/
+/target
 
 # OS
 .DS_Store

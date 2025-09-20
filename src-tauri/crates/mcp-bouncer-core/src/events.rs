@@ -1,5 +1,4 @@
 use serde_json::json;
-use tauri::Emitter;
 
 pub const EVENT_SERVERS_UPDATED: &str = "mcp:servers_updated";
 pub const EVENT_SETTINGS_UPDATED: &str = "settings:updated";
@@ -10,15 +9,6 @@ pub const EVENT_LOGS_RPC_EVENT: &str = "logs:rpc_event";
 
 pub trait EventEmitter {
     fn emit(&self, event: &str, payload: &serde_json::Value);
-}
-
-#[derive(Clone)]
-pub struct TauriEventEmitter(pub tauri::AppHandle);
-
-impl EventEmitter for TauriEventEmitter {
-    fn emit(&self, event: &str, payload: &serde_json::Value) {
-        let _ = self.0.emit(event, payload);
-    }
 }
 
 // A simple, threadsafe emitter for integration tests that want to assert

@@ -10,6 +10,7 @@ use mcp_bouncer::config::{
 };
 use mcp_bouncer::events::{TauriEventEmitter, client_error, client_status_changed};
 use mcp_bouncer::incoming::list_incoming;
+use mcp_bouncer::logging::{DuckDbPublisher, RpcEventPublisher};
 use mcp_bouncer::oauth::start_oauth_for_server;
 use mcp_bouncer::server::{get_runtime_listen_addr, start_http_server};
 use mcp_bouncer::unauthorized;
@@ -28,10 +29,12 @@ fn spawn_mcp_proxy(app: &tauri::AppHandle) {
     }
     let app_handle = app.clone();
     tauri::async_runtime::spawn(async move {
+        let logger = DuckDbPublisher;
         let primary = std::net::SocketAddr::from(([127, 0, 0, 1], 8091));
         if let Err(e) = start_http_server(
             mcp_bouncer::events::TauriEventEmitter(app_handle.clone()),
             mcp_bouncer::config::OsConfigProvider,
+            logger.clone(),
             primary,
         )
         .await
@@ -44,6 +47,7 @@ fn spawn_mcp_proxy(app: &tauri::AppHandle) {
             let _ = start_http_server(
                 mcp_bouncer::events::TauriEventEmitter(app_handle.clone()),
                 mcp_bouncer::config::OsConfigProvider,
+                logger,
                 std::net::SocketAddr::from(([127, 0, 0, 1], 0)),
             )
             .await;
@@ -397,8 +401,9 @@ async fn mcp_refresh_client_tools(
         }
     }));
     evt.duration_ms = Some(start.elapsed().as_millis() as i64);
-    logging::log_rpc_event(evt.clone());
-    mcp_bouncer::events::logs_rpc_event(&mcp_bouncer::events::TauriEventEmitter(app), &evt);
+    let logger = DuckDbPublisher;
+    let emitter = mcp_bouncer::events::TauriEventEmitter(app);
+    logger.log_and_emit(&emitter, evt);
     Ok(())
 }
 
@@ -412,6 +417,7 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
     ov::set_state(name, ClientConnectionState::Connecting).await;
     ov::set_error(name, None).await;
     client_status_changed(emitter, name, "connecting");
+    let logger = DuckDbPublisher;
     match ensure_rmcp_client(name, cfg).await {
         Ok(client) => {
             // Log the actual upstream Initialize result if available
@@ -427,8 +433,7 @@ async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
                 e.response_json = serde_json::to_value(init)
                     .ok()
                     .map(|v| serde_json::json!({ "result": v }));
-                logging::log_rpc_event(e.clone());
-                mcp_bouncer::events::logs_rpc_event(emitter, &e);
+                logger.log_and_emit(emitter, e);
             }
             // Note: do not emit a synthetic initialize event here to avoid confusion.
             // Real initialize responses are logged when external clients connect via the proxy.

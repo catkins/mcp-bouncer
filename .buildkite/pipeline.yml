@@ -1,7 +1,7 @@
 steps:
   - label: ":cargo::clippy: Cargo Clippy"
     commands:
-      - cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings
+      - cargo clippy --workspace --all-targets --all-features -- -D warnings
     plugins:
       - docker-compose#v5.10.0:
           run: app
@@ -9,7 +9,7 @@ steps:
           progress: plain
   - label: ":cargo::rust::test_tube: Backend Tests"
     commands:
-      - cargo test --manifest-path src-tauri/Cargo.toml --lib --tests
+      - cargo test --workspace --all-targets
     plugins:
       - docker-compose#v5.10.0:
           run: app

@@ -1,0 +1,7 @@
+[workspace]
+members = [
+  "src-tauri",
+  "src-tauri/crates/mcp-bouncer-core",
+  "src-tauri/crates/mcp-bouncer-logging",
+]
+resolver = "2"

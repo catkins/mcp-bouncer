@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use crate::types::ToolInfo;
 use crate::config::ConfigProvider;
+use crate::types::ToolInfo;
 
 static TOOLS_CACHE: std::sync::OnceLock<tokio::sync::Mutex<HashMap<String, Vec<ToolInfo>>>> =
     std::sync::OnceLock::new();
@@ -74,13 +74,38 @@ mod tests {
         // Use a unique temp config provider and write toggle map disabling a tool
         #[derive(Clone)]
         struct TempCP(std::path::PathBuf);
-        impl TempCP { fn new() -> Self { let d = std::env::temp_dir().join(format!("mcp-bouncer-tools-cache-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos())); std::fs::create_dir_all(&d).unwrap(); Self(d) } }
-        impl ConfigProvider for TempCP { fn base_dir(&self) -> std::path::PathBuf { self.0.clone() } }
+        impl TempCP {
+            fn new() -> Self {
+                let d = std::env::temp_dir().join(format!(
+                    "mcp-bouncer-tools-cache-{}-{}",
+                    std::process::id(),
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_nanos()
+                ));
+                std::fs::create_dir_all(&d).unwrap();
+                Self(d)
+            }
+        }
+        impl ConfigProvider for TempCP {
+            fn base_dir(&self) -> std::path::PathBuf {
+                self.0.clone()
+            }
+        }
         let cp = TempCP::new();
         crate::config::save_tools_toggle_with(&cp, "srv", "x", false).unwrap();
         let list = vec![
-            ToolInfo { name: "x".into(), description: None, input_schema: None },
-            ToolInfo { name: "y".into(), description: None, input_schema: None },
+            ToolInfo {
+                name: "x".into(),
+                description: None,
+                input_schema: None,
+            },
+            ToolInfo {
+                name: "y".into(),
+                description: None,
+                input_schema: None,
+            },
         ];
         let filtered = filter_enabled_with(&cp, "srv", list);
         assert_eq!(filtered.len(), 1);
