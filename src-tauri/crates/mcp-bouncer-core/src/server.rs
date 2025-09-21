@@ -49,6 +49,10 @@ where
         request: mcp::ClientRequest,
         context: rmcp::service::RequestContext<RoleServer>,
     ) -> Result<mcp::ServerResult, mcp::ErrorData> {
+        let log_ctx = context
+            .extensions
+            .get::<RequestLogContext<E, L>>()
+            .cloned();
         match request {
             mcp::ClientRequest::InitializeRequest(_req) => {
                 let capabilities = mcp::ServerCapabilities::builder()
@@ -68,7 +72,11 @@ where
                     },
                     instructions: None,
                 };
-                Ok(mcp::ServerResult::InitializeResult(result))
+                let out = mcp::ServerResult::InitializeResult(result);
+                if let Some(ctx) = log_ctx.clone() {
+                    ctx.log_local_result(&out).await;
+                }
+                Ok(out)
             }
             mcp::ClientRequest::ListToolsRequest(_req) => {
                 let settings = load_settings_with(&self.cp);
@@ -96,16 +104,17 @@ where
                         true
                     }
                 });
-                Ok(mcp::ServerResult::ListToolsResult(mcp::ListToolsResult {
+                let out = mcp::ServerResult::ListToolsResult(mcp::ListToolsResult {
                     tools,
                     next_cursor: None,
-                }))
+                });
+                if let Some(ctx) = log_ctx.clone() {
+                    ctx.log_local_result(&out).await;
+                }
+                Ok(out)
             }
             mcp::ClientRequest::CallToolRequest(req) => {
-                let log_ctx = context
-                    .extensions
-                    .get::<RequestLogContext<E, L>>()
-                    .cloned();
+                let log_ctx = log_ctx.clone();
                 let name = req.params.name.to_string();
                 let (server_name, tool_name) = name
                     .split_once("::")

@@ -130,6 +130,12 @@ where
             }
         }
     }
+
+    pub async fn log_local_result(&self, result: &ServerResult) {
+        self.state
+            .log_local_result(self.request_id.clone(), result)
+            .await;
+    }
 }
 
 struct InterceptState<E, L>
@@ -223,6 +229,25 @@ where
                 pending.event.response_json = serde_json::to_value(&error).ok();
             }
         }
+        self.logger.log_and_emit(&self.emitter, pending.event);
+    }
+
+    async fn log_local_result(&self, id: RequestId, result: &ServerResult) {
+        let pending = {
+            let mut guard = self.pending.lock().await;
+            guard.remove(&id)
+        };
+        let Some(mut pending) = pending else {
+            return;
+        };
+        pending.event.duration_ms = Some(pending.started_at.elapsed().as_millis() as i64);
+        match pending.kind {
+            PendingKind::CallTool => Self::enrich_call_tool(&mut pending.event, result),
+            _ => {
+                pending.event.ok = true;
+            }
+        }
+        pending.event.response_json = serde_json::to_value(result).ok();
         self.logger.log_and_emit(&self.emitter, pending.event);
     }
 
