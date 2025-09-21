@@ -62,6 +62,11 @@ This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the of
 - Settings JSON: `$XDG_CONFIG_HOME/mcp-bouncer/settings.json`
 - Incoming clients: recorded when rmcp Initialize is received; `connected_at` uses RFC3339 (ISO 8601) strings for robust JS parsing.
 
+#### Intercepting transport architecture
+- **Inbound (proxy server ➝ downstream client)**: The rmcp HTTP server composes `InterceptingSessionManager`, which wraps every session transport with `InterceptingTransport`. The wrapper injects a `RequestLogContext` into each inbound request, tracks elapsed time, enriches initialize/list/callTool events, records notifications, and hands events to the shared `RpcEventPublisher`/UI emitter.
+- **Outbound (proxy client ➝ upstream server)**: `ensure_rmcp_client` wraps every constructed transport (HTTP, SSE, stdio) in `InterceptingClientTransport`. The outbound interceptor mirrors the same logging pipeline, ensuring listTools/callTool/etc. invocations and their responses (or errors) are logged even when they originate from the proxy itself (tool refresh, OAuth reconnects, etc.).
+- The interceptors store per-request state (start time, serialized payloads, inferred server metadata) so logs have consistent structure regardless of direction. When introducing a new transport, make sure it is wrapped before calling `.serve(...)`, and that the caller passes an emitter + logger through to `ensure_rmcp_client`.
+
 #### JSON-RPC Logging (DuckDB)
 - Always-on: the backend persistently logs JSON-RPC requests/responses to a DuckDB database at `$XDG_CONFIG_HOME/mcp-bouncer/logs.duckdb`.
 - Schema:

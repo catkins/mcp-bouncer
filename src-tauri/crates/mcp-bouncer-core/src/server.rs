@@ -1,11 +1,11 @@
 use axum::Router;
-use std::{marker::PhantomData, sync::Arc};
 use futures::future::join_all;
 use rmcp::model as mcp;
 use rmcp::transport::streamable_http_server::{
     StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
 };
 use rmcp::{RoleServer, Service as McpService};
+use std::sync::Arc;
 
 use crate::client::{apply_log_context_from_client, ensure_rmcp_client, fetch_tools_for_cfg};
 use crate::config::{ConfigProvider, MCPServerConfig, load_settings_with};
@@ -35,7 +35,7 @@ where
 {
     pub emitter: E,
     pub cp: CP,
-    _logger: PhantomData<L>,
+    logger: L,
 }
 
 impl<E, CP, L> McpService<RoleServer> for BouncerService<E, CP, L>
@@ -49,20 +49,11 @@ where
         request: mcp::ClientRequest,
         context: rmcp::service::RequestContext<RoleServer>,
     ) -> Result<mcp::ServerResult, mcp::ErrorData> {
-        let log_ctx = context
-            .extensions
-            .get::<RequestLogContext<E, L>>()
-            .cloned();
+        let log_ctx = context.extensions.get::<RequestLogContext<E, L>>().cloned();
         match request {
-            mcp::ClientRequest::InitializeRequest(_req) => {
-                self.respond_initialize(log_ctx).await
-            }
-            mcp::ClientRequest::ListToolsRequest(_req) => {
-                self.respond_list_tools(log_ctx).await
-            }
-            mcp::ClientRequest::CallToolRequest(req) => {
-                self.respond_call_tool(req, log_ctx).await
-            }
+            mcp::ClientRequest::InitializeRequest(_req) => self.respond_initialize(log_ctx).await,
+            mcp::ClientRequest::ListToolsRequest(_req) => self.respond_list_tools(log_ctx).await,
+            mcp::ClientRequest::CallToolRequest(req) => self.respond_call_tool(req, log_ctx).await,
             _other => self.respond_other(log_ctx).await,
         }
     }
@@ -143,6 +134,8 @@ where
         let mut tools = aggregate_tools(
             servers,
             std::time::Duration::from_secs(TOOL_LIST_TIMEOUT_SECS),
+            self.emitter.clone(),
+            self.logger.clone(),
         )
         .await;
         let state = crate::config::load_tools_state_with(&self.cp);
@@ -203,7 +196,7 @@ where
             if let Some(ctx) = log_ctx.as_ref() {
                 ctx.set_server_name(cfg.name.clone()).await;
             }
-            match ensure_rmcp_client(&cfg.name, &cfg).await {
+            match ensure_rmcp_client(&cfg.name, &cfg, &self.emitter, &self.logger).await {
                 Ok(client) => {
                     if let Some(ctx) = log_ctx.as_ref() {
                         apply_log_context_from_client(&client, &cfg, ctx).await;
@@ -217,10 +210,8 @@ where
                     {
                         Ok(res) => Ok(mcp::ServerResult::CallToolResult(res)),
                         Err(e) => {
-                            if matches!(
-                                cfg.transport,
-                                crate::config::TransportType::StreamableHttp
-                            ) {
+                            if matches!(cfg.transport, crate::config::TransportType::StreamableHttp)
+                            {
                                 unauthorized::on_possible_unauthorized(
                                     &cfg.name,
                                     Some(&cfg.endpoint),
@@ -321,16 +312,26 @@ fn select_target_server<CP: ConfigProvider>(
     }
 }
 
-async fn aggregate_tools(
+async fn aggregate_tools<E, L>(
     servers: Vec<MCPServerConfig>,
     timeout: std::time::Duration,
-) -> Vec<mcp::Tool> {
-    let tasks = servers.into_iter().map(|cfg| async move {
+    emitter: E,
+    logger: L,
+) -> Vec<mcp::Tool>
+where
+    E: EventEmitter + Clone + Send + Sync + 'static,
+    L: RpcEventPublisher,
+{
+    let tasks = servers.into_iter().map(|cfg| {
         let name = cfg.name.clone();
-        let fut = async move { fetch_tools_for_cfg(&cfg).await };
-        match tokio::time::timeout(timeout, fut).await {
-            Ok(Ok(list)) => Some((name, list)),
-            _ => None,
+        let emitter = emitter.clone();
+        let logger = logger.clone();
+        async move {
+            let fut = async { fetch_tools_for_cfg(&cfg, &emitter, &logger).await };
+            match tokio::time::timeout(timeout, fut).await {
+                Ok(Ok(list)) => Some((name, list)),
+                _ => None,
+            }
         }
     });
     let mut tools: Vec<mcp::Tool> = Vec::new();
@@ -496,11 +497,12 @@ where
         {
             let emitter = emitter.clone();
             let cp = cp.clone();
+            let logger = logger.clone();
             move || {
                 Ok(BouncerService {
                     emitter: emitter.clone(),
                     cp: cp.clone(),
-                    _logger: PhantomData,
+                    logger: logger.clone(),
                 })
             }
         },

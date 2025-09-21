@@ -10,8 +10,9 @@ use rmcp::transport::auth::{OAuthState, OAuthTokenResponse};
 use crate::client::ensure_rmcp_client;
 use crate::config::{ClientConnectionState, ConfigProvider, OsConfigProvider, load_settings_with};
 use crate::events::{EventEmitter, client_error, client_status_changed};
+use crate::logging::RpcEventPublisher;
 use crate::overlay;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const CALLBACK_TIMEOUT: Duration = Duration::from_secs(180);
@@ -148,12 +149,17 @@ struct CallbackQuery {
 
 /// Start an OAuth flow for a server. Spawns a temporary callback server on localhost, opens the browser,
 /// handles the code exchange, persists credentials to XDG config, and updates overlay status.
-pub async fn start_oauth_for_server<E: EventEmitter>(
+pub async fn start_oauth_for_server<E, L>(
     emitter: &E,
+    logger: &L,
     name: &str,
     endpoint: &str,
-) -> Result<()> {
-    let result = start_oauth_inner(emitter, name, endpoint).await;
+) -> Result<()>
+where
+    E: EventEmitter + Clone + Send + Sync + 'static,
+    L: RpcEventPublisher,
+{
+    let result = start_oauth_inner(emitter, logger, name, endpoint).await;
 
     if let Err(err) = &result {
         overlay::set_error(name, Some(err.to_string())).await;
@@ -167,11 +173,11 @@ pub async fn start_oauth_for_server<E: EventEmitter>(
     result
 }
 
-async fn start_oauth_inner<E: EventEmitter>(
-    emitter: &E,
-    name: &str,
-    endpoint: &str,
-) -> Result<()> {
+async fn start_oauth_inner<E, L>(emitter: &E, logger: &L, name: &str, endpoint: &str) -> Result<()>
+where
+    E: EventEmitter + Clone + Send + Sync + 'static,
+    L: RpcEventPublisher,
+{
     // derive base URL from endpoint
     let url = reqwest::Url::parse(endpoint).context("url parse")?;
     let mut base = url.clone();
@@ -224,17 +230,17 @@ async fn start_oauth_inner<E: EventEmitter>(
 
     let outcome: Result<()> = async {
         // Initialize OAuth state machine with defensive request timeouts
-        let mut state = match tokio::time::timeout(REQUEST_TIMEOUT, OAuthState::new(base.as_str(), None))
-            .await
-        {
-            Ok(res) => res.context("oauth init")?,
-            Err(_) => {
-                return Err(anyhow!(
-                    "oauth init timed out after {} seconds",
-                    REQUEST_TIMEOUT.as_secs()
-                ));
-            }
-        };
+        let mut state =
+            match tokio::time::timeout(REQUEST_TIMEOUT, OAuthState::new(base.as_str(), None)).await
+            {
+                Ok(res) => res.context("oauth init")?,
+                Err(_) => {
+                    return Err(anyhow!(
+                        "oauth init timed out after {} seconds",
+                        REQUEST_TIMEOUT.as_secs()
+                    ));
+                }
+            };
 
         match tokio::time::timeout(
             REQUEST_TIMEOUT,
@@ -312,7 +318,7 @@ async fn start_oauth_inner<E: EventEmitter>(
             overlay::set_auth_required(name, false).await;
             overlay::set_state(name, ClientConnectionState::Connecting).await;
             client_status_changed(emitter, name, "connecting");
-            match ensure_rmcp_client(name, &cfg).await {
+            match ensure_rmcp_client(name, &cfg, emitter, logger).await {
                 Ok(client) => match client.list_all_tools().await {
                     Ok(tools) => {
                         // cache tools list and update count
@@ -451,8 +457,14 @@ mod tests {
         assert_eq!(loaded_json["access_token"], creds_value["access_token"]);
         assert_eq!(loaded_json["refresh_token"], creds_value["refresh_token"]);
         assert_eq!(
-            loaded_json["token_type"].as_str().unwrap().to_ascii_lowercase(),
-            creds_value["token_type"].as_str().unwrap().to_ascii_lowercase()
+            loaded_json["token_type"]
+                .as_str()
+                .unwrap()
+                .to_ascii_lowercase(),
+            creds_value["token_type"]
+                .as_str()
+                .unwrap()
+                .to_ascii_lowercase()
         );
         let expires_in = loaded_json["expires_in"].as_u64().unwrap();
         assert!(expires_in <= 3600);

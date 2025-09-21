@@ -272,9 +272,11 @@ async fn mcp_start_oauth(app: tauri::AppHandle, name: String) -> Result<(), Stri
     }
     // Mark as authorizing for UI feedback
     mcp_bouncer::overlay::set_state(&name, ClientConnectionState::Authorizing).await;
-    client_status_changed(&TauriEventEmitter(app.clone()), &name, "authorizing");
+    let emitter = TauriEventEmitter(app.clone());
+    client_status_changed(&emitter, &name, "authorizing");
+    let logger = logging::DuckDbPublisher;
     // Kick off OAuth flow (opens browser, waits for callback)
-    start_oauth_for_server(&TauriEventEmitter(app.clone()), &name, &endpoint)
+    start_oauth_for_server(&emitter, &logger, &name, &endpoint)
         .await
         .map_err(|e| e.to_string())
 }
@@ -369,7 +371,11 @@ async fn mcp_refresh_client_tools(
         return Err("server not found".into());
     };
     let start = std::time::Instant::now();
-    let raw = fetch_tools_for_cfg(&cfg).await.map_err(|e| e.to_string())?;
+    let logger = DuckDbPublisher;
+    let emitter = TauriEventEmitter(app.clone());
+    let raw = fetch_tools_for_cfg(&cfg, &emitter, &logger)
+        .await
+        .map_err(|e| e.to_string())?;
     let mut out: Vec<ToolInfo> = Vec::new();
     for v in raw.iter() {
         let name = v.get("name").and_then(|n| n.as_str()).unwrap_or("");
@@ -404,42 +410,22 @@ async fn mcp_refresh_client_tools(
         }
     }));
     evt.duration_ms = Some(start.elapsed().as_millis() as i64);
-    let logger = DuckDbPublisher;
-    let emitter = mcp_bouncer::events::TauriEventEmitter(app);
     logger.log_and_emit(&emitter, evt);
     Ok(())
 }
 
-async fn connect_and_initialize<E: mcp_bouncer::events::EventEmitter>(
-    emitter: &E,
-    name: &str,
-    cfg: &MCPServerConfig,
-) {
+async fn connect_and_initialize<E>(emitter: &E, name: &str, cfg: &MCPServerConfig)
+where
+    E: mcp_bouncer::events::EventEmitter + Clone + Send + Sync + 'static,
+{
     use mcp_bouncer::overlay as ov;
     tracing::info!(target = "lifecycle", server=%name, state=?ClientConnectionState::Connecting, "connect_start");
     ov::set_state(name, ClientConnectionState::Connecting).await;
     ov::set_error(name, None).await;
     client_status_changed(emitter, name, "connecting");
     let logger = DuckDbPublisher;
-    match ensure_rmcp_client(name, cfg).await {
+    match ensure_rmcp_client(name, cfg, emitter, &logger).await {
         Ok(client) => {
-            // Log the actual upstream Initialize result if available
-            if let Some(init) = client.peer().peer_info() {
-                let mut e = logging::Event::new("initialize", format!("internal::{name}"));
-                e.server_name = Some(name.to_string());
-                e.request_json = Some(serde_json::json!({
-                    "method": "initialize",
-                    "params": {
-                        "clientInfo": { "name": "MCP Bouncer", "version": env!("CARGO_PKG_VERSION") }
-                    }
-                }));
-                e.response_json = serde_json::to_value(init)
-                    .ok()
-                    .map(|v| serde_json::json!({ "result": v }));
-                logger.log_and_emit(emitter, e);
-            }
-            // Note: do not emit a synthetic initialize event here to avoid confusion.
-            // Real initialize responses are logged when external clients connect via the proxy.
             // list tools (forces initialize + verifies connection)
             match client.list_all_tools().await {
                 Ok(tools) => {

@@ -68,6 +68,11 @@ MCP Bouncer acts as a centralized hub for managing Model Context Protocol server
   - `SELECT DISTINCT method FROM rpc_events;`
   - `SELECT * FROM rpc_events ORDER BY ts DESC LIMIT 10;`
 
+### 🛰️ Intercepting Transport Architecture
+- **Inbound proxy traffic**: The embedded Streamable HTTP server wraps every session transport with an `InterceptingTransport` via `InterceptingSessionManager`. Each inbound request is annotated with a `RequestLogContext`, which captures timings, injects server/client metadata, and pushes events to the DuckDB logger and live UI stream.
+- **Outbound upstream traffic**: All upstream RMCP clients created by `ensure_rmcp_client` use `InterceptingClientTransport`, wrapping HTTP/SSE/stdio transports before `.serve(...)` runs. This guarantees that tool refreshes, OAuth reconnects, and user-triggered calls record the same structured events (including errors) as downstream traffic.
+- Both interceptors share the `RpcEventPublisher` + `EventEmitter`, so extending to new transports only requires wrapping the transport and passing the emitter/logger through. Pending-request state stores start timestamps, serialized payloads, and resolves human-readable errors (e.g., callTool content) for consistent DuckDB records.
+
 ## Quick Start
 
 ### Prerequisites

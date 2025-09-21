@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use mcp_bouncer::client::ensure_rmcp_client;
 use mcp_bouncer::config::{MCPServerConfig, TransportType};
+use mcp_bouncer::events::BufferingEventEmitter;
+use mcp_bouncer::logging::RpcEventPublisher;
 use rmcp::model as mcp;
 
 #[derive(Clone)]
@@ -65,6 +67,27 @@ impl rmcp::handler::server::ServerHandler for TestSseService {
     }
 }
 
+#[derive(Clone, Default)]
+struct NoopLogger;
+
+impl RpcEventPublisher for NoopLogger {
+    fn init_with(
+        &self,
+        _cp: &dyn mcp_bouncer::config::ConfigProvider,
+        _settings: &mcp_bouncer::config::Settings,
+    ) {
+    }
+
+    fn log(&self, _event: mcp_bouncer::logging::Event) {}
+
+    fn log_and_emit<E: mcp_bouncer::events::EventEmitter>(
+        &self,
+        _emitter: &E,
+        _event: mcp_bouncer::logging::Event,
+    ) {
+    }
+}
+
 #[tokio::test]
 async fn sse_client_can_connect_list_tools_and_send_headers() {
     // Start SSE server on ephemeral port
@@ -108,7 +131,10 @@ async fn sse_client_can_connect_list_tools_and_send_headers() {
         enabled: true,
     };
 
-    let client = ensure_rmcp_client(&cfg.name, &cfg)
+    let emitter = BufferingEventEmitter::default();
+    let logger = NoopLogger::default();
+
+    let client = ensure_rmcp_client(&cfg.name, &cfg, &emitter, &logger)
         .await
         .expect("ensure sse client");
     // list tools

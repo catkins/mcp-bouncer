@@ -1,18 +1,16 @@
-use std::{
-    collections::HashMap,
-    future::Future,
-    sync::Arc,
-    time::Instant,
-};
+use std::{collections::HashMap, future::Future, sync::Arc, time::Instant};
 
 use rmcp::{
-    RoleServer,
-    model::{self as mcp, ClientRequest, GetExtensions, JsonRpcMessage, RequestId, ServerResult},
+    RoleClient, RoleServer,
+    model::{
+        self as mcp, ClientRequest, ErrorData, GetExtensions, JsonRpcMessage, RequestId,
+        ServerNotification, ServerResult,
+    },
     service::{RxJsonRpcMessage, TxJsonRpcMessage},
     transport::{
+        Transport,
         common::server_side_http::ServerSseMessage,
         streamable_http_server::session::{SessionId, SessionManager},
-        Transport,
     },
 };
 use tokio::sync::{Mutex, RwLock};
@@ -46,7 +44,6 @@ where
             state: Arc::new(InterceptState::new(emitter, logger)),
         }
     }
-
 }
 
 impl<T, E, L> Transport<RoleServer> for InterceptingTransport<T, E, L>
@@ -112,8 +109,7 @@ where
     L: RpcEventPublisher,
 {
     pub async fn set_server_name(&self, server_name: impl Into<String>) {
-        self
-            .set_server_details(Some(server_name.into()), None, None)
+        self.set_server_details(Some(server_name.into()), None, None)
             .await;
     }
 
@@ -144,6 +140,37 @@ where
     }
 }
 
+struct PendingRequest {
+    started_at: Instant,
+    event: Event,
+    kind: PendingKind,
+}
+
+#[derive(Clone, Copy)]
+enum PendingKind {
+    Initialize,
+    ListTools,
+    CallTool,
+    Other,
+}
+
+fn enrich_call_tool(event: &mut Event, result: &ServerResult) {
+    if let ServerResult::CallToolResult(res) = result {
+        let is_error = res.is_error == Some(true);
+        event.ok = !is_error;
+        if is_error {
+            event.error = first_text_content(&res.content);
+            if event.error.is_none() {
+                event.error = Some("tool returned error".into());
+            }
+        } else {
+            event.ok = true;
+        }
+    } else {
+        event.ok = true;
+    }
+}
+
 struct InterceptState<E, L>
 where
     E: EventEmitter + Clone + Send + Sync + 'static,
@@ -153,19 +180,6 @@ where
     logger: L,
     session_id: RwLock<Option<String>>,
     pending: Mutex<HashMap<RequestId, PendingRequest>>,
-}
-
-struct PendingRequest {
-    started_at: Instant,
-    event: Event,
-    kind: PendingKind,
-}
-
-enum PendingKind {
-    Initialize,
-    ListTools,
-    CallTool,
-    Other,
 }
 
 impl<E, L> InterceptState<E, L>
@@ -183,8 +197,7 @@ where
     }
 
     async fn current_session_id(&self) -> String {
-        self
-            .session_id
+        self.session_id
             .read()
             .await
             .clone()
@@ -223,7 +236,7 @@ where
         match result {
             Ok(server_result) => {
                 if let PendingKind::CallTool = pending.kind {
-                    Self::enrich_call_tool(&mut pending.event, &server_result);
+                    enrich_call_tool(&mut pending.event, &server_result);
                 } else {
                     pending.event.ok = true;
                 }
@@ -248,7 +261,7 @@ where
         };
         pending.event.duration_ms = Some(pending.started_at.elapsed().as_millis() as i64);
         match pending.kind {
-            PendingKind::CallTool => Self::enrich_call_tool(&mut pending.event, result),
+            PendingKind::CallTool => enrich_call_tool(&mut pending.event, result),
             _ => {
                 pending.event.ok = true;
             }
@@ -405,21 +418,250 @@ where
         *guard = Some(id.clone());
         Some(id)
     }
+}
 
-    fn enrich_call_tool(event: &mut Event, result: &ServerResult) {
-        if let ServerResult::CallToolResult(res) = result {
-            let is_error = res.is_error == Some(true);
-            event.ok = !is_error;
-            if is_error {
-                event.error = first_text_content(&res.content);
-                if event.error.is_none() {
-                    event.error = Some("tool returned error".into());
+#[derive(Clone)]
+pub struct InterceptingClientTransport<T, E, L>
+where
+    T: Transport<RoleClient>,
+    E: EventEmitter + Clone + Send + Sync + 'static,
+    L: RpcEventPublisher,
+{
+    inner: T,
+    state: Arc<OutboundInterceptState<E, L>>,
+}
+
+impl<T, E, L> InterceptingClientTransport<T, E, L>
+where
+    T: Transport<RoleClient>,
+    E: EventEmitter + Clone + Send + Sync + 'static,
+    L: RpcEventPublisher,
+{
+    pub fn new(inner: T, server_name: impl Into<String>, emitter: E, logger: L) -> Self {
+        let state = Arc::new(OutboundInterceptState::new(server_name, emitter, logger));
+        Self { inner, state }
+    }
+}
+
+impl<T, E, L> Transport<RoleClient> for InterceptingClientTransport<T, E, L>
+where
+    T: Transport<RoleClient>,
+    E: EventEmitter + Clone + Send + Sync + 'static,
+    L: RpcEventPublisher,
+{
+    type Error = T::Error;
+
+    fn send(
+        &mut self,
+        item: TxJsonRpcMessage<RoleClient>,
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send + 'static {
+        let state = self.state.clone();
+        let cloned = item.clone();
+        let fut = self.inner.send(item);
+        async move {
+            if let JsonRpcMessage::Request(envelope) = &cloned {
+                state
+                    .handle_client_request(&envelope.request, &envelope.id)
+                    .await;
+            }
+            fut.await
+        }
+    }
+
+    fn receive(&mut self) -> impl Future<Output = Option<RxJsonRpcMessage<RoleClient>>> + Send {
+        let state = self.state.clone();
+        let fut = self.inner.receive();
+        async move {
+            let message = fut.await?;
+            if let Some((result, id)) = message.clone().into_result() {
+                match result {
+                    Ok(server_result) => {
+                        state.handle_server_result(id, server_result).await;
+                    }
+                    Err(error) => {
+                        state.handle_server_error(id, error).await;
+                    }
                 }
-            } else {
-                event.ok = true;
+            } else if let Some(notification) = message.clone().into_notification() {
+                state.log_server_notification(notification).await;
+            }
+            Some(message)
+        }
+    }
+
+    fn close(&mut self) -> impl Future<Output = Result<(), Self::Error>> + Send {
+        self.inner.close()
+    }
+}
+
+struct OutboundInterceptState<E, L>
+where
+    E: EventEmitter + Clone + Send + Sync + 'static,
+    L: RpcEventPublisher,
+{
+    emitter: E,
+    logger: L,
+    server_name: String,
+    session_id: String,
+    server_version: RwLock<Option<String>>,
+    server_protocol: RwLock<Option<String>>,
+    pending: Mutex<HashMap<RequestId, PendingRequest>>,
+}
+
+impl<E, L> OutboundInterceptState<E, L>
+where
+    E: EventEmitter + Clone + Send + Sync + 'static,
+    L: RpcEventPublisher,
+{
+    fn new(server_name: impl Into<String>, emitter: E, logger: L) -> Self {
+        let server_name = server_name.into();
+        Self {
+            emitter,
+            logger,
+            session_id: format!("internal::{server_name}"),
+            server_name,
+            server_version: RwLock::new(None),
+            server_protocol: RwLock::new(None),
+            pending: Mutex::new(HashMap::new()),
+        }
+    }
+
+    async fn handle_client_request(&self, request: &ClientRequest, id: &RequestId) {
+        if let Some(pending) = self.build_pending(request).await {
+            self.pending.lock().await.insert(id.clone(), pending);
+        }
+    }
+
+    async fn handle_server_result(&self, id: RequestId, result: ServerResult) {
+        let pending = {
+            let mut guard = self.pending.lock().await;
+            guard.remove(&id)
+        };
+        let Some(mut pending) = pending else {
+            return;
+        };
+        pending.event.duration_ms = Some(pending.started_at.elapsed().as_millis() as i64);
+        match pending.kind {
+            PendingKind::CallTool => enrich_call_tool(&mut pending.event, &result),
+            _ => {
+                pending.event.ok = true;
+            }
+        }
+        pending.event.response_json = serde_json::to_value(&result).ok();
+        if let ServerResult::InitializeResult(res) = &result {
+            pending.event.server_version = Some(res.server_info.version.clone());
+            pending.event.server_protocol = Some(res.protocol_version.to_string());
+            {
+                let mut guard = self.server_version.write().await;
+                *guard = Some(res.server_info.version.clone());
+            }
+            {
+                let mut guard = self.server_protocol.write().await;
+                *guard = Some(res.protocol_version.to_string());
             }
         } else {
-            event.ok = true;
+            self.populate_server_details(&mut pending.event).await;
+        }
+        self.logger.log_and_emit(&self.emitter, pending.event);
+    }
+
+    async fn handle_server_error(&self, id: RequestId, error: ErrorData) {
+        let pending = {
+            let mut guard = self.pending.lock().await;
+            guard.remove(&id)
+        };
+        let Some(mut pending) = pending else {
+            return;
+        };
+        pending.event.duration_ms = Some(pending.started_at.elapsed().as_millis() as i64);
+        pending.event.ok = false;
+        pending.event.error = Some(error.message.to_string());
+        pending.event.response_json = serde_json::to_value(&error).ok();
+        self.populate_server_details(&mut pending.event).await;
+        self.logger.log_and_emit(&self.emitter, pending.event);
+    }
+
+    async fn log_server_notification(&self, notification: ServerNotification) {
+        let mut event = Event::new("notification", self.session_id.clone());
+        event.server_name = Some(self.server_name.clone());
+        event.request_json = serde_json::to_value(&notification).ok();
+        self.populate_server_details(&mut event).await;
+        self.logger.log_and_emit(&self.emitter, event);
+    }
+
+    async fn build_pending(&self, request: &ClientRequest) -> Option<PendingRequest> {
+        let request_json = serde_json::to_value(request).ok();
+        let session_id = self.session_id.clone();
+        let (mut event, kind) = match request {
+            ClientRequest::InitializeRequest(_req) => {
+                let mut event = Event::new("initialize", session_id);
+                event.server_name = Some(self.server_name.clone());
+                if let Some(val) = request_json.as_ref() {
+                    event.client_name = extract_str(
+                        val,
+                        &[
+                            "clientInfo.name",
+                            "client_info.name",
+                            "client.name",
+                            "params.clientInfo.name",
+                            "params.client_info.name",
+                            "params.client.name",
+                        ],
+                    )
+                    .map(|s| s.to_string());
+                    event.client_version = extract_str(
+                        val,
+                        &[
+                            "clientInfo.version",
+                            "client_info.version",
+                            "client.version",
+                            "params.clientInfo.version",
+                            "params.client_info.version",
+                            "params.client.version",
+                        ],
+                    )
+                    .map(|s| s.to_string());
+                    event.client_protocol = Some("jsonrpc-2.0".into());
+                }
+                (event, PendingKind::Initialize)
+            }
+            ClientRequest::ListToolsRequest(_) => {
+                let mut event = Event::new("listTools", session_id);
+                event.server_name = Some(self.server_name.clone());
+                (event, PendingKind::ListTools)
+            }
+            ClientRequest::CallToolRequest(_) => {
+                let mut event = Event::new("callTool", session_id);
+                event.server_name = Some(self.server_name.clone());
+                (event, PendingKind::CallTool)
+            }
+            _ => {
+                let mut event = Event::new("other", session_id);
+                event.server_name = Some(self.server_name.clone());
+                (event, PendingKind::Other)
+            }
+        };
+        event.request_json = request_json;
+        if !matches!(kind, PendingKind::Initialize) {
+            self.populate_server_details(&mut event).await;
+        }
+        Some(PendingRequest {
+            started_at: Instant::now(),
+            event,
+            kind,
+        })
+    }
+
+    async fn populate_server_details(&self, event: &mut Event) {
+        if event.server_version.is_none() {
+            if let Some(version) = self.server_version.read().await.clone() {
+                event.server_version = Some(version);
+            }
+        }
+        if event.server_protocol.is_none() {
+            if let Some(protocol) = self.server_protocol.read().await.clone() {
+                event.server_protocol = Some(protocol);
+            }
         }
     }
 }
@@ -460,7 +702,9 @@ where
     type Error = M::Error;
     type Transport = InterceptingTransport<M::Transport, E, L>;
 
-    fn create_session(&self) -> impl Future<Output = Result<(SessionId, Self::Transport), Self::Error>> + Send {
+    fn create_session(
+        &self,
+    ) -> impl Future<Output = Result<(SessionId, Self::Transport), Self::Error>> + Send {
         let inner = self.inner.clone();
         let emitter = self.emitter.clone();
         let logger = self.logger.clone();
@@ -479,11 +723,17 @@ where
         self.inner.initialize_session(id, message)
     }
 
-    fn has_session(&self, id: &SessionId) -> impl Future<Output = Result<bool, Self::Error>> + Send {
+    fn has_session(
+        &self,
+        id: &SessionId,
+    ) -> impl Future<Output = Result<bool, Self::Error>> + Send {
         self.inner.has_session(id)
     }
 
-    fn close_session(&self, id: &SessionId) -> impl Future<Output = Result<(), Self::Error>> + Send {
+    fn close_session(
+        &self,
+        id: &SessionId,
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
         self.inner.close_session(id)
     }
 
@@ -533,7 +783,6 @@ where
         self.inner.resume(id, last_event_id)
     }
 }
-
 
 fn extract_str<'a>(val: &'a serde_json::Value, paths: &[&str]) -> Option<&'a str> {
     for path in paths {
@@ -585,7 +834,12 @@ mod tests {
     }
 
     impl RpcEventPublisher for TestLogger {
-        fn init_with(&self, _cp: &dyn crate::config::ConfigProvider, _settings: &crate::config::Settings) {}
+        fn init_with(
+            &self,
+            _cp: &dyn crate::config::ConfigProvider,
+            _settings: &crate::config::Settings,
+        ) {
+        }
 
         fn log(&self, event: Event) {
             self.0.lock().unwrap().push(event);
@@ -637,9 +891,7 @@ mod tests {
         ) -> impl Future<Output = Result<(), Self::Error>> + Send + 'static {
             let tx = self.outgoing.clone();
             async move {
-                tx.send(item)
-                    .await
-                    .map_err(|_| MockTransportError)?;
+                tx.send(item).await.map_err(|_| MockTransportError)?;
                 Ok(())
             }
         }
@@ -675,7 +927,8 @@ mod tests {
         incoming_tx.send(client_message).await.unwrap();
 
         let (mock_transport, _out_rx) = MockTransport::new(incoming_rx);
-        let mut transport = InterceptingTransport::new(mock_transport, emitter.clone(), logger.clone());
+        let mut transport =
+            InterceptingTransport::new(mock_transport, emitter.clone(), logger.clone());
 
         let mut message = transport.receive().await.expect("message");
         let ctx = match &mut message {
@@ -737,25 +990,26 @@ mod tests {
         incoming_tx.send(client_message).await.unwrap();
 
         let (mock_transport, _out_rx) = MockTransport::new(incoming_rx);
-        let mut transport = InterceptingTransport::new(mock_transport, emitter.clone(), logger.clone());
+        let mut transport =
+            InterceptingTransport::new(mock_transport, emitter.clone(), logger.clone());
 
         let message = transport.receive().await.expect("message");
         match message {
             JsonRpcMessage::Request(ref envelope) => {
-                assert!(envelope
-                    .request
-                    .extensions()
-                    .get::<RequestLogContext<BufferingEventEmitter, TestLogger>>()
-                    .is_some());
+                assert!(
+                    envelope
+                        .request
+                        .extensions()
+                        .get::<RequestLogContext<BufferingEventEmitter, TestLogger>>()
+                        .is_some()
+                );
             }
             _ => panic!("expected request"),
         }
 
         let init_result = mcp::InitializeResult {
             protocol_version: mcp::ProtocolVersion::V_2025_03_26,
-            capabilities: mcp::ServerCapabilities::builder()
-                .enable_logging()
-                .build(),
+            capabilities: mcp::ServerCapabilities::builder().enable_logging().build(),
             server_info: mcp::Implementation {
                 name: "srv".into(),
                 title: None,
