@@ -1,4 +1,5 @@
 use axum::Router;
+use std::{marker::PhantomData, sync::Arc};
 use futures::future::join_all;
 use rmcp::model as mcp;
 use rmcp::transport::streamable_http_server::{
@@ -6,12 +7,12 @@ use rmcp::transport::streamable_http_server::{
 };
 use rmcp::{RoleServer, Service as McpService};
 
-use crate::client::{ensure_rmcp_client, fetch_tools_for_cfg};
+use crate::client::{apply_log_context_from_client, ensure_rmcp_client, fetch_tools_for_cfg};
 use crate::config::{ConfigProvider, MCPServerConfig, load_settings_with};
 use crate::events::EventEmitter;
-use crate::events::{client_status_changed, incoming_clients_updated};
-use crate::incoming::record_connect;
-use crate::logging::{Event, RpcEventPublisher};
+use crate::events::client_status_changed;
+use crate::logging::RpcEventPublisher;
+use crate::transport::intercepting::{InterceptingSessionManager, RequestLogContext};
 use crate::unauthorized;
 
 // Runtime-bound listen address storage
@@ -25,31 +26,6 @@ pub fn get_runtime_listen_addr() -> Option<std::net::SocketAddr> {
     RUNTIME_ADDR.get().copied()
 }
 
-// Helper: JSON path extraction for InitializeRequest params (duplicated from main for reuse)
-fn extract_str<'a>(val: &'a serde_json::Value, paths: &[&str]) -> Option<&'a str> {
-    for path in paths {
-        let mut cur = val;
-        let mut ok = true;
-        for seg in path.split('.') {
-            if let Some(obj) = cur.as_object() {
-                if let Some(next) = obj.get(seg) {
-                    cur = next;
-                } else {
-                    ok = false;
-                    break;
-                }
-            } else {
-                ok = false;
-                break;
-            }
-        }
-        if ok && let Some(s) = cur.as_str() {
-            return Some(s);
-        }
-    }
-    None
-}
-
 #[derive(Clone)]
 pub struct BouncerService<E, CP, L>
 where
@@ -59,8 +35,7 @@ where
 {
     pub emitter: E,
     pub cp: CP,
-    pub logger: L,
-    pub session_id: std::sync::Arc<tokio::sync::RwLock<Option<String>>>,
+    _logger: PhantomData<L>,
 }
 
 impl<E, CP, L> McpService<RoleServer> for BouncerService<E, CP, L>
@@ -72,13 +47,10 @@ where
     async fn handle_request(
         &self,
         request: mcp::ClientRequest,
-        _context: rmcp::service::RequestContext<RoleServer>,
+        context: rmcp::service::RequestContext<RoleServer>,
     ) -> Result<mcp::ServerResult, mcp::ErrorData> {
-        let start = std::time::Instant::now();
-        let mut req_json = serde_json::to_value(&request).ok();
-        let mut evt = None;
         match request {
-            mcp::ClientRequest::InitializeRequest(req) => {
+            mcp::ClientRequest::InitializeRequest(_req) => {
                 let capabilities = mcp::ServerCapabilities::builder()
                     .enable_logging()
                     .enable_tools()
@@ -96,62 +68,21 @@ where
                     },
                     instructions: None,
                 };
-                if let Ok(val) = serde_json::to_value(&req)
-                    && let Some(id) = emit_incoming_from_initialize(&self.emitter, &val).await
-                {
-                    let mut guard = self.session_id.write().await;
-                    *guard = Some(id.clone());
-                    // create initialize event skeleton
-                    let mut e = Event::new("initialize", id);
-                    // enrich client fields from the same val
-                    e.client_name = extract_str(
-                        &val,
-                        &[
-                            "clientInfo.name",
-                            "client_info.name",
-                            "client.name",
-                            "params.clientInfo.name",
-                            "params.client_info.name",
-                            "params.client.name",
-                        ],
-                    )
-                    .map(|s| s.to_string());
-                    e.client_version = extract_str(
-                        &val,
-                        &[
-                            "clientInfo.version",
-                            "client_info.version",
-                            "client.version",
-                            "params.clientInfo.version",
-                            "params.client_info.version",
-                            "params.client.version",
-                        ],
-                    )
-                    .map(|s| s.to_string());
-                    e.client_protocol = Some("jsonrpc-2.0".into());
-                    e.request_json = req_json.clone();
-                    evt = Some(e);
-                }
-                let out = mcp::ServerResult::InitializeResult(result);
-                // log
-                if let Some(mut e) = evt.take() {
-                    e.response_json = serde_json::to_value(&out).ok();
-                    e.ok = true;
-                    e.duration_ms = Some(start.elapsed().as_millis() as i64);
-                    self.logger.log_and_emit(&self.emitter, e);
-                }
-                Ok(out)
+                Ok(mcp::ServerResult::InitializeResult(result))
             }
             mcp::ClientRequest::ListToolsRequest(_req) => {
-                let s = load_settings_with(&self.cp);
-                let servers: Vec<_> = s.mcp_servers.into_iter().filter(|c| c.enabled).collect();
+                let settings = load_settings_with(&self.cp);
+                let servers: Vec<_> = settings
+                    .mcp_servers
+                    .into_iter()
+                    .filter(|c| c.enabled)
+                    .collect();
                 const TOOL_LIST_TIMEOUT_SECS: u64 = 6;
                 let mut tools = aggregate_tools(
                     servers,
                     std::time::Duration::from_secs(TOOL_LIST_TIMEOUT_SECS),
                 )
                 .await;
-                // Filter out disabled tools based on persisted toggles
                 let state = crate::config::load_tools_state_with(&self.cp);
                 tools.retain(|t| {
                     if let Some((server, tool)) = t.name.split_once("::") {
@@ -165,39 +96,21 @@ where
                         true
                     }
                 });
-                let out = mcp::ServerResult::ListToolsResult(mcp::ListToolsResult {
+                Ok(mcp::ServerResult::ListToolsResult(mcp::ListToolsResult {
                     tools,
                     next_cursor: None,
-                });
-                // log (ensure a session id exists even if initialize wasn't observed)
-                let sid = self
-                    .session_id
-                    .read()
-                    .await
-                    .as_ref()
-                    .cloned()
-                    .unwrap_or_else(|| "anon".into());
-                let mut e = Event::new("listTools", sid);
-                e.server_name = Some("aggregate".into());
-                e.request_json = req_json.take();
-                e.response_json = serde_json::to_value(&out).ok();
-                e.ok = true;
-                e.duration_ms = Some(start.elapsed().as_millis() as i64);
-                self.logger.log_and_emit(&self.emitter, e);
-                Ok(out)
+                }))
             }
             mcp::ClientRequest::CallToolRequest(req) => {
+                let log_ctx = context
+                    .extensions
+                    .get::<RequestLogContext<E, L>>()
+                    .cloned();
                 let name = req.params.name.to_string();
                 let (server_name, tool_name) = name
                     .split_once("::")
                     .map(|(a, b)| (a.to_string(), b.to_string()))
                     .unwrap_or((String::new(), name.clone()));
-                let sid = self
-                    .session_id
-                    .read()
-                    .await
-                    .clone()
-                    .unwrap_or_else(|| "anon".into());
                 let args_obj = req
                     .params
                     .arguments
@@ -213,42 +126,26 @@ where
                             is_error: Some(true),
                             meta: None,
                         });
-                        // log error
-                        let mut e = Event::new("callTool", sid);
-                        e.server_name = Some(server_name.clone());
-                        e.request_json = req_json.take();
-                        e.response_json = serde_json::to_value(&out).ok();
-                        e.ok = false;
-                        e.error = Some("multiple enabled servers; specify 'server::tool'".into());
-                        e.duration_ms = Some(start.elapsed().as_millis() as i64);
-                        self.logger.log(e);
                         return Ok(out);
                     }
                 };
                 if let Some(cfg) = cfg_opt {
+                    if let Some(ctx) = log_ctx.as_ref() {
+                        ctx.set_server_name(cfg.name.clone()).await;
+                    }
                     match ensure_rmcp_client(&cfg.name, &cfg).await {
-                        Ok(client) => match client
+                        Ok(client) => {
+                            if let Some(ctx) = log_ctx.as_ref() {
+                                apply_log_context_from_client(&client, &cfg, ctx).await;
+                            }
+                            match client
                             .call_tool(mcp::CallToolRequestParam {
                                 name: tool_name.into(),
                                 arguments: args_obj,
                             })
                             .await
                         {
-                            Ok(res) => {
-                                let out = mcp::ServerResult::CallToolResult(res.clone());
-                                let mut e = Event::new("callTool", sid);
-                                e.server_name = Some(cfg.name.clone());
-                                e.request_json = req_json.take();
-                                e.response_json = serde_json::to_value(&out).ok();
-                                let ok = res.is_error != Some(true);
-                                e.ok = ok;
-                                e.duration_ms = Some(start.elapsed().as_millis() as i64);
-                                if !ok {
-                                    e.error = Some("tool returned error".into());
-                                }
-                                self.logger.log_and_emit(&self.emitter, e);
-                                Ok(out)
-                            }
+                            Ok(res) => Ok(mcp::ServerResult::CallToolResult(res)),
                             Err(e) => {
                                 if matches!(
                                     cfg.transport,
@@ -259,7 +156,6 @@ where
                                         Some(&cfg.endpoint),
                                     )
                                     .await;
-                                    // Notify UI when auth is required
                                     client_status_changed(
                                         &self.emitter,
                                         &cfg.name,
@@ -272,17 +168,10 @@ where
                                     is_error: Some(true),
                                     meta: None,
                                 });
-                                let mut evt = Event::new("callTool", sid);
-                                evt.server_name = Some(cfg.name.clone());
-                                evt.request_json = req_json.take();
-                                evt.response_json = serde_json::to_value(&out).ok();
-                                evt.ok = false;
-                                evt.error = Some(e.to_string());
-                                evt.duration_ms = Some(start.elapsed().as_millis() as i64);
-                                self.logger.log_and_emit(&self.emitter, evt);
                                 Ok(out)
                             }
-                        },
+                        }
+                        }
                         Err(e) => {
                             let out = mcp::ServerResult::CallToolResult(mcp::CallToolResult {
                                 content: vec![mcp::Content::text(format!("error: {e}"))],
@@ -290,14 +179,6 @@ where
                                 is_error: Some(true),
                                 meta: None,
                             });
-                            let mut evt = Event::new("callTool", sid);
-                            evt.server_name = Some(cfg.name.clone());
-                            evt.request_json = req_json.take();
-                            evt.response_json = serde_json::to_value(&out).ok();
-                            evt.ok = false;
-                            evt.error = Some(e.to_string());
-                            evt.duration_ms = Some(start.elapsed().as_millis() as i64);
-                            self.logger.log_and_emit(&self.emitter, evt);
                             Ok(out)
                         }
                     }
@@ -308,34 +189,12 @@ where
                         is_error: Some(true),
                         meta: None,
                     });
-                    let mut e = Event::new("callTool", sid);
-                    e.server_name = Some(server_name.clone());
-                    e.request_json = req_json.take();
-                    e.response_json = serde_json::to_value(&out).ok();
-                    e.ok = false;
-                    e.error = Some("no server".into());
-                    e.duration_ms = Some(start.elapsed().as_millis() as i64);
-                    self.logger.log_and_emit(&self.emitter, e);
                     Ok(out)
                 }
             }
             other => {
                 let _ = other;
-                let out = mcp::ServerResult::empty(());
-                let sid = self
-                    .session_id
-                    .read()
-                    .await
-                    .as_ref()
-                    .cloned()
-                    .unwrap_or_else(|| "anon".into());
-                let mut e = Event::new("other", sid);
-                e.request_json = req_json.take();
-                e.response_json = serde_json::to_value(&out).ok();
-                e.ok = true;
-                e.duration_ms = Some(start.elapsed().as_millis() as i64);
-                self.logger.log_and_emit(&self.emitter, e);
-                Ok(out)
+                Ok(mcp::ServerResult::empty(()))
             }
         }
     }
@@ -385,51 +244,6 @@ fn to_mcp_tool(server: &str, v: &serde_json::Value) -> Option<mcp::Tool> {
         description.unwrap_or_default(),
         schema_obj,
     ))
-}
-
-async fn emit_incoming_from_initialize<E: EventEmitter>(
-    emitter: &E,
-    val: &serde_json::Value,
-) -> Option<String> {
-    let name = extract_str(
-        val,
-        &[
-            "clientInfo.name",
-            "client_info.name",
-            "client.name",
-            "params.clientInfo.name",
-            "params.client_info.name",
-            "params.client.name",
-        ],
-    )
-    .unwrap_or("unknown");
-    let version = extract_str(
-        val,
-        &[
-            "clientInfo.version",
-            "client_info.version",
-            "client.version",
-            "params.clientInfo.version",
-            "params.client_info.version",
-            "params.client.version",
-        ],
-    )
-    .unwrap_or("");
-    let title = extract_str(
-        val,
-        &[
-            "clientInfo.title",
-            "client_info.title",
-            "title",
-            "params.clientInfo.title",
-            "params.client_info.title",
-            "params.title",
-        ],
-    )
-    .map(|s| s.to_string());
-    let id = record_connect(name.to_string(), version.to_string(), title).await;
-    incoming_clients_updated(emitter, "connect");
-    Some(id)
 }
 
 fn select_target_server<CP: ConfigProvider>(
@@ -566,25 +380,6 @@ mod tests {
     }
 
     #[test]
-    fn extract_str_reads_multiple_paths() {
-        let val = serde_json::json!({
-            "params": { "client_info": { "name": "X", "version": "1", "title": "T" } }
-        });
-        assert_eq!(
-            super::extract_str(&val, &["clientInfo.name", "params.client_info.name"]),
-            Some("X")
-        );
-        assert_eq!(
-            super::extract_str(&val, &["clientInfo.version", "params.client_info.version"]),
-            Some("1")
-        );
-        assert_eq!(
-            super::extract_str(&val, &["clientInfo.title", "params.client_info.title"]),
-            Some("T")
-        );
-    }
-
-    #[test]
     fn to_mcp_tool_handles_input_schema_casing() {
         let v1 = serde_json::json!({ "name": "echo", "description": "d", "inputSchema": { "type": "object" } });
         let v2 = serde_json::json!({ "name": "ping", "input_schema": { "type": "object" } });
@@ -613,33 +408,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
-    async fn initialize_emits_incoming_once() {
-        use crate::events::{BufferingEventEmitter, EVENT_INCOMING_CLIENTS_UPDATED};
-        let emitter = BufferingEventEmitter::default();
-        let _cp = TestProvider::new();
-        crate::incoming::clear_incoming().await;
-        // Directly test the helper using a value resembling the InitializeRequest shape
-        let val = serde_json::json!({
-            "clientInfo": { "name": "X", "version": "1", "title": "T" }
-        });
-        let _ = super::emit_incoming_from_initialize(&emitter, &val).await;
-        let events = emitter.0.lock().unwrap().clone();
-        let mut incoming = 0;
-        for (ev, payload) in events {
-            if ev == EVENT_INCOMING_CLIENTS_UPDATED {
-                incoming += 1;
-                assert_eq!(payload["reason"], "connect");
-            }
-        }
-        assert_eq!(
-            incoming, 1,
-            "should emit exactly one incoming_clients_updated"
-        );
-        crate::incoming::clear_incoming().await;
-    }
-
-    #[tokio::test]
     async fn list_tools_does_not_emit_events() {
         use crate::events::BufferingEventEmitter;
         let emitter = BufferingEventEmitter::default();
@@ -665,22 +433,32 @@ where
     // Initialize logging (idempotent)
     let settings = load_settings_with(&cp);
     logger.init_with(&cp, &settings);
-    let service: StreamableHttpService<BouncerService<E, CP, L>, LocalSessionManager> =
-        StreamableHttpService::new(
+    let session_manager = Arc::new(InterceptingSessionManager::new(
+        LocalSessionManager::default(),
+        emitter.clone(),
+        logger.clone(),
+    ));
+    let service: StreamableHttpService<
+        BouncerService<E, CP, L>,
+        InterceptingSessionManager<LocalSessionManager, E, L>,
+    > = StreamableHttpService::new(
+        {
+            let emitter = emitter.clone();
+            let cp = cp.clone();
             move || {
                 Ok(BouncerService {
                     emitter: emitter.clone(),
                     cp: cp.clone(),
-                    logger: logger.clone(),
-                    session_id: std::sync::Arc::new(tokio::sync::RwLock::new(None)),
+                    _logger: PhantomData,
                 })
-            },
-            Default::default(),
-            StreamableHttpServerConfig {
-                stateful_mode: true,
-                sse_keep_alive: Some(std::time::Duration::from_secs(15)),
-            },
-        );
+            }
+        },
+        session_manager,
+        StreamableHttpServerConfig {
+            stateful_mode: true,
+            sse_keep_alive: Some(std::time::Duration::from_secs(15)),
+        },
+    );
     let router = Router::new().nest_service("/mcp", service);
     let listener = tokio::net::TcpListener::bind(addr)
         .await

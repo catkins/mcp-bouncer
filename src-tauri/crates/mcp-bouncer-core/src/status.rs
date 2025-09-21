@@ -82,6 +82,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn tools_count_and_connected_logic() {
         crate::overlay::clear_all().await;
         let cp = TestProvider::new();
@@ -114,6 +115,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn overlay_precedence_over_registry() {
         crate::overlay::clear_all().await;
         let cp = TestProvider::new();

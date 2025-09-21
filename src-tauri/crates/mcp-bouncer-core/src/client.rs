@@ -10,6 +10,9 @@ use rmcp::transport::{
 };
 
 use crate::config::{MCPServerConfig, TransportType};
+use crate::events::EventEmitter;
+use crate::logging::RpcEventPublisher;
+use crate::transport::intercepting::RequestLogContext;
 use crate::oauth::load_credentials_for;
 use crate::unauthorized;
 
@@ -142,6 +145,28 @@ pub async fn ensure_rmcp_client(name: &str, cfg: &MCPServerConfig) -> Result<Arc
     guard.insert(name.to_string(), arc.clone());
     tracing::info!(target = "client", server=%name, "registered");
     Ok(arc)
+}
+
+pub async fn apply_log_context_from_client<E, L>(
+    client: &ClientService,
+    cfg: &MCPServerConfig,
+    ctx: &RequestLogContext<E, L>,
+)
+where
+    E: EventEmitter + Clone + Send + Sync + 'static,
+    L: RpcEventPublisher,
+{
+    let (version, protocol) = if let Some(info) = client.peer().peer_info() {
+        (
+            Some(info.server_info.version.clone()),
+            Some(info.protocol_version.to_string()),
+        )
+    } else {
+        (None, None)
+    };
+    ctx
+        .set_server_details(Some(cfg.name.clone()), version, protocol)
+        .await;
 }
 
 pub async fn remove_rmcp_client(name: &str) -> Result<()> {
