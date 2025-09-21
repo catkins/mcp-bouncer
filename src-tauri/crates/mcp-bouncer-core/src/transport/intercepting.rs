@@ -513,10 +513,8 @@ fn extract_str<'a>(val: &'a serde_json::Value, paths: &[&str]) -> Option<&'a str
                 break;
             }
         }
-        if ok {
-            if let Some(s) = cur.as_str() {
-                return Some(s);
-            }
+        if ok && let Some(s) = cur.as_str() {
+            return Some(s);
         }
     }
     None
