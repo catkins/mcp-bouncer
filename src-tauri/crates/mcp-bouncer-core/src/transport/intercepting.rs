@@ -76,10 +76,16 @@ where
         let fut = self.inner.receive();
         async move {
             let mut message = fut.await?;
-            if let JsonRpcMessage::Request(ref mut envelope) = message {
-                state
-                    .handle_incoming_request(&mut envelope.request, &envelope.id)
-                    .await;
+            match &mut message {
+                JsonRpcMessage::Request(envelope) => {
+                    state
+                        .handle_incoming_request(&mut envelope.request, &envelope.id)
+                        .await;
+                }
+                JsonRpcMessage::Notification(envelope) => {
+                    state.log_notification(&envelope.notification).await;
+                }
+                _ => {}
             }
             Some(message)
         }
@@ -249,6 +255,14 @@ where
         }
         pending.event.response_json = serde_json::to_value(result).ok();
         self.logger.log_and_emit(&self.emitter, pending.event);
+    }
+
+    async fn log_notification(&self, notification: &mcp::ClientNotification) {
+        let session_id = self.current_session_id().await;
+        let mut event = Event::new("notification", session_id);
+        event.request_json = serde_json::to_value(notification).ok();
+        event.ok = true;
+        self.logger.log_and_emit(&self.emitter, event);
     }
 
     async fn build_pending(
