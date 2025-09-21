@@ -132,7 +132,7 @@ async fn sse_client_can_connect_list_tools_and_send_headers() {
     };
 
     let emitter = BufferingEventEmitter::default();
-    let logger = NoopLogger::default();
+    let logger = NoopLogger;
 
     let client = ensure_rmcp_client(&cfg.name, &cfg, &emitter, &logger)
         .await

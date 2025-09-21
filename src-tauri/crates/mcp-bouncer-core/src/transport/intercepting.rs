@@ -653,15 +653,15 @@ where
     }
 
     async fn populate_server_details(&self, event: &mut Event) {
-        if event.server_version.is_none() {
-            if let Some(version) = self.server_version.read().await.clone() {
-                event.server_version = Some(version);
-            }
+        if event.server_version.is_none()
+            && let Some(version) = self.server_version.read().await.clone()
+        {
+            event.server_version = Some(version);
         }
-        if event.server_protocol.is_none() {
-            if let Some(protocol) = self.server_protocol.read().await.clone() {
-                event.server_protocol = Some(protocol);
-            }
+        if event.server_protocol.is_none()
+            && let Some(protocol) = self.server_protocol.read().await.clone()
+        {
+            event.server_protocol = Some(protocol);
         }
     }
 }

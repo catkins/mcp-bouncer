@@ -6,55 +6,60 @@ import { HighlightedJson } from './HighlightedJson';
 function methodIcon(method: string) {
   switch (method) {
     case 'initialize':
-      return <RocketLaunchIcon className="h-5 w-5 text-blue-500" />;
+      return <RocketLaunchIcon className="h-4 w-4 text-blue-500" />;
     case 'listTools':
-      return <WrenchScrewdriverIcon className="h-5 w-5 text-purple-500" />;
+      return <WrenchScrewdriverIcon className="h-4 w-4 text-purple-500" />;
     case 'callTool':
-      return <PlayCircleIcon className="h-5 w-5 text-amber-500" />;
+      return <PlayCircleIcon className="h-4 w-4 text-amber-500" />;
     default:
-      return <EllipsisHorizontalCircleIcon className="h-5 w-5 text-gray-400" />;
+      return <EllipsisHorizontalCircleIcon className="h-4 w-4 text-gray-400" />;
   }
 }
 
 export function LogListItem({ item }: { item: RpcLog }) {
   const ts = new Date(item.ts_ms);
   return (
-    <div className="p-3 rounded-md bg-white/80 dark:bg-gray-800/70 border border-gray-200 dark:border-gray-700">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-800/60 p-2.5 sm:p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5">
           {methodIcon(item.method)}
-          <div className="text-sm font-medium text-gray-800 dark:text-gray-100">
-            {item.method} {item.server_name ? <span className="ml-2 text-gray-500">· {item.server_name}</span> : null}
+          <div className="text-sm font-medium leading-tight text-gray-800 dark:text-gray-100">
+            {item.method}
+            {item.server_name ? (
+              <span className="ml-1 text-xs font-normal text-gray-500 dark:text-gray-400">· {item.server_name}</span>
+            ) : null}
           </div>
         </div>
-        <div className="flex items-center gap-2 text-xs">
+        <div className="flex items-center gap-1.5 text-[11px] leading-tight text-gray-600 dark:text-gray-300">
           {item.duration_ms != null && (
-            <span className="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">{item.duration_ms} ms</span>
+            <span className="inline-flex items-center rounded-full bg-gray-100 px-1.5 py-[1px] text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+              {item.duration_ms} ms
+            </span>
           )}
           {item.ok ? (
             <span className="inline-flex items-center gap-1 text-green-600"><CheckCircleIcon className="h-4 w-4"/>ok</span>
           ) : (
             <span className="inline-flex items-center gap-1 text-red-600"><XCircleIcon className="h-4 w-4"/>error</span>
           )}
-          <span className="text-gray-500">{format(ts, 'PP p')}</span>
+          <span className="text-gray-500 dark:text-gray-400">{format(ts, 'PP p')}</span>
         </div>
       </div>
-      <div className="mt-2 grid grid-cols-2 gap-3">
+      <div className="mt-1.5 grid gap-2 md:grid-cols-2 md:items-stretch">
         {item.request_json != null && (
-          <div>
-            <div className="text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Request</div>
-            <HighlightedJson value={item.request_json} collapsedByDefault />
+          <div className="flex flex-col gap-0.5">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Request</div>
+            <HighlightedJson className="flex-1" value={item.request_json} collapsedByDefault />
           </div>
         )}
         {item.response_json != null && (
-          <div>
-            <div className="text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Response</div>
-            <HighlightedJson value={item.response_json} collapsedByDefault />
+          <div className="flex flex-col gap-0.5">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Response</div>
+            <HighlightedJson className="flex-1" value={item.response_json} collapsedByDefault />
           </div>
         )}
       </div>
       {!item.ok && item.error && (
-        <div className="mt-2 text-xs text-red-600">{item.error}</div>
+        <div className="mt-1.5 text-[11px] text-red-600">{item.error}</div>
       )}
     </div>
   );

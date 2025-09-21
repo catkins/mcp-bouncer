@@ -39,7 +39,7 @@ async fn http_missing_endpoint_errors() {
         enabled: true,
     };
     let emitter = BufferingEventEmitter::default();
-    let logger = NoopLogger::default();
+    let logger = NoopLogger;
     let err = ensure_rmcp_client(&cfg.name, &cfg, &emitter, &logger)
         .await
         .err()
@@ -62,7 +62,7 @@ async fn missing_command_for_stdio_errors() {
         enabled: true,
     };
     let emitter = BufferingEventEmitter::default();
-    let logger = NoopLogger::default();
+    let logger = NoopLogger;
     let err = ensure_rmcp_client(&cfg.name, &cfg, &emitter, &logger)
         .await
         .err()
