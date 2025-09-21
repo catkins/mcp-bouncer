@@ -570,6 +570,9 @@ fn main() {
     #[cfg(debug_assertions)]
     {
         // Export Typescript bindings for commands during dev builds.
+        let start = std::time::Instant::now();
+        tracing::info!(target = "specta", "binding_generation_start");
+
         let builder = SpectaBuilder::<tauri::Wry>::new().commands(collect_commands![
             mcp_list,
             mcp_listen_addr,
@@ -592,12 +595,21 @@ fn main() {
             settings_open_config_directory,
             settings_update_settings
         ]);
-        let _ = builder
-            .export(Typescript::default(), "../src/tauri/bindings.ts")
-            .map_err(|e| eprintln!("[specta] export failed: {e}"));
-        // Optional fast-path: allow regenerating bindings without launching the app
-        if std::env::var("SPECTA_EXPORT_ONLY").ok().as_deref() == Some("1") {
-            return;
+
+        let export_result = builder.export(Typescript::default(), "../src/tauri/bindings.ts");
+
+        let elapsed = start.elapsed();
+        match export_result {
+            Ok(_) => {
+                tracing::info!(
+                    target = "specta",
+                    duration_ms = elapsed.as_millis(),
+                    "binding_generation_success"
+                );
+            }
+            Err(e) => {
+                tracing::error!(target = "specta", duration_ms = elapsed.as_millis(), error = %e, "binding_generation_failed");
+            }
         }
     }
 
