@@ -55,156 +55,15 @@ where
             .cloned();
         match request {
             mcp::ClientRequest::InitializeRequest(_req) => {
-                let capabilities = mcp::ServerCapabilities::builder()
-                    .enable_logging()
-                    .enable_tools()
-                    .enable_tool_list_changed()
-                    .build();
-                let result = mcp::InitializeResult {
-                    protocol_version: mcp::ProtocolVersion::V_2025_03_26,
-                    capabilities,
-                    server_info: mcp::Implementation {
-                        name: "MCP Bouncer".into(),
-                        title: None,
-                        version: env!("CARGO_PKG_VERSION").into(),
-                        icons: None,
-                        website_url: None,
-                    },
-                    instructions: None,
-                };
-                let out = mcp::ServerResult::InitializeResult(result);
-                if let Some(ctx) = log_ctx.clone() {
-                    ctx.log_local_result(&out).await;
-                }
-                Ok(out)
+                self.respond_initialize(log_ctx).await
             }
             mcp::ClientRequest::ListToolsRequest(_req) => {
-                let settings = load_settings_with(&self.cp);
-                let servers: Vec<_> = settings
-                    .mcp_servers
-                    .into_iter()
-                    .filter(|c| c.enabled)
-                    .collect();
-                const TOOL_LIST_TIMEOUT_SECS: u64 = 6;
-                let mut tools = aggregate_tools(
-                    servers,
-                    std::time::Duration::from_secs(TOOL_LIST_TIMEOUT_SECS),
-                )
-                .await;
-                let state = crate::config::load_tools_state_with(&self.cp);
-                tools.retain(|t| {
-                    if let Some((server, tool)) = t.name.split_once("::") {
-                        state
-                            .0
-                            .get(server)
-                            .and_then(|m| m.get(tool))
-                            .copied()
-                            .unwrap_or(true)
-                    } else {
-                        true
-                    }
-                });
-                let out = mcp::ServerResult::ListToolsResult(mcp::ListToolsResult {
-                    tools,
-                    next_cursor: None,
-                });
-                if let Some(ctx) = log_ctx.clone() {
-                    ctx.log_local_result(&out).await;
-                }
-                Ok(out)
+                self.respond_list_tools(log_ctx).await
             }
             mcp::ClientRequest::CallToolRequest(req) => {
-                let log_ctx = log_ctx.clone();
-                let name = req.params.name.to_string();
-                let (server_name, tool_name) = name
-                    .split_once("::")
-                    .map(|(a, b)| (a.to_string(), b.to_string()))
-                    .unwrap_or((String::new(), name.clone()));
-                let args_obj = req
-                    .params
-                    .arguments
-                    .clone()
-                    .map(serde_json::Value::Object)
-                    .and_then(|v| v.as_object().cloned());
-                let cfg_opt = match select_target_server(&self.cp, &server_name) {
-                    Ok(opt) => opt,
-                    Err(msg) => {
-                        let out = mcp::ServerResult::CallToolResult(mcp::CallToolResult {
-                            content: vec![mcp::Content::text(msg)],
-                            structured_content: None,
-                            is_error: Some(true),
-                            meta: None,
-                        });
-                        return Ok(out);
-                    }
-                };
-                if let Some(cfg) = cfg_opt {
-                    if let Some(ctx) = log_ctx.as_ref() {
-                        ctx.set_server_name(cfg.name.clone()).await;
-                    }
-                    match ensure_rmcp_client(&cfg.name, &cfg).await {
-                        Ok(client) => {
-                            if let Some(ctx) = log_ctx.as_ref() {
-                                apply_log_context_from_client(&client, &cfg, ctx).await;
-                            }
-                            match client
-                            .call_tool(mcp::CallToolRequestParam {
-                                name: tool_name.into(),
-                                arguments: args_obj,
-                            })
-                            .await
-                        {
-                            Ok(res) => Ok(mcp::ServerResult::CallToolResult(res)),
-                            Err(e) => {
-                                if matches!(
-                                    cfg.transport,
-                                    crate::config::TransportType::StreamableHttp
-                                ) {
-                                    unauthorized::on_possible_unauthorized(
-                                        &cfg.name,
-                                        Some(&cfg.endpoint),
-                                    )
-                                    .await;
-                                    client_status_changed(
-                                        &self.emitter,
-                                        &cfg.name,
-                                        "requires_authorization",
-                                    );
-                                }
-                                let out = mcp::ServerResult::CallToolResult(mcp::CallToolResult {
-                                    content: vec![mcp::Content::text(format!("error: {e}"))],
-                                    structured_content: None,
-                                    is_error: Some(true),
-                                    meta: None,
-                                });
-                                Ok(out)
-                            }
-                        }
-                        }
-                        Err(e) => {
-                            let out = mcp::ServerResult::CallToolResult(mcp::CallToolResult {
-                                content: vec![mcp::Content::text(format!("error: {e}"))],
-                                structured_content: None,
-                                is_error: Some(true),
-                                meta: None,
-                            });
-                            Ok(out)
-                        }
-                    }
-                } else {
-                    let out = mcp::ServerResult::CallToolResult(mcp::CallToolResult {
-                        content: vec![mcp::Content::text("no server".to_string())],
-                        structured_content: None,
-                        is_error: Some(true),
-                        meta: None,
-                    });
-                    Ok(out)
-                }
+                self.respond_call_tool(req, log_ctx).await
             }
-            other => {
-                let _ = other;
-                Ok(mcp::ServerResult::empty(()))
-            }
+            _other => self.respond_other(log_ctx).await,
         }
     }
 
@@ -233,6 +92,189 @@ where
             },
             instructions: None,
         }
+    }
+}
+
+impl<E, CP, L> BouncerService<E, CP, L>
+where
+    E: EventEmitter + Clone + Send + Sync + 'static,
+    CP: ConfigProvider + Clone + Send + Sync + 'static,
+    L: RpcEventPublisher,
+{
+    async fn respond_initialize(
+        &self,
+        log_ctx: Option<RequestLogContext<E, L>>,
+    ) -> Result<mcp::ServerResult, mcp::ErrorData> {
+        let capabilities = mcp::ServerCapabilities::builder()
+            .enable_logging()
+            .enable_tools()
+            .enable_tool_list_changed()
+            .build();
+        let result = mcp::InitializeResult {
+            protocol_version: mcp::ProtocolVersion::V_2025_03_26,
+            capabilities,
+            server_info: mcp::Implementation {
+                name: "MCP Bouncer".into(),
+                title: None,
+                version: env!("CARGO_PKG_VERSION").into(),
+                icons: None,
+                website_url: None,
+            },
+            instructions: None,
+        };
+        let out = mcp::ServerResult::InitializeResult(result);
+        if let Some(ctx) = log_ctx.as_ref() {
+            ctx.log_local_result(&out).await;
+        }
+        Ok(out)
+    }
+
+    async fn respond_list_tools(
+        &self,
+        log_ctx: Option<RequestLogContext<E, L>>,
+    ) -> Result<mcp::ServerResult, mcp::ErrorData> {
+        let settings = load_settings_with(&self.cp);
+        let servers: Vec<_> = settings
+            .mcp_servers
+            .into_iter()
+            .filter(|c| c.enabled)
+            .collect();
+        const TOOL_LIST_TIMEOUT_SECS: u64 = 6;
+        let mut tools = aggregate_tools(
+            servers,
+            std::time::Duration::from_secs(TOOL_LIST_TIMEOUT_SECS),
+        )
+        .await;
+        let state = crate::config::load_tools_state_with(&self.cp);
+        tools.retain(|t| {
+            if let Some((server, tool)) = t.name.split_once("::") {
+                state
+                    .0
+                    .get(server)
+                    .and_then(|m| m.get(tool))
+                    .copied()
+                    .unwrap_or(true)
+            } else {
+                true
+            }
+        });
+        let out = mcp::ServerResult::ListToolsResult(mcp::ListToolsResult {
+            tools,
+            next_cursor: None,
+        });
+        if let Some(ctx) = log_ctx.as_ref() {
+            ctx.log_local_result(&out).await;
+        }
+        Ok(out)
+    }
+
+    async fn respond_call_tool(
+        &self,
+        req: mcp::CallToolRequest,
+        log_ctx: Option<RequestLogContext<E, L>>,
+    ) -> Result<mcp::ServerResult, mcp::ErrorData> {
+        let name = req.params.name.to_string();
+        let (server_name, tool_name) = name
+            .split_once("::")
+            .map(|(a, b)| (a.to_string(), b.to_string()))
+            .unwrap_or((String::new(), name.clone()));
+        let args_obj = req
+            .params
+            .arguments
+            .clone()
+            .map(serde_json::Value::Object)
+            .and_then(|v| v.as_object().cloned());
+        let cfg_opt = match select_target_server(&self.cp, &server_name) {
+            Ok(opt) => opt,
+            Err(msg) => {
+                let out = mcp::ServerResult::CallToolResult(mcp::CallToolResult {
+                    content: vec![mcp::Content::text(msg)],
+                    structured_content: None,
+                    is_error: Some(true),
+                    meta: None,
+                });
+                if let Some(ctx) = log_ctx.as_ref() {
+                    ctx.log_local_result(&out).await;
+                }
+                return Ok(out);
+            }
+        };
+        if let Some(cfg) = cfg_opt {
+            if let Some(ctx) = log_ctx.as_ref() {
+                ctx.set_server_name(cfg.name.clone()).await;
+            }
+            match ensure_rmcp_client(&cfg.name, &cfg).await {
+                Ok(client) => {
+                    if let Some(ctx) = log_ctx.as_ref() {
+                        apply_log_context_from_client(&client, &cfg, ctx).await;
+                    }
+                    match client
+                        .call_tool(mcp::CallToolRequestParam {
+                            name: tool_name.into(),
+                            arguments: args_obj,
+                        })
+                        .await
+                    {
+                        Ok(res) => Ok(mcp::ServerResult::CallToolResult(res)),
+                        Err(e) => {
+                            if matches!(
+                                cfg.transport,
+                                crate::config::TransportType::StreamableHttp
+                            ) {
+                                unauthorized::on_possible_unauthorized(
+                                    &cfg.name,
+                                    Some(&cfg.endpoint),
+                                )
+                                .await;
+                                client_status_changed(
+                                    &self.emitter,
+                                    &cfg.name,
+                                    "requires_authorization",
+                                );
+                            }
+                            let out = mcp::ServerResult::CallToolResult(mcp::CallToolResult {
+                                content: vec![mcp::Content::text(format!("error: {e}"))],
+                                structured_content: None,
+                                is_error: Some(true),
+                                meta: None,
+                            });
+                            Ok(out)
+                        }
+                    }
+                }
+                Err(e) => {
+                    let out = mcp::ServerResult::CallToolResult(mcp::CallToolResult {
+                        content: vec![mcp::Content::text(format!("error: {e}"))],
+                        structured_content: None,
+                        is_error: Some(true),
+                        meta: None,
+                    });
+                    Ok(out)
+                }
+            }
+        } else {
+            let out = mcp::ServerResult::CallToolResult(mcp::CallToolResult {
+                content: vec![mcp::Content::text("no server".to_string())],
+                structured_content: None,
+                is_error: Some(true),
+                meta: None,
+            });
+            if let Some(ctx) = log_ctx.as_ref() {
+                ctx.log_local_result(&out).await;
+            }
+            Ok(out)
+        }
+    }
+
+    async fn respond_other(
+        &self,
+        log_ctx: Option<RequestLogContext<E, L>>,
+    ) -> Result<mcp::ServerResult, mcp::ErrorData> {
+        let out = mcp::ServerResult::empty(());
+        if let Some(ctx) = log_ctx.as_ref() {
+            ctx.log_local_result(&out).await;
+        }
+        Ok(out)
     }
 }
 
