@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build:dev": "npm run generate:bindings && vite build --minify false --mode development",
-    "build": "npm run generate:bindings && tsc && vite build --mode production",
+    "build:dev": "vite build --minify false --mode development",
+    "build": "tsc && vite build --mode production",
     "generate:bindings": "cross-env SPECTA_EXPORT_ONLY=1 cargo run --manifest-path src-tauri/Cargo.toml --bin mcp-bouncer-tauri",
     "preview": "vite preview",
     "lint": "eslint . --ext .ts,.tsx --max-warnings=0",
