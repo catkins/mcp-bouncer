@@ -19,4 +19,24 @@ export interface LogsQueryParams {
   ok?: boolean;
   limit?: number;
   after?: { ts_ms: number; id: string };
+  start_ts_ms?: number;
+  end_ts_ms?: number;
+}
+
+export interface LogsHistogramCount {
+  method: string;
+  count: number;
+}
+
+export interface LogsHistogramBucket {
+  start_ts_ms: number;
+  end_ts_ms: number;
+  counts: LogsHistogramCount[];
+}
+
+export interface LogsHistogram {
+  start_ts_ms: number | null;
+  end_ts_ms: number | null;
+  bucket_width_ms: number;
+  buckets: LogsHistogramBucket[];
 }

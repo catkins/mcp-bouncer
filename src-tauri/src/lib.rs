@@ -6,8 +6,9 @@ pub use mcp_bouncer_core::{
 pub mod logging {
     pub use mcp_bouncer_core::logging::{Event, RpcEventPublisher};
     pub use mcp_bouncer_logging::{
-        EventRow, QueryParams, SqlitePublisher, count_events, db_path, force_flush_and_checkpoint,
-        init_once, init_once_with, log_rpc_event, query_events, query_events_since,
+        EventHistogram, EventRow, HistogramBucket, HistogramCount, HistogramParams, QueryParams,
+        SqlitePublisher, count_events, db_path, force_flush_and_checkpoint, init_once,
+        init_once_with, log_rpc_event, query_event_histogram, query_events, query_events_since,
     };
 }
 

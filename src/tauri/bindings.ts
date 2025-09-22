@@ -133,6 +133,14 @@ async mcpLogsListSince(params: LogsSinceParams) : Promise<Result<EventRow[], str
     else return { status: "error", error: e  as any };
 }
 },
+async mcpLogsHistogram(params: LogsHistogramParams) : Promise<Result<EventHistogram, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mcp_logs_histogram", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async mcpLogsCount(server: string | null) : Promise<Result<number, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("mcp_logs_count", { server }) };
@@ -179,11 +187,15 @@ async settingsUpdateSettings(settings: Settings | null) : Promise<Result<null, s
 
 export type ClientConnectionState = "disconnected" | "connecting" | "errored" | "connected" | "requires_authorization" | "authorizing"
 export type ClientStatus = { name: string; state: ClientConnectionState; tools: number; last_error?: string | null; authorization_required: boolean; oauth_authenticated: boolean }
+export type EventHistogram = { start_ts_ms: number | null; end_ts_ms: number | null; bucket_width_ms: number; buckets: HistogramBucket[] }
 export type EventRow = { id: string; ts_ms: number; session_id: string; method: string; server_name: string | null; server_version: string | null; server_protocol: string | null; duration_ms: number | null; ok: boolean; error: string | null; request_json: JsonValue | null; response_json: JsonValue | null }
+export type HistogramBucket = { start_ts_ms: number; end_ts_ms: number; counts: HistogramCount[] }
+export type HistogramCount = { method: string; count: number }
 export type IncomingClient = { id: string; name: string; version: string; title?: string | null; connected_at?: string | null }
 export type JsonValue = null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>
 export type LogsCursor = { ts_ms: number; id: string }
-export type LogsListParams = { server: string | null; method: string | null; ok: boolean | null; limit: number | null; after: LogsCursor | null }
+export type LogsHistogramParams = { server: string | null; method: string | null; ok: boolean | null; max_buckets: number | null }
+export type LogsListParams = { server: string | null; method: string | null; ok: boolean | null; limit: number | null; after: LogsCursor | null; start_ts_ms: number | null; end_ts_ms: number | null }
 export type LogsSinceParams = { since_ts_ms: number; server: string | null; method: string | null; ok: boolean | null; limit: number | null }
 export type MCPServerConfig = { name: string; description: string; transport?: TransportType; command: string; args?: string[]; env?: Partial<{ [key in string]: string }>; endpoint?: string; headers?: Partial<{ [key in string]: string }>; requires_auth?: boolean; enabled: boolean }
 export type Settings = { mcp_servers: MCPServerConfig[]; listen_addr: string }
