@@ -67,21 +67,21 @@ This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the of
 - **Outbound (proxy client ➝ upstream server)**: `ensure_rmcp_client` wraps every constructed transport (HTTP, SSE, stdio) in `InterceptingClientTransport`. The outbound interceptor mirrors the same logging pipeline, ensuring listTools/callTool/etc. invocations and their responses (or errors) are logged even when they originate from the proxy itself (tool refresh, OAuth reconnects, etc.).
 - The interceptors store per-request state (start time, serialized payloads, inferred server metadata) so logs have consistent structure regardless of direction. When introducing a new transport, make sure it is wrapped before calling `.serve(...)`, and that the caller passes an emitter + logger through to `ensure_rmcp_client`.
 
-#### JSON-RPC Logging (DuckDB)
-- Always-on: the backend persistently logs JSON-RPC requests/responses to a DuckDB database at `$XDG_CONFIG_HOME/mcp-bouncer/logs.duckdb`.
+#### JSON-RPC Logging (SQLite)
+- Always-on: the backend persistently logs JSON-RPC requests/responses to a SQLite database at `$XDG_CONFIG_HOME/mcp-bouncer/logs.sqlite`.
 - Schema:
-  - `sessions(session_id TEXT PRIMARY KEY, created_at TIMESTAMP, client_name TEXT, client_version TEXT, client_protocol TEXT, last_seen_at TIMESTAMP)`
-  - `rpc_events(id UUID PRIMARY KEY, ts TIMESTAMP, session_id TEXT, method TEXT, server_name TEXT, server_version TEXT, server_protocol TEXT, duration_ms BIGINT, ok BOOLEAN, error TEXT, request_json JSON, response_json JSON)`
-  - Indexes on `rpc_events(ts)` and `rpc_events(session_id)`.
+  - `sessions(session_id TEXT PRIMARY KEY, created_at_ms INTEGER, client_name TEXT, client_version TEXT, client_protocol TEXT, last_seen_at_ms INTEGER)`
+  - `rpc_events(id TEXT PRIMARY KEY, ts_ms INTEGER, session_id TEXT, method TEXT, server_name TEXT, server_version TEXT, server_protocol TEXT, duration_ms INTEGER, ok INTEGER, error TEXT, request_json TEXT, response_json TEXT)`
+  - Indexes on `rpc_events(ts_ms)` and `rpc_events(session_id)`.
 - Redaction: sensitive keys are masked recursively before persistence: `authorization`, `token`, `password`, `secret`, `api_key`, `access_token`.
 - Flushing & WAL:
-  - Events are buffered and flushed every ~250ms or when batches reach 256 items.
-  - A `CHECKPOINT` is issued roughly once per second and on explicit flush to apply the WAL to the main DB file.
+  - Events are buffered and flushed every ~250 ms or when batches reach 256 items.
+  - The connection runs in WAL mode and triggers `PRAGMA wal_checkpoint(TRUNCATE)` roughly once per second and on explicit flush.
   - Tests may force a flush + checkpoint via `mcp_bouncer::logging::force_flush_and_checkpoint().await`.
 - Querying examples:
   - `SELECT COUNT(*) FROM rpc_events;`
   - `SELECT DISTINCT method FROM rpc_events;`
-  - `SELECT * FROM rpc_events WHERE method = 'callTool' ORDER BY ts DESC LIMIT 10;`
+  - `SELECT * FROM rpc_events WHERE method = 'callTool' ORDER BY ts_ms DESC LIMIT 10;`
 
 #### Testability Notes (backend)
 

@@ -1,7 +1,7 @@
 use mcp_bouncer::config::{
     ConfigProvider, MCPServerConfig, TransportType, default_settings, save_settings_with,
 };
-use mcp_bouncer::{events::EventEmitter, logging::DuckDbPublisher, server::start_http_server};
+use mcp_bouncer::{events::EventEmitter, logging::SqlitePublisher, server::start_http_server};
 use rmcp::ServiceExt;
 use rmcp::model as mcp;
 use rmcp::transport::{
@@ -144,7 +144,7 @@ async fn e2e_list_and_echo_hermetic_http() {
         fn emit(&self, _e: &str, _p: &serde_json::Value) {}
     }
     let (_handle, bound) =
-        match start_http_server(NoopEmitter, cp.clone(), DuckDbPublisher, addr).await {
+        match start_http_server(NoopEmitter, cp.clone(), SqlitePublisher, addr).await {
             Ok(res) => res,
             Err(err) => {
                 if err.contains("Operation not permitted") {

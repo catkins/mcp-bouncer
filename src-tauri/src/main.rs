@@ -10,7 +10,7 @@ use mcp_bouncer::config::{
 };
 use mcp_bouncer::events::{TauriEventEmitter, client_error, client_status_changed};
 use mcp_bouncer::incoming::list_incoming;
-use mcp_bouncer::logging::{DuckDbPublisher, RpcEventPublisher};
+use mcp_bouncer::logging::{RpcEventPublisher, SqlitePublisher};
 use mcp_bouncer::oauth::start_oauth_for_server;
 use mcp_bouncer::server::{get_runtime_listen_addr, start_http_server};
 use mcp_bouncer::unauthorized;
@@ -29,7 +29,7 @@ fn spawn_mcp_proxy(app: &tauri::AppHandle) {
     }
     let app_handle = app.clone();
     tauri::async_runtime::spawn(async move {
-        let logger = DuckDbPublisher;
+        let logger = SqlitePublisher;
         let primary = std::net::SocketAddr::from(([127, 0, 0, 1], 8091));
         if let Err(e) = start_http_server(
             mcp_bouncer::events::TauriEventEmitter(app_handle.clone()),
@@ -274,7 +274,7 @@ async fn mcp_start_oauth(app: tauri::AppHandle, name: String) -> Result<(), Stri
     mcp_bouncer::overlay::set_state(&name, ClientConnectionState::Authorizing).await;
     let emitter = TauriEventEmitter(app.clone());
     client_status_changed(&emitter, &name, "authorizing");
-    let logger = logging::DuckDbPublisher;
+    let logger = logging::SqlitePublisher;
     // Kick off OAuth flow (opens browser, waits for callback)
     start_oauth_for_server(&emitter, &logger, &name, &endpoint)
         .await
@@ -299,7 +299,7 @@ async fn mcp_get_client_tools(client_name: String) -> Result<Vec<ToolInfo>, Stri
     ))
 }
 
-// ---------------- Logs (DuckDB) UI commands ----------------
+// ---------------- Logs (SQLite) UI commands ----------------
 
 #[derive(serde::Serialize, serde::Deserialize, specta::Type)]
 struct LogsCursor {
@@ -371,7 +371,7 @@ async fn mcp_refresh_client_tools(
         return Err("server not found".into());
     };
     let start = std::time::Instant::now();
-    let logger = DuckDbPublisher;
+    let logger = SqlitePublisher;
     let emitter = TauriEventEmitter(app.clone());
     let raw = fetch_tools_for_cfg(&cfg, &emitter, &logger)
         .await
@@ -423,7 +423,7 @@ where
     ov::set_state(name, ClientConnectionState::Connecting).await;
     ov::set_error(name, None).await;
     client_status_changed(emitter, name, "connecting");
-    let logger = DuckDbPublisher;
+    let logger = SqlitePublisher;
     match ensure_rmcp_client(name, cfg, emitter, &logger).await {
         Ok(client) => {
             // list tools (forces initialize + verifies connection)
