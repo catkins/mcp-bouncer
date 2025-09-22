@@ -7,7 +7,6 @@
     "dev": "vite",
     "build:dev": "vite build --minify false --mode development",
     "build": "tsc && vite build --mode production",
-    "generate:bindings": "cross-env SPECTA_EXPORT_ONLY=1 cargo run --manifest-path src-tauri/Cargo.toml --bin mcp-bouncer-tauri",
     "preview": "vite preview",
     "lint": "eslint . --ext .ts,.tsx --max-warnings=0",
     "lint:fix": "eslint . --ext .ts,.tsx --fix --max-warnings=0",

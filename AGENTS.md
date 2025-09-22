@@ -108,7 +108,6 @@ This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the of
 ### Frontend (React)
 - Uses `src/tauri/bridge.ts` (which wraps the generated `src/tauri/bindings.ts`)
 - Hooks (`useMCPService`, `useIncomingClients`) subscribe via `event.listen`
-- No Wails bindings — do not import from `frontend/bindings` or `@wailsio/runtime`
 
 ## Project Structure (Tauri standard)
 
