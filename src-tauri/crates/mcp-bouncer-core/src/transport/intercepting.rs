@@ -171,6 +171,63 @@ fn enrich_call_tool(event: &mut Event, result: &ServerResult) {
     }
 }
 
+fn client_request_envelope_json(request: &ClientRequest, id: &RequestId) -> Option<serde_json::Value> {
+    serde_json::to_value(
+        JsonRpcMessage::<
+            ClientRequest,
+            mcp::ClientResult,
+            mcp::ClientNotification,
+        >::request(request.clone(), id.clone()),
+    )
+    .ok()
+}
+
+fn client_notification_envelope_json(
+    notification: &mcp::ClientNotification,
+) -> Option<serde_json::Value> {
+    serde_json::to_value(
+        JsonRpcMessage::<
+            ClientRequest,
+            mcp::ClientResult,
+            mcp::ClientNotification,
+        >::notification(notification.clone()),
+    )
+    .ok()
+}
+
+fn server_response_envelope_json(result: &ServerResult, id: &RequestId) -> Option<serde_json::Value> {
+    serde_json::to_value(
+        JsonRpcMessage::<
+            mcp::ServerRequest,
+            ServerResult,
+            ServerNotification,
+        >::response(result.clone(), id.clone()),
+    )
+    .ok()
+}
+
+fn server_error_envelope_json(error: &ErrorData, id: &RequestId) -> Option<serde_json::Value> {
+    serde_json::to_value(
+        JsonRpcMessage::<
+            mcp::ServerRequest,
+            ServerResult,
+            ServerNotification,
+        >::error(error.clone(), id.clone()),
+    )
+    .ok()
+}
+
+fn server_notification_envelope_json(notification: &ServerNotification) -> Option<serde_json::Value> {
+    serde_json::to_value(
+        JsonRpcMessage::<
+            mcp::ServerRequest,
+            ServerResult,
+            ServerNotification,
+        >::notification(notification.clone()),
+    )
+    .ok()
+}
+
 struct InterceptState<E, L>
 where
     E: EventEmitter + Clone + Send + Sync + 'static,
@@ -240,12 +297,13 @@ where
                 } else {
                     pending.event.ok = true;
                 }
-                pending.event.response_json = serde_json::to_value(&server_result).ok();
+                pending.event.response_json =
+                    server_response_envelope_json(&server_result, &id);
             }
             Err(error) => {
                 pending.event.ok = false;
                 pending.event.error = Some(error.message.to_string());
-                pending.event.response_json = serde_json::to_value(&error).ok();
+                pending.event.response_json = server_error_envelope_json(&error, &id);
             }
         }
         self.logger.log_and_emit(&self.emitter, pending.event);
@@ -266,14 +324,14 @@ where
                 pending.event.ok = true;
             }
         }
-        pending.event.response_json = serde_json::to_value(result).ok();
+        pending.event.response_json = server_response_envelope_json(result, &id);
         self.logger.log_and_emit(&self.emitter, pending.event);
     }
 
     async fn log_notification(&self, notification: &mcp::ClientNotification) {
         let session_id = self.current_session_id().await;
         let mut event = Event::new("notification", session_id);
-        event.request_json = serde_json::to_value(notification).ok();
+        event.request_json = client_notification_envelope_json(notification);
         event.ok = true;
         self.logger.log_and_emit(&self.emitter, event);
     }
@@ -281,9 +339,9 @@ where
     async fn build_pending(
         self: &Arc<Self>,
         request: &ClientRequest,
-        _id: &RequestId,
+        id: &RequestId,
     ) -> Option<PendingRequest> {
-        let request_json = serde_json::to_value(request).ok();
+        let request_json = client_request_envelope_json(request, id);
         match request {
             ClientRequest::InitializeRequest(req) => {
                 let request_val = serde_json::to_value(req).ok();
@@ -527,7 +585,7 @@ where
     }
 
     async fn handle_client_request(&self, request: &ClientRequest, id: &RequestId) {
-        if let Some(pending) = self.build_pending(request).await {
+        if let Some(pending) = self.build_pending(request, id).await {
             self.pending.lock().await.insert(id.clone(), pending);
         }
     }
@@ -547,7 +605,7 @@ where
                 pending.event.ok = true;
             }
         }
-        pending.event.response_json = serde_json::to_value(&result).ok();
+        pending.event.response_json = server_response_envelope_json(&result, &id);
         if let ServerResult::InitializeResult(res) = &result {
             pending.event.server_version = Some(res.server_info.version.clone());
             pending.event.server_protocol = Some(res.protocol_version.to_string());
@@ -576,7 +634,7 @@ where
         pending.event.duration_ms = Some(pending.started_at.elapsed().as_millis() as i64);
         pending.event.ok = false;
         pending.event.error = Some(error.message.to_string());
-        pending.event.response_json = serde_json::to_value(&error).ok();
+        pending.event.response_json = server_error_envelope_json(&error, &id);
         self.populate_server_details(&mut pending.event).await;
         self.logger.log_and_emit(&self.emitter, pending.event);
     }
@@ -584,13 +642,13 @@ where
     async fn log_server_notification(&self, notification: ServerNotification) {
         let mut event = Event::new("notification", self.session_id.clone());
         event.server_name = Some(self.server_name.clone());
-        event.request_json = serde_json::to_value(&notification).ok();
+        event.request_json = server_notification_envelope_json(&notification);
         self.populate_server_details(&mut event).await;
         self.logger.log_and_emit(&self.emitter, event);
     }
 
-    async fn build_pending(&self, request: &ClientRequest) -> Option<PendingRequest> {
-        let request_json = serde_json::to_value(request).ok();
+    async fn build_pending(&self, request: &ClientRequest, id: &RequestId) -> Option<PendingRequest> {
+        let request_json = client_request_envelope_json(request, id);
         let session_id = self.session_id.clone();
         let (mut event, kind) = match request {
             ClientRequest::InitializeRequest(_req) => {
@@ -961,7 +1019,40 @@ mod tests {
         assert_eq!(event.server_version.as_deref(), Some("1.2.3"));
         assert_eq!(event.server_protocol.as_deref(), Some("jsonrpc-2.0"));
         assert!(event.ok);
-        assert!(event.response_json.is_some());
+        let request_json = event.request_json.as_ref().expect("request json");
+        let request_obj = request_json.as_object().expect("request json object");
+        assert_eq!(
+            request_obj
+                .get("jsonrpc")
+                .and_then(|v| v.as_str()),
+            Some("2.0"),
+            "request jsonrpc version"
+        );
+        assert_eq!(request_obj.get("id"), Some(&serde_json::json!(1)));
+        assert_eq!(
+            request_obj
+                .get("method")
+                .and_then(|v| v.as_str()),
+            Some("tools/call"),
+            "request method"
+        );
+        let response_json = event.response_json.as_ref().expect("response json");
+        let response_obj = response_json.as_object().expect("response json object");
+        assert_eq!(
+            response_obj
+                .get("jsonrpc")
+                .and_then(|v| v.as_str()),
+            Some("2.0"),
+            "response jsonrpc version"
+        );
+        assert_eq!(response_obj.get("id"), Some(&serde_json::json!(1)));
+        assert!(
+            response_obj
+                .get("result")
+                .and_then(|v| v.get("content"))
+                .is_some(),
+            "response result content present"
+        );
     }
 
     #[tokio::test]
@@ -1031,7 +1122,40 @@ mod tests {
         assert_eq!(event.method, "initialize");
         assert_eq!(event.client_name.as_deref(), Some("cli"));
         assert!(event.ok);
-        assert!(event.response_json.is_some());
+        let request_json = event.request_json.as_ref().expect("request json");
+        let request_obj = request_json.as_object().expect("request json object");
+        assert_eq!(
+            request_obj
+                .get("jsonrpc")
+                .and_then(|v| v.as_str()),
+            Some("2.0"),
+            "initialize request jsonrpc"
+        );
+        assert_eq!(request_obj.get("id"), Some(&serde_json::json!(42)));
+        assert_eq!(
+            request_obj
+                .get("method")
+                .and_then(|v| v.as_str()),
+            Some("initialize"),
+            "initialize request method"
+        );
+        let response_json = event.response_json.as_ref().expect("response json");
+        let response_obj = response_json.as_object().expect("response json object");
+        assert_eq!(
+            response_obj
+                .get("jsonrpc")
+                .and_then(|v| v.as_str()),
+            Some("2.0"),
+            "initialize response jsonrpc"
+        );
+        assert_eq!(response_obj.get("id"), Some(&serde_json::json!(42)));
+        assert!(
+            response_obj
+                .get("result")
+                .and_then(|v| v.get("serverInfo"))
+                .is_some(),
+            "initialize response includes server info"
+        );
 
         let emitted = emitter.0.lock().unwrap().clone();
         assert!(emitted.iter().any(|(name, payload)| {
