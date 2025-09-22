@@ -1,7 +1,7 @@
 use mcp_bouncer::config::{
     ConfigProvider, MCPServerConfig, TransportType, default_settings, save_settings_with,
 };
-use mcp_bouncer::{events::EventEmitter, logging::DuckDbPublisher, server::start_http_server};
+use mcp_bouncer::{events::EventEmitter, logging::SqlitePublisher, server::start_http_server};
 use rmcp::ServiceExt;
 use rmcp::model as mcp;
 use rmcp::transport::{
@@ -40,7 +40,7 @@ impl ConfigProvider for TempConfigProvider {
 
 #[tokio::test]
 #[serial_test::serial]
-async fn logging_persists_events_to_duckdb() {
+async fn logging_persists_events_to_sqlite() {
     // Spin an in-process upstream server with a simple echo tool
     #[derive(Clone)]
     struct Upstream;
@@ -97,7 +97,7 @@ async fn logging_persists_events_to_duckdb() {
         }
     }
 
-    let test_name = "logging_persists_events_to_duckdb";
+    let test_name = "logging_persists_events_to_sqlite";
     let upstream_listener = match tokio::net::TcpListener::bind("127.0.0.1:0").await {
         Ok(l) => l,
         Err(err) if err.kind() == std::io::ErrorKind::PermissionDenied => {
@@ -146,7 +146,7 @@ async fn logging_persists_events_to_duckdb() {
     }
     let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 0));
     let (_handle, bound) =
-        match start_http_server(NoopEmitter, cp.clone(), DuckDbPublisher, addr).await {
+        match start_http_server(NoopEmitter, cp.clone(), SqlitePublisher, addr).await {
             Ok(res) => res,
             Err(err) => {
                 if err.contains("Operation not permitted") {
@@ -178,10 +178,10 @@ async fn logging_persists_events_to_duckdb() {
     // Force logger flush and checkpoint
     mcp_bouncer::logging::force_flush_and_checkpoint().await;
 
-    // Verify DuckDB contains events
+    // Verify SQLite contains events
     let db_path = mcp_bouncer::logging::db_path().expect("logger should expose db_path");
-    assert!(db_path.exists(), "logs.duckdb should exist at {db_path:?}");
-    let conn = duckdb::Connection::open(&db_path).expect("open duckdb");
+    assert!(db_path.exists(), "logs.sqlite should exist at {db_path:?}");
+    let conn = rusqlite::Connection::open(&db_path).expect("open sqlite");
     let mut stmt = conn.prepare("SELECT COUNT(*) FROM rpc_events").unwrap();
     let cnt: i64 = stmt.query_row([], |r| r.get::<_, i64>(0)).unwrap();
     assert!(cnt >= 2, "expected at least 2 events, had {cnt}");
@@ -203,6 +203,32 @@ async fn logging_persists_events_to_duckdb() {
         .query_row([], |r| r.get(0))
         .unwrap();
     assert!(sess_cnt >= 1, "expected at least one session row");
+
+    // Query through the public logging helpers to ensure UI paths work
+    let queried = mcp_bouncer::logging::query_events(mcp_bouncer::logging::QueryParams {
+        server: None,
+        method: None,
+        ok: None,
+        limit: 100,
+        after: None,
+    })
+    .expect("query events");
+    assert!(!queried.is_empty(), "expected query_events to return rows");
+    assert!(queried.iter().any(|row| row.method == "initialize"));
+
+    let count_via_helper = mcp_bouncer::logging::count_events(None).expect("count events");
+    assert!(count_via_helper >= queried.len() as f64);
+
+    let latest = queried.first().expect("at least one event");
+    let since = mcp_bouncer::logging::query_events_since(
+        latest.ts_ms as i64 - 10_000,
+        None,
+        None,
+        None,
+        25,
+    )
+    .expect("query since");
+    assert!(since.iter().any(|row| row.id == latest.id));
 }
 
 #[tokio::test]
@@ -308,7 +334,7 @@ async fn logging_persists_error_and_redacts_sensitive_fields() {
     }
     let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 0));
     let (_handle, bound) =
-        match start_http_server(NoopEmitter, cp.clone(), DuckDbPublisher, addr).await {
+        match start_http_server(NoopEmitter, cp.clone(), SqlitePublisher, addr).await {
             Ok(res) => res,
             Err(err) => {
                 if err.contains("Operation not permitted") {
@@ -338,9 +364,9 @@ async fn logging_persists_error_and_redacts_sensitive_fields() {
 
     mcp_bouncer::logging::force_flush_and_checkpoint().await;
 
-    // Verify DuckDB contains an error event and sensitive fields were redacted
+    // Verify SQLite contains an error event and sensitive fields were redacted
     let db_path = mcp_bouncer::logging::db_path().expect("logger should expose db_path");
-    let conn = duckdb::Connection::open(&db_path).expect("open duckdb");
+    let conn = rusqlite::Connection::open(&db_path).expect("open sqlite");
     // Ensure at least one callTool event exists
     let call_cnt: i64 = conn
         .prepare("SELECT COUNT(*) FROM rpc_events WHERE method='callTool'")
@@ -350,7 +376,7 @@ async fn logging_persists_error_and_redacts_sensitive_fields() {
     assert!(call_cnt >= 1, "expected at least one callTool event");
     // Sensitive raw values should not appear in any callTool request_json
     let leaked_cnt: i64 = conn
-        .prepare("SELECT COUNT(*) FROM rpc_events WHERE method='callTool' AND (CAST(request_json AS VARCHAR) LIKE '%s3cr3t%' OR CAST(request_json AS VARCHAR) LIKE '%Bearer abc%')")
+        .prepare("SELECT COUNT(*) FROM rpc_events WHERE method='callTool' AND (request_json LIKE '%s3cr3t%' OR request_json LIKE '%Bearer abc%')")
         .unwrap()
         .query_row([], |r| r.get(0))
         .unwrap();
@@ -358,6 +384,26 @@ async fn logging_persists_error_and_redacts_sensitive_fields() {
         leaked_cnt, 0,
         "expected no leaked sensitive values in request_json"
     );
+
+    // Ensure query helpers also present redacted payloads
+    let queried = mcp_bouncer::logging::query_events(mcp_bouncer::logging::QueryParams {
+        server: None,
+        method: Some("callTool"),
+        ok: None,
+        limit: 10,
+        after: None,
+    })
+    .expect("query events for err::callTool");
+    assert!(queried.iter().any(|row| row.method == "callTool"));
+    for row in queried {
+        if let Some(request_json) = &row.request_json {
+            let serialized = request_json.to_string();
+            assert!(
+                !serialized.contains("s3cr3t") && !serialized.contains("Bearer abc"),
+                "query helper should return redacted JSON"
+            );
+        }
+    }
 }
 
 #[tokio::test]
@@ -469,7 +515,7 @@ async fn logging_persists_many_calltool_events_in_batches() {
     }
     let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 0));
     let (_handle, bound) =
-        match start_http_server(NoopEmitter, cp.clone(), DuckDbPublisher, addr).await {
+        match start_http_server(NoopEmitter, cp.clone(), SqlitePublisher, addr).await {
             Ok(res) => res,
             Err(err) => {
                 if err.contains("Operation not permitted") {
@@ -503,7 +549,7 @@ async fn logging_persists_many_calltool_events_in_batches() {
 
     // Verify enough callTool rows are present
     let db_path = mcp_bouncer::logging::db_path().expect("logger should expose db_path");
-    let conn = duckdb::Connection::open(&db_path).expect("open duckdb");
+    let conn = rusqlite::Connection::open(&db_path).expect("open sqlite");
     let call_cnt: i64 = conn
         .prepare("SELECT COUNT(*) FROM rpc_events WHERE method='callTool'")
         .unwrap()
@@ -513,4 +559,29 @@ async fn logging_persists_many_calltool_events_in_batches() {
         call_cnt >= 1,
         "expected at least one callTool event, had {call_cnt}"
     );
+
+    // query helper keyset pagination sanity check
+    let first_page = mcp_bouncer::logging::query_events(mcp_bouncer::logging::QueryParams {
+        server: Some("batch"),
+        method: Some("callTool"),
+        ok: None,
+        limit: 20,
+        after: None,
+    })
+    .expect("first page");
+    assert!(first_page.len() <= 20);
+    if let Some(last) = first_page.last() {
+        let cursor = (last.ts_ms as i64, last.id.as_str());
+        let next_page = mcp_bouncer::logging::query_events(mcp_bouncer::logging::QueryParams {
+            server: Some("batch"),
+            method: Some("callTool"),
+            ok: None,
+            limit: 20,
+            after: Some(cursor),
+        })
+        .expect("next page");
+        for row in next_page {
+            assert!(row.ts_ms <= last.ts_ms);
+        }
+    }
 }

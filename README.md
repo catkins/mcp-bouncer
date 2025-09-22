@@ -52,26 +52,26 @@ MCP Bouncer acts as a centralized hub for managing Model Context Protocol server
 - Real-time connection status updates
 - Error reporting and debugging information
 
-### 🪵 JSON-RPC Logging (DuckDB)
+### 🪵 JSON-RPC Logging (SQLite)
 - Always-on logging of all JSON-RPC requests/responses handled by the proxy.
-- Location: `logs.duckdb` in the app config directory:
-  - macOS: `~/Library/Application Support/mcp-bouncer/logs.duckdb`
-  - Linux: `~/.config/mcp-bouncer/logs.duckdb`
-  - Windows: `%APPDATA%\\mcp-bouncer\\logs.duckdb`
+- Location: `logs.sqlite` in the app config directory:
+  - macOS: `~/Library/Application Support/mcp-bouncer/logs.sqlite`
+  - Linux: `~/.config/mcp-bouncer/logs.sqlite`
+  - Windows: `%APPDATA%\\mcp-bouncer\\logs.sqlite`
 - Schema overview:
-  - `sessions(session_id, created_at, client_name, client_version, client_protocol, last_seen_at)`
-  - `rpc_events(id, ts, session_id, method, server_name, duration_ms, ok, error, request_json, response_json)`
+  - `sessions(session_id, created_at_ms, client_name, client_version, client_protocol, last_seen_at_ms)`
+  - `rpc_events(id, ts_ms, session_id, method, server_name, server_version, server_protocol, duration_ms, ok, error, request_json, response_json)`
 - Sensitive fields are masked recursively (authorization, token, password, secret, api_key, access_token).
-- The logger batches writes (~250ms) and periodically checkpoints so the WAL is applied to the main DB. On shutdown, a final flush+checkpoint is attempted.
+- The logger batches writes (~250 ms), runs connections in WAL mode, and periodically triggers `PRAGMA wal_checkpoint(TRUNCATE)`; on shutdown it attempts a final flush + checkpoint.
 - Quick queries:
   - `SELECT COUNT(*) FROM rpc_events;`
   - `SELECT DISTINCT method FROM rpc_events;`
-  - `SELECT * FROM rpc_events ORDER BY ts DESC LIMIT 10;`
+  - `SELECT * FROM rpc_events ORDER BY ts_ms DESC LIMIT 10;`
 
 ### 🛰️ Intercepting Transport Architecture
-- **Inbound proxy traffic**: The embedded Streamable HTTP server wraps every session transport with an `InterceptingTransport` via `InterceptingSessionManager`. Each inbound request is annotated with a `RequestLogContext`, which captures timings, injects server/client metadata, and pushes events to the DuckDB logger and live UI stream.
+- **Inbound proxy traffic**: The embedded Streamable HTTP server wraps every session transport with an `InterceptingTransport` via `InterceptingSessionManager`. Each inbound request is annotated with a `RequestLogContext`, which captures timings, injects server/client metadata, and pushes events to the SQLite logger and live UI stream.
 - **Outbound upstream traffic**: All upstream RMCP clients created by `ensure_rmcp_client` use `InterceptingClientTransport`, wrapping HTTP/SSE/stdio transports before `.serve(...)` runs. This guarantees that tool refreshes, OAuth reconnects, and user-triggered calls record the same structured events (including errors) as downstream traffic.
-- Both interceptors share the `RpcEventPublisher` + `EventEmitter`, so extending to new transports only requires wrapping the transport and passing the emitter/logger through. Pending-request state stores start timestamps, serialized payloads, and resolves human-readable errors (e.g., callTool content) for consistent DuckDB records.
+- Both interceptors share the `RpcEventPublisher` + `EventEmitter`, so extending to new transports only requires wrapping the transport and passing the emitter/logger through. Pending-request state stores start timestamps, serialized payloads, and resolves human-readable errors (e.g., callTool content) for consistent SQLite records.
 
 ## Quick Start
 

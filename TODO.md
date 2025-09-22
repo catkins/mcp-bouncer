@@ -2,12 +2,12 @@
 
 - [x] Modularize backend into workspace crates
   - Summary: Break `src-tauri` into `mcp-bouncer-core` (config, client registry, overlay), `mcp-bouncer-logging`, and a thin `mcp-bouncer-tauri` binary crate so incremental builds skip heavy code when editing commands or UI glue.
-  - Justification: Today every code change re-compiles the entire crate, including heavy dependencies like `duckdb`, `axum`, and `rmcp` (see `src-tauri/Cargo.toml`). Isolating crates allows Cargo to cache more artifacts and lets us gate slow dependencies (per https://corrode.dev/blog/tips-for-faster-rust-compile-times/).
+  - Justification: Today every code change re-compiles the entire crate, including heavy dependencies like `rusqlite`, `axum`, and `rmcp` (see `src-tauri/Cargo.toml`). Isolating crates allows Cargo to cache more artifacts and lets us gate slow dependencies (per https://corrode.dev/blog/tips-for-faster-rust-compile-times/).
   - Trade-offs: Introduces workspace plumbing, new crate boundaries, and requires updating imports/tests. Initial re-org is non-trivial and we must ensure Tauri build scripts still locate assets.
 
-- [ ] Gate the DuckDB logger behind a feature-friendly crate
-  - Summary: Move `logging.rs` into its own crate with a trait-based sink so the Tauri app depends on it optionally; default builds can disable DuckDB to cut compile times while still allowing a “full” feature for releases.
-  - Justification: `src-tauri/src/logging.rs` pulls in bundled DuckDB (`duckdb` with `bundled` feature) which dominates compile time and links native code even for dev builds that may not need persistence.
+- [ ] Gate the SQLite logger behind a feature-friendly crate
+  - Summary: Move `logging.rs` into its own crate with a trait-based sink so the Tauri app depends on it optionally; default builds can disable SQLite persistence to cut compile times while still allowing a “full” feature for releases.
+  - Justification: `src-tauri/src/logging.rs` pulls in bundled SQLite (`rusqlite` with `bundled` feature) which links native code even for dev builds that may not need persistence.
   - Trade-offs: Need a lightweight in-memory fallback for tests/preview builds and extra work to plumb feature flags throughout the workspace.
 
 - [ ] Refactor Tauri commands into dedicated service modules with unit coverage
@@ -41,6 +41,6 @@
   - Trade-offs: Risk of accidentally dropping a feature required by future work; CI must exercise both minimal and full builds to prevent regressions.
 
 - [ ] Extend integration tests to cover client lifecycle and logging edge cases
-  - Summary: Add tests around `connect_and_initialize` success/error paths, DuckDB flushing (`logging.rs:133-199`), and unauthorized probes to increase confidence in failure handling.
+  - Summary: Add tests around `connect_and_initialize` success/error paths, SQLite flushing (`logging.rs:133-199`), and unauthorized probes to increase confidence in failure handling.
   - Justification: These flows currently rely on manual testing even though regressions would break core UX; structured tests improve maintainability and catch race conditions early.
-  - Trade-offs: More test harness code and potentially slower CI, especially if DuckDB remains in-process; we may need to add feature-gated mocks.
+  - Trade-offs: More test harness code and potentially slower CI, especially if the bundled SQLite remains in-process; we may need to add feature-gated mocks.
