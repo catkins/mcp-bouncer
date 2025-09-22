@@ -8,7 +8,7 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['node_modules/**', 'dist/**', 'storybook-static/**', 'src/tauri/bindings.ts', 'src-tauri/target/**'],
+    ignores: ['node_modules/**', 'dist/**', 'storybook-static/**', 'src/tauri/bindings.ts', 'src-tauri/target/**', 'target/**'],
   },
   js.configs.recommended,
   {

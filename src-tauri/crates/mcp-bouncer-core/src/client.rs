@@ -10,7 +10,10 @@ use rmcp::transport::{
 };
 
 use crate::config::{MCPServerConfig, TransportType};
+use crate::events::EventEmitter;
+use crate::logging::RpcEventPublisher;
 use crate::oauth::load_credentials_for;
+use crate::transport::intercepting::{InterceptingClientTransport, RequestLogContext};
 use crate::unauthorized;
 
 use anyhow::{Context, Result, anyhow};
@@ -25,7 +28,18 @@ pub fn client_registry() -> &'static ClientRegistry {
     CLIENT_REGISTRY_INST.get_or_init(|| tokio::sync::Mutex::new(HashMap::new()))
 }
 
-pub async fn ensure_rmcp_client(name: &str, cfg: &MCPServerConfig) -> Result<Arc<ClientService>> {
+pub async fn ensure_rmcp_client<E, L>(
+    name: &str,
+    cfg: &MCPServerConfig,
+    emitter: &E,
+    logger: &L,
+) -> Result<Arc<ClientService>>
+where
+    E: EventEmitter + Clone + Send + Sync + 'static,
+    L: RpcEventPublisher,
+{
+    let emitter = emitter.clone();
+    let logger = logger.clone();
     let reg = client_registry();
     let mut guard = reg.lock().await;
     if let Some(c) = guard.get(name) {
@@ -61,6 +75,12 @@ pub async fn ensure_rmcp_client(name: &str, cfg: &MCPServerConfig) -> Result<Arc
                     client,
                     StreamableHttpClientTransportConfig::with_uri(endpoint.clone()),
                 );
+                let transport = InterceptingClientTransport::new(
+                    transport,
+                    cfg.name.clone(),
+                    emitter.clone(),
+                    logger.clone(),
+                );
                 match ().serve(transport).await {
                     Ok(svc) => svc,
                     Err(e) => {
@@ -85,6 +105,12 @@ pub async fn ensure_rmcp_client(name: &str, cfg: &MCPServerConfig) -> Result<Arc
                 let transport = StreamableHttpClientTransport::with_client(
                     client,
                     StreamableHttpClientTransportConfig::with_uri(endpoint.clone()),
+                );
+                let transport = InterceptingClientTransport::new(
+                    transport,
+                    cfg.name.clone(),
+                    emitter.clone(),
+                    logger.clone(),
                 );
                 match ().serve(transport).await {
                     Ok(svc) => svc,
@@ -122,6 +148,12 @@ pub async fn ensure_rmcp_client(name: &str, cfg: &MCPServerConfig) -> Result<Arc
             )
             .await
             .context("sse start")?;
+            let transport = InterceptingClientTransport::new(
+                transport,
+                cfg.name.clone(),
+                emitter.clone(),
+                logger.clone(),
+            );
             ().serve(transport).await.context("rmcp serve")?
         }
         TransportType::Stdio => {
@@ -135,6 +167,12 @@ pub async fn ensure_rmcp_client(name: &str, cfg: &MCPServerConfig) -> Result<Arc
                 command.env(k, v);
             }
             let transport = TokioChildProcess::new(command).context("spawn")?;
+            let transport = InterceptingClientTransport::new(
+                transport,
+                cfg.name.clone(),
+                emitter.clone(),
+                logger.clone(),
+            );
             ().serve(transport).await.context("rmcp serve")?
         }
     };
@@ -142,6 +180,26 @@ pub async fn ensure_rmcp_client(name: &str, cfg: &MCPServerConfig) -> Result<Arc
     guard.insert(name.to_string(), arc.clone());
     tracing::info!(target = "client", server=%name, "registered");
     Ok(arc)
+}
+
+pub async fn apply_log_context_from_client<E, L>(
+    client: &ClientService,
+    cfg: &MCPServerConfig,
+    ctx: &RequestLogContext<E, L>,
+) where
+    E: EventEmitter + Clone + Send + Sync + 'static,
+    L: RpcEventPublisher,
+{
+    let (version, protocol) = if let Some(info) = client.peer().peer_info() {
+        (
+            Some(info.server_info.version.clone()),
+            Some(info.protocol_version.to_string()),
+        )
+    } else {
+        (None, None)
+    };
+    ctx.set_server_details(Some(cfg.name.clone()), version, protocol)
+        .await;
 }
 
 pub async fn remove_rmcp_client(name: &str) -> Result<()> {
@@ -163,8 +221,16 @@ pub async fn shutdown_all_clients() {
     }
 }
 
-pub async fn fetch_tools_for_cfg(cfg: &MCPServerConfig) -> Result<Vec<serde_json::Value>> {
-    let client = ensure_rmcp_client(&cfg.name, cfg).await?;
+pub async fn fetch_tools_for_cfg<E, L>(
+    cfg: &MCPServerConfig,
+    emitter: &E,
+    logger: &L,
+) -> Result<Vec<serde_json::Value>>
+where
+    E: EventEmitter + Clone + Send + Sync + 'static,
+    L: RpcEventPublisher,
+{
+    let client = ensure_rmcp_client(&cfg.name, cfg, emitter, logger).await?;
     let tools = match client.list_all_tools().await {
         Ok(t) => t,
         Err(e) => {

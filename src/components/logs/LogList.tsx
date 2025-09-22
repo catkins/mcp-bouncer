@@ -25,16 +25,15 @@ export function LogList({ items, loadMore, hasMore, loading }: {
   }, [hasMore, loading, loadMore]);
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2">
       {items.map(item => (
         <LogListItem key={item.id} item={item} />
       ))}
       <div ref={sentinelRef} />
-      {loading && <div className="text-sm text-gray-500">Loading…</div>}
+      {loading && <div className="text-sm text-gray-500 py-1">Loading…</div>}
       {!hasMore && items.length > 0 && (
         <div className="text-xs text-gray-400 text-center py-2">End of results</div>
       )}
     </div>
   );
 }
-

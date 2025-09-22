@@ -90,3 +90,12 @@
 }
 
 /* Respect theme classes managed by useTheme; no hardcoded page bg */
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
