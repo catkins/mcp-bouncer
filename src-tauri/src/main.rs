@@ -314,6 +314,8 @@ struct LogsListParams {
     ok: Option<bool>,
     limit: Option<u32>,
     after: Option<LogsCursor>,
+    start_ts_ms: Option<f64>,
+    end_ts_ms: Option<f64>,
 }
 
 #[tauri::command]
@@ -330,6 +332,8 @@ async fn mcp_logs_list(params: LogsListParams) -> Result<Vec<logging::EventRow>,
         ok: params.ok,
         limit,
         after,
+        start_ts_ms: params.start_ts_ms.map(|v| v as i64),
+        end_ts_ms: params.end_ts_ms.map(|v| v as i64),
     })
 }
 
@@ -359,6 +363,27 @@ async fn mcp_logs_list_since(params: LogsSinceParams) -> Result<Vec<logging::Eve
 #[specta::specta]
 async fn mcp_logs_count(server: Option<String>) -> Result<f64, String> {
     logging::count_events(server.as_deref())
+}
+
+#[derive(serde::Serialize, serde::Deserialize, specta::Type)]
+struct LogsHistogramParams {
+    server: Option<String>,
+    method: Option<String>,
+    ok: Option<bool>,
+    max_buckets: Option<u32>,
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn mcp_logs_histogram(
+    params: LogsHistogramParams,
+) -> Result<logging::EventHistogram, String> {
+    logging::query_event_histogram(logging::HistogramParams {
+        server: params.server.as_deref(),
+        method: params.method.as_deref(),
+        ok: params.ok,
+        max_buckets: params.max_buckets.map(|v| v as usize),
+    })
 }
 
 #[specta::specta]
@@ -576,6 +601,7 @@ fn main() {
             mcp_toggle_tool,
             mcp_logs_list,
             mcp_logs_list_since,
+            mcp_logs_histogram,
             mcp_logs_count,
             settings_get_settings,
             settings_open_config_directory,
@@ -642,6 +668,7 @@ fn main() {
             mcp_toggle_tool,
             mcp_logs_list,
             mcp_logs_list_since,
+            mcp_logs_histogram,
             mcp_logs_count,
             settings_get_settings,
             settings_open_config_directory,

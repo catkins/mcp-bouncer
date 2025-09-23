@@ -342,12 +342,92 @@ pub struct EventRow {
     pub response_json: Option<JsonValue>,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+pub struct HistogramCount {
+    pub method: String,
+    pub count: f64,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+pub struct HistogramBucket {
+    pub start_ts_ms: f64,
+    pub end_ts_ms: f64,
+    pub counts: Vec<HistogramCount>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+pub struct EventHistogram {
+    pub start_ts_ms: Option<f64>,
+    pub end_ts_ms: Option<f64>,
+    pub bucket_width_ms: f64,
+    pub buckets: Vec<HistogramBucket>,
+}
+
 pub struct QueryParams<'a> {
     pub server: Option<&'a str>,
     pub method: Option<&'a str>,
     pub ok: Option<bool>,
     pub limit: usize,
     pub after: Option<(i64, &'a str)>, // (ts_ms, id)
+    pub start_ts_ms: Option<i64>,
+    pub end_ts_ms: Option<i64>,
+}
+
+fn push_common_filters(
+    where_clauses: &mut Vec<String>,
+    binds: &mut Vec<Box<dyn ToSql>>,
+    server: Option<&str>,
+    method: Option<&str>,
+    ok: Option<bool>,
+) {
+    if let Some(s) = server {
+        where_clauses.push("server_name = ?".into());
+        binds.push(Box::new(s.to_string()));
+    }
+    if let Some(m) = method {
+        where_clauses.push("method = ?".into());
+        binds.push(Box::new(m.to_string()));
+    }
+    if let Some(ok_flag) = ok {
+        where_clauses.push("ok = ?".into());
+        binds.push(Box::new(ok_flag));
+    }
+}
+
+fn choose_bucket_width(range_ms: i64, max_buckets: usize) -> i64 {
+    const CANDIDATES: [i64; 21] = [
+        1,
+        10,
+        50,
+        100,
+        250,
+        500,
+        1_000,
+        2_000,
+        5_000,
+        10_000,
+        30_000,
+        60_000,
+        120_000,
+        300_000,
+        600_000,
+        1_800_000,
+        3_600_000,
+        7_200_000,
+        14_400_000,
+        43_200_000,
+        86_400_000,
+    ];
+    if range_ms <= 0 {
+        return 1_000;
+    }
+    for width in CANDIDATES {
+        let buckets = (range_ms / width) + 1;
+        if buckets as usize <= max_buckets {
+            return width.max(1);
+        }
+    }
+    (range_ms / max_buckets as i64).max(1)
 }
 
 pub fn query_events(params: QueryParams) -> Result<Vec<EventRow>, String> {
@@ -361,17 +441,14 @@ pub fn query_events(params: QueryParams) -> Result<Vec<EventRow>, String> {
     );
     let mut where_clauses: Vec<String> = Vec::new();
     let mut binds: Vec<Box<dyn ToSql>> = Vec::new();
-    if let Some(s) = params.server {
-        where_clauses.push("server_name = ?".into());
-        binds.push(Box::new(s.to_string()));
+    push_common_filters(&mut where_clauses, &mut binds, params.server, params.method, params.ok);
+    if let Some(start) = params.start_ts_ms {
+        where_clauses.push("ts_ms >= ?".into());
+        binds.push(Box::new(start));
     }
-    if let Some(m) = params.method {
-        where_clauses.push("method = ?".into());
-        binds.push(Box::new(m.to_string()));
-    }
-    if let Some(ok) = params.ok {
-        where_clauses.push("ok = ?".into());
-        binds.push(Box::new(ok));
+    if let Some(end) = params.end_ts_ms {
+        where_clauses.push("ts_ms <= ?".into());
+        binds.push(Box::new(end));
     }
     if let Some((ts_ms, id)) = params.after {
         // keyset: (ts,id) < (after.ts, after.id) for DESC order
@@ -534,6 +611,144 @@ pub fn query_events_since(
         out.push(r.map_err(|e| format!("row: {e}"))?);
     }
     Ok(out)
+}
+
+pub struct HistogramParams<'a> {
+    pub server: Option<&'a str>,
+    pub method: Option<&'a str>,
+    pub ok: Option<bool>,
+    pub max_buckets: Option<usize>,
+}
+
+pub fn query_event_histogram(params: HistogramParams) -> Result<EventHistogram, String> {
+    let Some(path) = db_path() else {
+        return Ok(EventHistogram {
+            start_ts_ms: None,
+            end_ts_ms: None,
+            bucket_width_ms: 0.0,
+            buckets: Vec::new(),
+        });
+    };
+    let conn = SqliteConn::open(path).map_err(|e| format!("open db: {e}"))?;
+
+    // Compute time bounds first.
+    let mut range_sql = String::from("SELECT MIN(ts_ms), MAX(ts_ms) FROM rpc_events");
+    let mut range_where: Vec<String> = Vec::new();
+    let mut range_binds: Vec<Box<dyn ToSql>> = Vec::new();
+    push_common_filters(
+        &mut range_where,
+        &mut range_binds,
+        params.server,
+        params.method,
+        params.ok,
+    );
+    if !range_where.is_empty() {
+        range_sql.push_str(" WHERE ");
+        range_sql.push_str(&range_where.join(" AND "));
+    }
+    let mut range_stmt = conn
+        .prepare(&range_sql)
+        .map_err(|e| format!("prepare range: {e}"))?;
+    let range_row = range_stmt
+        .query_row(
+            params_from_iter(range_binds.iter().map(|b| &**b as &dyn ToSql)),
+            |row| {
+                let min_ts: Option<i64> = row.get(0)?;
+                let max_ts: Option<i64> = row.get(1)?
+;
+                Ok((min_ts, max_ts))
+            },
+        )
+        .map_err(|e| format!("query range: {e}"))?;
+
+    let (Some(min_ts), Some(max_ts)) = range_row else {
+        return Ok(EventHistogram {
+            start_ts_ms: None,
+            end_ts_ms: None,
+            bucket_width_ms: 0.0,
+            buckets: Vec::new(),
+        });
+    };
+
+    let range_ms = (max_ts - min_ts).max(0);
+    let max_buckets = params.max_buckets.unwrap_or(80).max(1);
+    let bucket_width = choose_bucket_width(range_ms, max_buckets);
+    let bucket_width = bucket_width.max(1);
+
+    let mut hist_sql = String::from(
+        "SELECT ((ts_ms - ?) / ?) AS bucket_idx, method, COUNT(*) FROM rpc_events",
+    );
+    let mut hist_where: Vec<String> = Vec::new();
+    let mut hist_binds: Vec<Box<dyn ToSql>> = vec![Box::new(min_ts), Box::new(bucket_width)];
+    push_common_filters(
+        &mut hist_where,
+        &mut hist_binds,
+        params.server,
+        params.method,
+        params.ok,
+    );
+    if !hist_where.is_empty() {
+        hist_sql.push_str(" WHERE ");
+        hist_sql.push_str(&hist_where.join(" AND "));
+    }
+    hist_sql.push_str(" GROUP BY bucket_idx, method ORDER BY bucket_idx ASC");
+
+    let mut hist_stmt = conn
+        .prepare(&hist_sql)
+        .map_err(|e| format!("prepare histogram: {e}"))?;
+    let rows = hist_stmt
+        .query_map(
+            params_from_iter(hist_binds.iter().map(|b| &**b as &dyn ToSql)),
+            |row| {
+                let bucket_idx: i64 = row.get(0)?;
+                let method: String = row.get(1)?;
+                let count: i64 = row.get(2)?;
+                Ok((bucket_idx, method, count))
+            },
+        )
+        .map_err(|e| format!("query histogram: {e}"))?;
+
+    let mut cell_data: Vec<(i64, String, i64)> = Vec::new();
+    let mut max_bucket_idx = 0i64;
+    for row in rows {
+        let (idx, method, count) = row.map_err(|e| format!("row histogram: {e}"))?;
+        if idx >= 0 {
+            if idx > max_bucket_idx {
+                max_bucket_idx = idx;
+            }
+            cell_data.push((idx, method, count));
+        }
+    }
+
+    let required_from_range = ((range_ms + bucket_width - 1) / bucket_width) + 1;
+    let bucket_count = ((max_bucket_idx + 1).max(required_from_range)) as usize;
+    let mut buckets: Vec<HistogramBucket> = (0..bucket_count)
+        .map(|i| {
+            let start = min_ts + (i as i64 * bucket_width);
+            let end = start + bucket_width;
+            HistogramBucket {
+                start_ts_ms: start as f64,
+                end_ts_ms: end as f64,
+                counts: Vec::new(),
+            }
+        })
+        .collect();
+
+    for (idx, method, count) in cell_data {
+        if let Some(bucket) = buckets.get_mut(idx as usize) {
+            bucket.counts.push(HistogramCount {
+                method,
+                count: count as f64,
+            });
+        }
+    }
+
+    Ok(EventHistogram {
+        start_ts_ms: Some(min_ts as f64),
+        end_ts_ms: Some(max_ts as f64),
+        bucket_width_ms: bucket_width as f64,
+        buckets,
+    })
 }
 
 #[cfg(test)]

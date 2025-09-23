@@ -206,15 +206,63 @@ async fn logging_persists_events_to_sqlite() {
 
     // Query through the public logging helpers to ensure UI paths work
     let queried = mcp_bouncer::logging::query_events(mcp_bouncer::logging::QueryParams {
-        server: None,
+        server: Some("up"),
         method: None,
         ok: None,
         limit: 100,
         after: None,
+        start_ts_ms: None,
+        end_ts_ms: None,
     })
     .expect("query events");
     assert!(!queried.is_empty(), "expected query_events to return rows");
     assert!(queried.iter().any(|row| row.method == "initialize"));
+
+    let histogram = mcp_bouncer::logging::query_event_histogram(
+        mcp_bouncer::logging::HistogramParams {
+            server: None,
+            method: None,
+            ok: None,
+            max_buckets: Some(16),
+        },
+    )
+    .expect("histogram query");
+    if let Some(hist_start) = histogram.start_ts_ms
+        && let Some(hist_end) = histogram.end_ts_ms
+        && !histogram.buckets.is_empty()
+    {
+        let total_events: i64 = histogram
+            .buckets
+            .iter()
+            .map(|bucket| bucket.counts.iter().map(|c| c.count as i64).sum::<i64>())
+            .sum();
+        assert_eq!(
+            total_events, cnt,
+            "histogram aggregate should match total row count",
+        );
+
+        if hist_end > hist_start {
+            let mid = hist_start + (hist_end - hist_start) / 2.0;
+            let window_start = mid.floor() as i64;
+            let window_end = hist_end.ceil() as i64;
+            let filtered = mcp_bouncer::logging::query_events(mcp_bouncer::logging::QueryParams {
+                server: None,
+                method: None,
+                ok: None,
+                limit: 200,
+                after: None,
+                start_ts_ms: Some(window_start),
+                end_ts_ms: Some(window_end),
+            })
+            .expect("time-window query");
+            for row in filtered.iter() {
+                assert!(
+                    row.ts_ms >= window_start as f64 && row.ts_ms <= window_end as f64 + 1.0,
+                    "row outside requested time window",
+                );
+            }
+        }
+    }
 
     let count_via_helper = mcp_bouncer::logging::count_events(None).expect("count events");
     assert!(count_via_helper >= queried.len() as f64);
@@ -392,6 +440,8 @@ async fn logging_persists_error_and_redacts_sensitive_fields() {
         ok: None,
         limit: 10,
         after: None,
+        start_ts_ms: None,
+        end_ts_ms: None,
     })
     .expect("query events for err::callTool");
     assert!(queried.iter().any(|row| row.method == "callTool"));
@@ -567,6 +617,8 @@ async fn logging_persists_many_calltool_events_in_batches() {
         ok: None,
         limit: 20,
         after: None,
+        start_ts_ms: None,
+        end_ts_ms: None,
     })
     .expect("first page");
     assert!(first_page.len() <= 20);
@@ -578,6 +630,8 @@ async fn logging_persists_many_calltool_events_in_batches() {
             ok: None,
             limit: 20,
             after: Some(cursor),
+            start_ts_ms: None,
+            end_ts_ms: None,
         })
         .expect("next page");
         for row in next_page {
