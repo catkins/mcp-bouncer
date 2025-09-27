@@ -9,6 +9,11 @@
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173"
   },
+  "plugins": {
+    "sql": {
+      "preload": ["sqlite:logs.sqlite"]
+    }
+  },
   "app": {
     "security": {
       "capabilities": ["events"]

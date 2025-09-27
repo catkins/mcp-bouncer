@@ -300,6 +300,8 @@ async fn mcp_get_client_tools(client_name: String) -> Result<Vec<ToolInfo>, Stri
 }
 
 // ---------------- Logs (SQLite) UI commands ----------------
+// Note: With Tauri SQL Plugin, these commands are being migrated to frontend SQL operations
+// The frontend can now access the database directly via @tauri-apps/plugin-sql
 
 #[derive(serde::Serialize, serde::Deserialize, specta::Type)]
 struct LogsCursor {
@@ -628,6 +630,8 @@ fn main() {
     let res = tauri::Builder::default()
         // Shell plugin is commonly needed to open links, etc.
         .plugin(tauri_plugin_shell::init())
+        // SQL plugin for database operations
+        .plugin(tauri_plugin_sql::Builder::default().build())
         // Ensure logs are flushed on window close / app shutdown
         .on_window_event(|_win, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {

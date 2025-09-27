@@ -1,10 +1,10 @@
 use std::path::PathBuf;
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 
-use rusqlite::{Connection as SqliteConn, params, params_from_iter, ToSql};
 use mcp_bouncer_core::config::{ConfigProvider, OsConfigProvider, Settings};
 use mcp_bouncer_core::events::{EventEmitter, logs_rpc_event};
 use mcp_bouncer_core::logging::{Event, RpcEventPublisher};
+use rusqlite::{Connection as SqliteConn, ToSql, params, params_from_iter};
 use serde_json::Value as JsonValue;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::{Duration, Instant, timeout};
@@ -16,7 +16,7 @@ pub struct LoggerCfg {
     pub redact_keys: Vec<String>, // lowercased
 }
 
-static LOGGER: OnceLock<LoggerHandle> = OnceLock::new();
+static LOGGER: OnceLock<Arc<Mutex<Option<LoggerHandle>>>> = OnceLock::new();
 
 enum Msg {
     Event(Box<Event>),
@@ -50,11 +50,15 @@ impl RpcEventPublisher for SqlitePublisher {
 
 // Expose current DB path for tests and diagnostics
 pub fn db_path() -> Option<PathBuf> {
-    LOGGER.get().map(|h| h.cfg.db_path.clone())
+    let mutex = LOGGER.get_or_init(|| Arc::new(Mutex::new(None)));
+    let guard = mutex.lock().unwrap();
+    guard.as_ref().map(|h| h.cfg.db_path.clone())
 }
 
 pub fn init_once_with(cp: &dyn ConfigProvider, _settings: &Settings) {
-    // Always-on logging: ignore app settings and create DB at default location.
+    let mutex = LOGGER.get_or_init(|| Arc::new(Mutex::new(None)));
+    let mut guard = mutex.lock().unwrap();
+
     let enabled = true;
     let db_path = default_db_path(cp);
     let redact_keys: Vec<String> = default_redact_list();
@@ -68,10 +72,12 @@ pub fn init_once_with(cp: &dyn ConfigProvider, _settings: &Settings) {
         tx,
         cfg: Arc::new(cfg),
     };
-    if LOGGER.set(handle.clone()).is_ok() {
-        // Spawn background writer
-        tokio::spawn(async move { writer_task(handle.cfg.clone(), rx).await });
-    }
+
+    // Spawn background writer
+    let task_cfg = handle.cfg.clone();
+    tokio::spawn(async move { writer_task(task_cfg, rx).await });
+
+    *guard = Some(handle);
 }
 
 pub fn init_once() {
@@ -80,7 +86,10 @@ pub fn init_once() {
 }
 
 pub fn log_rpc_event(mut evt: Event) {
-    if let Some(handle) = LOGGER.get()
+    let mutex = LOGGER.get_or_init(|| Arc::new(Mutex::new(None)));
+    let guard = mutex.lock().unwrap();
+
+    if let Some(handle) = guard.as_ref()
         && handle.cfg.enabled
     {
         // Redact before sending
@@ -95,7 +104,15 @@ pub fn log_rpc_event(mut evt: Event) {
 }
 
 pub async fn force_flush_and_checkpoint() {
-    if let Some(handle) = LOGGER.get() {
+    let mutex = LOGGER.get_or_init(|| Arc::new(Mutex::new(None)));
+
+    // Get the handle without holding the guard across await
+    let handle = {
+        let guard = mutex.lock().unwrap();
+        guard.as_ref().cloned()
+    };
+
+    if let Some(handle) = handle {
         let (tx_done, rx_done) = oneshot::channel();
         let _ = handle.tx.send(Msg::Flush(tx_done)).await;
         let _ = tokio::time::timeout(Duration::from_secs(2), rx_done).await;
@@ -396,27 +413,8 @@ fn push_common_filters(
 
 fn choose_bucket_width(range_ms: i64, max_buckets: usize) -> i64 {
     const CANDIDATES: [i64; 21] = [
-        1,
-        10,
-        50,
-        100,
-        250,
-        500,
-        1_000,
-        2_000,
-        5_000,
-        10_000,
-        30_000,
-        60_000,
-        120_000,
-        300_000,
-        600_000,
-        1_800_000,
-        3_600_000,
-        7_200_000,
-        14_400_000,
-        43_200_000,
-        86_400_000,
+        1, 10, 50, 100, 250, 500, 1_000, 2_000, 5_000, 10_000, 30_000, 60_000, 120_000, 300_000,
+        600_000, 1_800_000, 3_600_000, 7_200_000, 14_400_000, 43_200_000, 86_400_000,
     ];
     if range_ms <= 0 {
         return 1_000;
@@ -441,7 +439,13 @@ pub fn query_events(params: QueryParams) -> Result<Vec<EventRow>, String> {
     );
     let mut where_clauses: Vec<String> = Vec::new();
     let mut binds: Vec<Box<dyn ToSql>> = Vec::new();
-    push_common_filters(&mut where_clauses, &mut binds, params.server, params.method, params.ok);
+    push_common_filters(
+        &mut where_clauses,
+        &mut binds,
+        params.server,
+        params.method,
+        params.ok,
+    );
     if let Some(start) = params.start_ts_ms {
         where_clauses.push("ts_ms >= ?".into());
         binds.push(Box::new(start));
@@ -452,10 +456,7 @@ pub fn query_events(params: QueryParams) -> Result<Vec<EventRow>, String> {
     }
     if let Some((ts_ms, id)) = params.after {
         // keyset: (ts,id) < (after.ts, after.id) for DESC order
-        where_clauses.push(
-            "(ts_ms < ? OR (ts_ms = ? AND id < ?))"
-                .into(),
-        );
+        where_clauses.push("(ts_ms < ? OR (ts_ms = ? AND id < ?))".into());
         binds.push(Box::new(ts_ms));
         binds.push(Box::new(ts_ms));
         binds.push(Box::new(id.to_string()));
@@ -654,8 +655,7 @@ pub fn query_event_histogram(params: HistogramParams) -> Result<EventHistogram, 
             params_from_iter(range_binds.iter().map(|b| &**b as &dyn ToSql)),
             |row| {
                 let min_ts: Option<i64> = row.get(0)?;
-                let max_ts: Option<i64> = row.get(1)?
-;
+                let max_ts: Option<i64> = row.get(1)?;
                 Ok((min_ts, max_ts))
             },
         )
@@ -675,9 +675,8 @@ pub fn query_event_histogram(params: HistogramParams) -> Result<EventHistogram, 
     let bucket_width = choose_bucket_width(range_ms, max_buckets);
     let bucket_width = bucket_width.max(1);
 
-    let mut hist_sql = String::from(
-        "SELECT ((ts_ms - ?) / ?) AS bucket_idx, method, COUNT(*) FROM rpc_events",
-    );
+    let mut hist_sql =
+        String::from("SELECT ((ts_ms - ?) / ?) AS bucket_idx, method, COUNT(*) FROM rpc_events");
     let mut hist_where: Vec<String> = Vec::new();
     let mut hist_binds: Vec<Box<dyn ToSql>> = vec![Box::new(min_ts), Box::new(bucket_width)];
     push_common_filters(

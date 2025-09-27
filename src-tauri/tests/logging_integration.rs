@@ -25,8 +25,14 @@ impl TempConfigProvider {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let dir =
-            std::env::temp_dir().join(format!("mcp-bouncer-log-{}-{}", std::process::id(), stamp));
+        // Include thread ID to ensure each test gets a unique directory even in parallel execution
+        let thread_id = std::thread::current().id();
+        let dir = std::env::temp_dir().join(format!(
+            "mcp-bouncer-log-{}-{}-{:?}",
+            std::process::id(),
+            stamp,
+            thread_id
+        ));
         fs::create_dir_all(&dir).unwrap();
         Self { base: dir }
     }
@@ -218,15 +224,14 @@ async fn logging_persists_events_to_sqlite() {
     assert!(!queried.is_empty(), "expected query_events to return rows");
     assert!(queried.iter().any(|row| row.method == "initialize"));
 
-    let histogram = mcp_bouncer::logging::query_event_histogram(
-        mcp_bouncer::logging::HistogramParams {
+    let histogram =
+        mcp_bouncer::logging::query_event_histogram(mcp_bouncer::logging::HistogramParams {
             server: None,
             method: None,
             ok: None,
             max_buckets: Some(16),
-        },
-    )
-    .expect("histogram query");
+        })
+        .expect("histogram query");
     if let Some(hist_start) = histogram.start_ts_ms
         && let Some(hist_end) = histogram.end_ts_ms
         && !histogram.buckets.is_empty()
