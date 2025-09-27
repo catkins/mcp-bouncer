@@ -10,6 +10,8 @@ use rmcp::transport::{
         StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
     },
 };
+use sqlx::sqlite::SqliteConnectOptions;
+use sqlx::{ConnectOptions, Row};
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -187,27 +189,33 @@ async fn logging_persists_events_to_sqlite() {
     // Verify SQLite contains events
     let db_path = mcp_bouncer::logging::db_path().expect("logger should expose db_path");
     assert!(db_path.exists(), "logs.sqlite should exist at {db_path:?}");
-    let conn = rusqlite::Connection::open(&db_path).expect("open sqlite");
-    let mut stmt = conn.prepare("SELECT COUNT(*) FROM rpc_events").unwrap();
-    let cnt: i64 = stmt.query_row([], |r| r.get::<_, i64>(0)).unwrap();
+    let mut conn = SqliteConnectOptions::new()
+        .filename(&db_path)
+        .create_if_missing(false)
+        .connect()
+        .await
+        .expect("open sqlite");
+    let cnt: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM rpc_events")
+        .fetch_one(&mut conn)
+        .await
+        .expect("count events");
     assert!(cnt >= 2, "expected at least 2 events, had {cnt}");
 
-    let mut mstmt = conn
-        .prepare("SELECT DISTINCT method FROM rpc_events")
-        .unwrap();
-    let mut rows = mstmt.query([]).unwrap();
+    let rows = sqlx::query("SELECT DISTINCT method FROM rpc_events")
+        .fetch_all(&mut conn)
+        .await
+        .expect("distinct methods");
     let mut methods = Vec::new();
-    while let Some(row) = rows.next().unwrap() {
-        methods.push(row.get::<_, String>(0).unwrap());
+    for row in rows {
+        methods.push(row.try_get::<String, _>(0).expect("method column"));
     }
     assert!(methods.iter().any(|m| m == "initialize"));
     assert!(methods.iter().any(|m| m == "listTools") || methods.iter().any(|m| m == "callTool"));
 
-    let sess_cnt: i64 = conn
-        .prepare("SELECT COUNT(*) FROM sessions")
-        .unwrap()
-        .query_row([], |r| r.get(0))
-        .unwrap();
+    let sess_cnt: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sessions")
+        .fetch_one(&mut conn)
+        .await
+        .expect("count sessions");
     assert!(sess_cnt >= 1, "expected at least one session row");
 
     // Query through the public logging helpers to ensure UI paths work
@@ -220,6 +228,7 @@ async fn logging_persists_events_to_sqlite() {
         start_ts_ms: None,
         end_ts_ms: None,
     })
+    .await
     .expect("query events");
     assert!(!queried.is_empty(), "expected query_events to return rows");
     assert!(queried.iter().any(|row| row.method == "initialize"));
@@ -231,6 +240,7 @@ async fn logging_persists_events_to_sqlite() {
             ok: None,
             max_buckets: Some(16),
         })
+        .await
         .expect("histogram query");
     if let Some(hist_start) = histogram.start_ts_ms
         && let Some(hist_end) = histogram.end_ts_ms
@@ -259,6 +269,7 @@ async fn logging_persists_events_to_sqlite() {
                 start_ts_ms: Some(window_start),
                 end_ts_ms: Some(window_end),
             })
+            .await
             .expect("time-window query");
             for row in filtered.iter() {
                 assert!(
@@ -269,7 +280,9 @@ async fn logging_persists_events_to_sqlite() {
         }
     }
 
-    let count_via_helper = mcp_bouncer::logging::count_events(None).expect("count events");
+    let count_via_helper = mcp_bouncer::logging::count_events(None)
+        .await
+        .expect("count events");
     assert!(count_via_helper >= queried.len() as f64);
 
     let latest = queried.first().expect("at least one event");
@@ -280,6 +293,7 @@ async fn logging_persists_events_to_sqlite() {
         None,
         25,
     )
+    .await
     .expect("query since");
     assert!(since.iter().any(|row| row.id == latest.id));
 }
@@ -419,20 +433,26 @@ async fn logging_persists_error_and_redacts_sensitive_fields() {
 
     // Verify SQLite contains an error event and sensitive fields were redacted
     let db_path = mcp_bouncer::logging::db_path().expect("logger should expose db_path");
-    let conn = rusqlite::Connection::open(&db_path).expect("open sqlite");
+    let mut conn = SqliteConnectOptions::new()
+        .filename(&db_path)
+        .create_if_missing(false)
+        .connect()
+        .await
+        .expect("open sqlite");
     // Ensure at least one callTool event exists
-    let call_cnt: i64 = conn
-        .prepare("SELECT COUNT(*) FROM rpc_events WHERE method='callTool'")
-        .unwrap()
-        .query_row([], |r| r.get(0))
-        .unwrap();
+    let call_cnt: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM rpc_events WHERE method='callTool'")
+            .fetch_one(&mut conn)
+            .await
+            .expect("count callTool rows");
     assert!(call_cnt >= 1, "expected at least one callTool event");
     // Sensitive raw values should not appear in any callTool request_json
-    let leaked_cnt: i64 = conn
-        .prepare("SELECT COUNT(*) FROM rpc_events WHERE method='callTool' AND (request_json LIKE '%s3cr3t%' OR request_json LIKE '%Bearer abc%')")
-        .unwrap()
-        .query_row([], |r| r.get(0))
-        .unwrap();
+    let leaked_cnt: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM rpc_events WHERE method='callTool' AND (request_json LIKE '%s3cr3t%' OR request_json LIKE '%Bearer abc%')",
+    )
+    .fetch_one(&mut conn)
+    .await
+    .expect("leak count");
     assert_eq!(
         leaked_cnt, 0,
         "expected no leaked sensitive values in request_json"
@@ -448,6 +468,7 @@ async fn logging_persists_error_and_redacts_sensitive_fields() {
         start_ts_ms: None,
         end_ts_ms: None,
     })
+    .await
     .expect("query events for err::callTool");
     assert!(queried.iter().any(|row| row.method == "callTool"));
     for row in queried {
@@ -604,12 +625,17 @@ async fn logging_persists_many_calltool_events_in_batches() {
 
     // Verify enough callTool rows are present
     let db_path = mcp_bouncer::logging::db_path().expect("logger should expose db_path");
-    let conn = rusqlite::Connection::open(&db_path).expect("open sqlite");
-    let call_cnt: i64 = conn
-        .prepare("SELECT COUNT(*) FROM rpc_events WHERE method='callTool'")
-        .unwrap()
-        .query_row([], |r| r.get(0))
-        .unwrap();
+    let mut conn = SqliteConnectOptions::new()
+        .filename(&db_path)
+        .create_if_missing(false)
+        .connect()
+        .await
+        .expect("open sqlite");
+    let call_cnt: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM rpc_events WHERE method='callTool'")
+            .fetch_one(&mut conn)
+            .await
+            .expect("count callTool rows");
     assert!(
         call_cnt >= 1,
         "expected at least one callTool event, had {call_cnt}"
@@ -625,6 +651,7 @@ async fn logging_persists_many_calltool_events_in_batches() {
         start_ts_ms: None,
         end_ts_ms: None,
     })
+    .await
     .expect("first page");
     assert!(first_page.len() <= 20);
     if let Some(last) = first_page.last() {
@@ -638,6 +665,7 @@ async fn logging_persists_many_calltool_events_in_batches() {
             start_ts_ms: None,
             end_ts_ms: None,
         })
+        .await
         .expect("next page");
         for row in next_page {
             assert!(row.ts_ms <= last.ts_ms);

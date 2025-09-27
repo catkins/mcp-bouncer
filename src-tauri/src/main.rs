@@ -337,6 +337,7 @@ async fn mcp_logs_list(params: LogsListParams) -> Result<Vec<logging::EventRow>,
         start_ts_ms: params.start_ts_ms.map(|v| v as i64),
         end_ts_ms: params.end_ts_ms.map(|v| v as i64),
     })
+    .await
 }
 
 #[derive(serde::Serialize, serde::Deserialize, specta::Type)]
@@ -359,12 +360,13 @@ async fn mcp_logs_list_since(params: LogsSinceParams) -> Result<Vec<logging::Eve
         params.ok,
         limit,
     )
+    .await
 }
 
 #[tauri::command]
 #[specta::specta]
 async fn mcp_logs_count(server: Option<String>) -> Result<f64, String> {
-    logging::count_events(server.as_deref())
+    logging::count_events(server.as_deref()).await
 }
 
 #[derive(serde::Serialize, serde::Deserialize, specta::Type)]
@@ -386,6 +388,7 @@ async fn mcp_logs_histogram(
         ok: params.ok,
         max_buckets: params.max_buckets.map(|v| v as usize),
     })
+    .await
 }
 
 #[specta::specta]
@@ -627,11 +630,16 @@ fn main() {
         }
     }
 
+    let log_migrations = mcp_bouncer::logging::migrations();
+    let sql_plugin = tauri_plugin_sql::Builder::default()
+        .add_migrations("sqlite:logs.sqlite", log_migrations)
+        .build();
+
     let res = tauri::Builder::default()
         // Shell plugin is commonly needed to open links, etc.
         .plugin(tauri_plugin_shell::init())
         // SQL plugin for database operations
-        .plugin(tauri_plugin_sql::Builder::default().build())
+        .plugin(sql_plugin)
         // Ensure logs are flushed on window close / app shutdown
         .on_window_event(|_win, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {

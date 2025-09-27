@@ -9,19 +9,37 @@ name = "mcp_bouncer"
 path = "src/lib.rs"
 
 [dependencies]
-tauri = { version = "2", features = [] }
-tauri-plugin-shell = "2"
-tauri-plugin-sql = { version = "2", features = ["sqlite"] }
+anyhow = "1"
+axum = { version = "0.7", features = ["http1"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+dirs = "6"
+futures = "0.3"
+open = "5"
+reqwest = { version = "0.12", features = ["json", "stream"] }
+rmcp = { version = "0.6.1", features = [
+  "client",
+  "macros",
+  "transport-streamable-http-client-reqwest",
+  "transport-sse-client-reqwest",
+  "transport-sse-server",
+  "transport-child-process",
+  "transport-streamable-http-server",
+  "transport-worker",
+  "auth"
+] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 specta = { version = "2.0.0-rc.22", features = ["derive", "serde", "serde_json", "chrono"] }
-tauri-specta = { version = "2.0.0-rc.21", features = ["typescript"] }
 specta-typescript = "0.0.9"
-open = "5"
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"] }
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+tauri-plugin-sql = { version = "2", features = ["sqlite"] }
+tauri-specta = { version = "2.0.0-rc.21", features = ["typescript"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "io-util", "net", "process"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
-mcp-bouncer-core = { path = "crates/mcp-bouncer-core" }
-mcp-bouncer-logging = { path = "crates/mcp-bouncer-logging" }
+uuid = { version = "1", features = ["v4", "serde"] }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -35,17 +53,3 @@ default = []
 async-trait = "0.1"
 schemars = "0.8"
 serial_test = "3"
-rusqlite = { version = "0.32", features = ["bundled"] }
-axum = { version = "0.7", features = ["http1"] }
-rmcp = { version = "0.6.1", features = [
-  "client",
-  "macros",
-  "transport-streamable-http-client-reqwest",
-  "transport-sse-client-reqwest",
-  "transport-sse-server",
-  "transport-child-process",
-  "transport-streamable-http-server",
-  "auth"
-] }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "io-util", "time", "net"] }
-reqwest = { version = "0.12", features = ["json", "stream"] }
