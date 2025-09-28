@@ -1,5 +1,6 @@
 // SQL service using Tauri SQL plugin for logging database operations
 import Database from '@tauri-apps/plugin-sql';
+import { appConfigDir } from '@tauri-apps/api/path';
 import type { LogsHistogram, LogsHistogramBucket, LogsQueryParams, RpcLog } from '../types/logs';
 
 type EventRow = RpcLog;
@@ -52,31 +53,45 @@ const HISTOGRAM_BUCKET_CANDIDATES = [
 
 class SQLLoggingService {
   private db: Database | null = null;
+  private initialized = false;
 
   async initialize(): Promise<void> {
     try {
-      this.db = await Database.load('sqlite:logs.sqlite');
-      await this.initializeSchema();
+      await this.ensureDb();
     } catch (error) {
       console.error('Failed to initialize SQL logging service:', error);
       throw error;
     }
   }
 
-  private async initializeSchema(): Promise<void> {
-    if (!this.db) throw new Error('Database not initialized');
-
-    for (const query of SCHEMA_QUERIES) {
-      await this.db.execute(query);
+  private async ensureDb(): Promise<Database> {
+    if (!this.db) {
+      const uri = await this.databaseUri();
+      this.db = await Database.load(uri);
     }
+    const db = this.db!;
+    if (!this.initialized) {
+      for (const query of SCHEMA_QUERIES) {
+        await db.execute(query);
+      }
+      this.initialized = true;
+    }
+    return db;
+  }
+
+  private async databaseUri(): Promise<string> {
+    const dir = await appConfigDir();
+    const normalized = dir.endsWith('/') ? dir : `${dir}/`;
+    const path = `${normalized}logs.sqlite`;
+    // SQLite URIs accept backslashes on Windows, but forward slashes are safe cross-platform
+    const sanitized = path.replace(/\\/g, '/');
+    return `sqlite:${sanitized}`;
   }
 
   async queryEvents(params: QueryParams = {}): Promise<EventRow[]> {
-    if (!this.db) throw new Error('Database not initialized');
-
+    const db = await this.ensureDb();
     const { sql, values } = this.buildEventsQuery(params);
-    const rows = await this.db.select<any[]>(sql, values);
-    
+    const rows = await db.select<any[]>(sql, values);
     return rows.map(this.mapEventRow);
   }
 
@@ -173,8 +188,7 @@ class SQLLoggingService {
   }
 
   async countEvents(server?: string): Promise<number> {
-    if (!this.db) throw new Error('Database not initialized');
-
+    const db = await this.ensureDb();
     let sql = 'SELECT COUNT(*) as count FROM rpc_events';
     const values: any[] = [];
 
@@ -183,15 +197,15 @@ class SQLLoggingService {
       values.push(server);
     }
 
-    const result = await this.db.select<[{ count: number }]>(sql, values);
+    const result = await db.select<[{ count: number }]>(sql, values);
     return result[0]?.count || 0;
   }
 
   async queryEventHistogram(params: HistogramParams = {}): Promise<LogsHistogram> {
-    if (!this.db) throw new Error('Database not initialized');
+    const db = await this.ensureDb();
 
     // Get time range
-    const { min_ts, max_ts } = await this.getTimeRange(params);
+    const { min_ts, max_ts } = await this.getTimeRange(db, params);
 
     if (min_ts == null || max_ts == null) {
       return { start_ts_ms: null, end_ts_ms: null, bucket_width_ms: 0, buckets: [] };
@@ -201,7 +215,7 @@ class SQLLoggingService {
     const bucketWidth = this.chooseBucketWidth(range_ms, params.max_buckets || 80);
 
     // Get histogram data
-    const histogramData = await this.getHistogramData(params, min_ts, bucketWidth);
+    const histogramData = await this.getHistogramData(db, params, min_ts, bucketWidth);
     
     // Build buckets
     const buckets = this.buildHistogramBuckets(min_ts, range_ms, bucketWidth, histogramData);
@@ -214,7 +228,7 @@ class SQLLoggingService {
     };
   }
 
-  private async getTimeRange(params: HistogramParams): Promise<{ min_ts?: number; max_ts?: number }> {
+  private async getTimeRange(db: Database, params: HistogramParams): Promise<{ min_ts?: number; max_ts?: number }> {
     let sql = 'SELECT MIN(ts_ms) as min_ts, MAX(ts_ms) as max_ts FROM rpc_events';
     const { conditions, values } = this.buildHistogramConditions(params);
 
@@ -222,11 +236,12 @@ class SQLLoggingService {
       sql += ' WHERE ' + conditions.join(' AND ');
     }
 
-    const result = await this.db!.select<[{ min_ts?: number; max_ts?: number }]>(sql, values);
+    const result = await db.select<[{ min_ts?: number; max_ts?: number }]>(sql, values);
     return result[0] || {};
   }
 
   private async getHistogramData(
+    db: Database,
     params: HistogramParams, 
     min_ts: number, 
     bucketWidth: number
@@ -245,7 +260,7 @@ class SQLLoggingService {
 
     sql += ' GROUP BY bucket_idx, method ORDER BY bucket_idx ASC';
 
-    return this.db!.select<Array<{ bucket_idx: number; method: string; count: number }>>(sql, values);
+    return db.select<Array<{ bucket_idx: number; method: string; count: number }>>(sql, values);
   }
 
   private buildHistogramConditions(params: HistogramParams): { conditions: string[]; values: any[] } {
