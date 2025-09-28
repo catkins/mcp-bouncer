@@ -12,7 +12,7 @@ import { useState, useEffect } from 'react';
 import { useIncomingClients } from './hooks/useIncomingClients';
 import { on, safeUnlisten, EVENT_LOGS_RPC_EVENT } from './tauri/events';
 import LogsPage from './pages/LogsPage';
-import { MCPService } from './tauri/bridge';
+import { sqlLoggingService } from './lib/sqlLogging';
 import ServersPage from './pages/ServersPage';
 
 function AppContent() {
@@ -41,7 +41,8 @@ function AppContent() {
   const [logsCount, setLogsCount] = useState<number>(0);
   // Load logs count on startup (keeps parity with earlier behavior)
   useEffect(() => {
-    MCPService.LogsCount()
+    sqlLoggingService
+      .countEvents()
       .then(n => setLogsCount(Number(n) || 0))
       .catch(() => setLogsCount(0));
   }, []);

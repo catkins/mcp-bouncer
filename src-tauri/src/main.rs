@@ -10,7 +10,7 @@ use mcp_bouncer::config::{
 };
 use mcp_bouncer::events::{TauriEventEmitter, client_error, client_status_changed};
 use mcp_bouncer::incoming::list_incoming;
-use mcp_bouncer::logging::{RpcEventPublisher, SqlitePublisher};
+use mcp_bouncer::logging::{Event, RpcEventPublisher, SqlitePublisher};
 use mcp_bouncer::oauth::start_oauth_for_server;
 use mcp_bouncer::server::{get_runtime_listen_addr, start_http_server};
 use mcp_bouncer::unauthorized;
@@ -274,14 +274,13 @@ async fn mcp_start_oauth(app: tauri::AppHandle, name: String) -> Result<(), Stri
     mcp_bouncer::overlay::set_state(&name, ClientConnectionState::Authorizing).await;
     let emitter = TauriEventEmitter(app.clone());
     client_status_changed(&emitter, &name, "authorizing");
-    let logger = logging::SqlitePublisher;
+    let logger = SqlitePublisher;
     // Kick off OAuth flow (opens browser, waits for callback)
     start_oauth_for_server(&emitter, &logger, &name, &endpoint)
         .await
         .map_err(|e| e.to_string())
 }
 
-use mcp_bouncer::logging;
 use mcp_bouncer::types::ToolInfo;
 
 #[tauri::command]
@@ -297,93 +296,6 @@ async fn mcp_get_client_tools(client_name: String) -> Result<Vec<ToolInfo>, Stri
         &client_name,
         list,
     ))
-}
-
-// ---------------- Logs (SQLite) UI commands ----------------
-
-#[derive(serde::Serialize, serde::Deserialize, specta::Type)]
-struct LogsCursor {
-    ts_ms: f64,
-    id: String,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, specta::Type)]
-struct LogsListParams {
-    server: Option<String>,
-    method: Option<String>,
-    ok: Option<bool>,
-    limit: Option<u32>,
-    after: Option<LogsCursor>,
-    start_ts_ms: Option<f64>,
-    end_ts_ms: Option<f64>,
-}
-
-#[tauri::command]
-#[specta::specta]
-async fn mcp_logs_list(params: LogsListParams) -> Result<Vec<logging::EventRow>, String> {
-    let limit = params.limit.unwrap_or(50) as usize;
-    let after = params
-        .after
-        .as_ref()
-        .map(|c| (c.ts_ms as i64, c.id.as_str()));
-    logging::query_events(logging::QueryParams {
-        server: params.server.as_deref(),
-        method: params.method.as_deref(),
-        ok: params.ok,
-        limit,
-        after,
-        start_ts_ms: params.start_ts_ms.map(|v| v as i64),
-        end_ts_ms: params.end_ts_ms.map(|v| v as i64),
-    })
-}
-
-#[derive(serde::Serialize, serde::Deserialize, specta::Type)]
-struct LogsSinceParams {
-    since_ts_ms: f64,
-    server: Option<String>,
-    method: Option<String>,
-    ok: Option<bool>,
-    limit: Option<u32>,
-}
-
-#[tauri::command]
-#[specta::specta]
-async fn mcp_logs_list_since(params: LogsSinceParams) -> Result<Vec<logging::EventRow>, String> {
-    let limit = params.limit.unwrap_or(50) as usize;
-    logging::query_events_since(
-        params.since_ts_ms as i64,
-        params.server.as_deref(),
-        params.method.as_deref(),
-        params.ok,
-        limit,
-    )
-}
-
-#[tauri::command]
-#[specta::specta]
-async fn mcp_logs_count(server: Option<String>) -> Result<f64, String> {
-    logging::count_events(server.as_deref())
-}
-
-#[derive(serde::Serialize, serde::Deserialize, specta::Type)]
-struct LogsHistogramParams {
-    server: Option<String>,
-    method: Option<String>,
-    ok: Option<bool>,
-    max_buckets: Option<u32>,
-}
-
-#[tauri::command]
-#[specta::specta]
-async fn mcp_logs_histogram(
-    params: LogsHistogramParams,
-) -> Result<logging::EventHistogram, String> {
-    logging::query_event_histogram(logging::HistogramParams {
-        server: params.server.as_deref(),
-        method: params.method.as_deref(),
-        ok: params.ok,
-        max_buckets: params.max_buckets.map(|v| v as usize),
-    })
 }
 
 #[specta::specta]
@@ -421,7 +333,7 @@ async fn mcp_refresh_client_tools(
     mcp_bouncer::tools_cache::set(&client_name, out.clone()).await;
     mcp_bouncer::overlay::set_tools(&client_name, out.len() as u32).await;
     // Log listTools event for internal refresh + emit live update
-    let mut evt = logging::Event::new("listTools", format!("internal::{client_name}"));
+    let mut evt = Event::new("listTools", format!("internal::{client_name}"));
     evt.server_name = Some(client_name.clone());
     // Mirror the external JSON-RPC-ish shape used elsewhere
     evt.request_json = Some(serde_json::json!({
@@ -599,10 +511,6 @@ fn main() {
             mcp_get_client_tools,
             mcp_refresh_client_tools,
             mcp_toggle_tool,
-            mcp_logs_list,
-            mcp_logs_list_since,
-            mcp_logs_histogram,
-            mcp_logs_count,
             settings_get_settings,
             settings_open_config_directory,
             settings_update_settings
@@ -625,9 +533,19 @@ fn main() {
         }
     }
 
+    let log_dir = mcp_bouncer::config::config_dir();
+    if let Err(e) = fs::create_dir_all(&log_dir) {
+        tracing::warn!(error = %e, "failed to create log directory");
+    }
+    let sql_plugin = tauri_plugin_sql::Builder::default()
+        .add_migrations("sqlite:logs.sqlite", mcp_bouncer::logging::migrations())
+        .build();
+
     let res = tauri::Builder::default()
         // Shell plugin is commonly needed to open links, etc.
         .plugin(tauri_plugin_shell::init())
+        // SQL plugin for database operations
+        .plugin(sql_plugin)
         // Ensure logs are flushed on window close / app shutdown
         .on_window_event(|_win, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
@@ -666,10 +584,6 @@ fn main() {
             mcp_get_client_tools,
             mcp_refresh_client_tools,
             mcp_toggle_tool,
-            mcp_logs_list,
-            mcp_logs_list_since,
-            mcp_logs_histogram,
-            mcp_logs_count,
             settings_get_settings,
             settings_open_config_directory,
             settings_update_settings

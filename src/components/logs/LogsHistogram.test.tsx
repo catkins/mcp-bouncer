@@ -3,7 +3,7 @@ import type { MockInstance } from 'vitest';
 import { render, fireEvent, act, cleanup } from '@testing-library/react';
 import React, { forwardRef, useImperativeHandle } from 'react';
 import { LogsHistogram } from './LogsHistogram';
-import { MCPService } from '../../tauri/bridge';
+import { sqlLoggingService } from '../../lib/sqlLogging';
 import * as events from '../../tauri/events';
 
 type DataZoomHandler = ((event: any) => void) | undefined;
@@ -56,7 +56,7 @@ const histogramPayload = {
   ],
 };
 
-const logsHistogramSpy = vi.spyOn(MCPService as any, 'LogsHistogram');
+const logsHistogramSpy = vi.spyOn(sqlLoggingService as any, 'queryEventHistogram');
 let onSpy: MockInstance;
 let safeUnlistenSpy: MockInstance;
 

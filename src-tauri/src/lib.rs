@@ -1,27 +1,23 @@
-pub use mcp_bouncer_core::{
-    app_logic, client, config, incoming, oauth, overlay, server, status, tools_cache, types,
-    unauthorized,
-};
+pub mod app_logic;
+pub mod client;
+pub mod config;
+pub mod events;
+pub mod incoming;
+mod logging_core;
+mod logging_sqlite;
+pub mod oauth;
+pub mod overlay;
+pub mod server;
+pub mod status;
+pub mod tools_cache;
+pub mod transport;
+pub mod types;
+pub mod unauthorized;
 
 pub mod logging {
-    pub use mcp_bouncer_core::logging::{Event, RpcEventPublisher};
-    pub use mcp_bouncer_logging::{
-        EventHistogram, EventRow, HistogramBucket, HistogramCount, HistogramParams, QueryParams,
-        SqlitePublisher, count_events, db_path, force_flush_and_checkpoint, init_once,
-        init_once_with, log_rpc_event, query_event_histogram, query_events, query_events_since,
+    pub use crate::logging_core::{Event, RpcEventPublisher};
+    pub use crate::logging_sqlite::{
+        SqlitePublisher, db_path, force_flush_and_checkpoint, init_once, init_once_with,
+        log_rpc_event, migrations,
     };
-}
-
-pub mod events {
-    pub use mcp_bouncer_core::events::*;
-    use tauri::Emitter;
-
-    #[derive(Clone)]
-    pub struct TauriEventEmitter(pub tauri::AppHandle);
-
-    impl EventEmitter for TauriEventEmitter {
-        fn emit(&self, event: &str, payload: &serde_json::Value) {
-            let _ = self.0.emit(event, payload);
-        }
-    }
 }

@@ -171,60 +171,58 @@ fn enrich_call_tool(event: &mut Event, result: &ServerResult) {
     }
 }
 
-fn client_request_envelope_json(request: &ClientRequest, id: &RequestId) -> Option<serde_json::Value> {
-    serde_json::to_value(
-        JsonRpcMessage::<
-            ClientRequest,
-            mcp::ClientResult,
-            mcp::ClientNotification,
-        >::request(request.clone(), id.clone()),
-    )
+fn client_request_envelope_json(
+    request: &ClientRequest,
+    id: &RequestId,
+) -> Option<serde_json::Value> {
+    serde_json::to_value(JsonRpcMessage::<
+        ClientRequest,
+        mcp::ClientResult,
+        mcp::ClientNotification,
+    >::request(request.clone(), id.clone()))
     .ok()
 }
 
 fn client_notification_envelope_json(
     notification: &mcp::ClientNotification,
 ) -> Option<serde_json::Value> {
-    serde_json::to_value(
-        JsonRpcMessage::<
-            ClientRequest,
-            mcp::ClientResult,
-            mcp::ClientNotification,
-        >::notification(notification.clone()),
-    )
+    serde_json::to_value(JsonRpcMessage::<
+        ClientRequest,
+        mcp::ClientResult,
+        mcp::ClientNotification,
+    >::notification(notification.clone()))
     .ok()
 }
 
-fn server_response_envelope_json(result: &ServerResult, id: &RequestId) -> Option<serde_json::Value> {
-    serde_json::to_value(
-        JsonRpcMessage::<
-            mcp::ServerRequest,
-            ServerResult,
-            ServerNotification,
-        >::response(result.clone(), id.clone()),
-    )
+fn server_response_envelope_json(
+    result: &ServerResult,
+    id: &RequestId,
+) -> Option<serde_json::Value> {
+    serde_json::to_value(JsonRpcMessage::<
+        mcp::ServerRequest,
+        ServerResult,
+        ServerNotification,
+    >::response(result.clone(), id.clone()))
     .ok()
 }
 
 fn server_error_envelope_json(error: &ErrorData, id: &RequestId) -> Option<serde_json::Value> {
-    serde_json::to_value(
-        JsonRpcMessage::<
-            mcp::ServerRequest,
-            ServerResult,
-            ServerNotification,
-        >::error(error.clone(), id.clone()),
-    )
+    serde_json::to_value(JsonRpcMessage::<
+        mcp::ServerRequest,
+        ServerResult,
+        ServerNotification,
+    >::error(error.clone(), id.clone()))
     .ok()
 }
 
-fn server_notification_envelope_json(notification: &ServerNotification) -> Option<serde_json::Value> {
-    serde_json::to_value(
-        JsonRpcMessage::<
-            mcp::ServerRequest,
-            ServerResult,
-            ServerNotification,
-        >::notification(notification.clone()),
-    )
+fn server_notification_envelope_json(
+    notification: &ServerNotification,
+) -> Option<serde_json::Value> {
+    serde_json::to_value(JsonRpcMessage::<
+        mcp::ServerRequest,
+        ServerResult,
+        ServerNotification,
+    >::notification(notification.clone()))
     .ok()
 }
 
@@ -297,8 +295,7 @@ where
                 } else {
                     pending.event.ok = true;
                 }
-                pending.event.response_json =
-                    server_response_envelope_json(&server_result, &id);
+                pending.event.response_json = server_response_envelope_json(&server_result, &id);
             }
             Err(error) => {
                 pending.event.ok = false;
@@ -647,7 +644,11 @@ where
         self.logger.log_and_emit(&self.emitter, event);
     }
 
-    async fn build_pending(&self, request: &ClientRequest, id: &RequestId) -> Option<PendingRequest> {
+    async fn build_pending(
+        &self,
+        request: &ClientRequest,
+        id: &RequestId,
+    ) -> Option<PendingRequest> {
         let request_json = client_request_envelope_json(request, id);
         let session_id = self.session_id.clone();
         let (mut event, kind) = match request {
@@ -1022,26 +1023,20 @@ mod tests {
         let request_json = event.request_json.as_ref().expect("request json");
         let request_obj = request_json.as_object().expect("request json object");
         assert_eq!(
-            request_obj
-                .get("jsonrpc")
-                .and_then(|v| v.as_str()),
+            request_obj.get("jsonrpc").and_then(|v| v.as_str()),
             Some("2.0"),
             "request jsonrpc version"
         );
         assert_eq!(request_obj.get("id"), Some(&serde_json::json!(1)));
         assert_eq!(
-            request_obj
-                .get("method")
-                .and_then(|v| v.as_str()),
+            request_obj.get("method").and_then(|v| v.as_str()),
             Some("tools/call"),
             "request method"
         );
         let response_json = event.response_json.as_ref().expect("response json");
         let response_obj = response_json.as_object().expect("response json object");
         assert_eq!(
-            response_obj
-                .get("jsonrpc")
-                .and_then(|v| v.as_str()),
+            response_obj.get("jsonrpc").and_then(|v| v.as_str()),
             Some("2.0"),
             "response jsonrpc version"
         );
@@ -1125,26 +1120,20 @@ mod tests {
         let request_json = event.request_json.as_ref().expect("request json");
         let request_obj = request_json.as_object().expect("request json object");
         assert_eq!(
-            request_obj
-                .get("jsonrpc")
-                .and_then(|v| v.as_str()),
+            request_obj.get("jsonrpc").and_then(|v| v.as_str()),
             Some("2.0"),
             "initialize request jsonrpc"
         );
         assert_eq!(request_obj.get("id"), Some(&serde_json::json!(42)));
         assert_eq!(
-            request_obj
-                .get("method")
-                .and_then(|v| v.as_str()),
+            request_obj.get("method").and_then(|v| v.as_str()),
             Some("initialize"),
             "initialize request method"
         );
         let response_json = event.response_json.as_ref().expect("response json");
         let response_obj = response_json.as_object().expect("response json object");
         assert_eq!(
-            response_obj
-                .get("jsonrpc")
-                .and_then(|v| v.as_str()),
+            response_obj.get("jsonrpc").and_then(|v| v.as_str()),
             Some("2.0"),
             "initialize response jsonrpc"
         );

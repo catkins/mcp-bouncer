@@ -93,7 +93,7 @@ pub struct OsConfigProvider;
 impl ConfigProvider for OsConfigProvider {
     fn base_dir(&self) -> PathBuf {
         let base = dirs::config_dir().unwrap_or_else(|| dirs::home_dir().unwrap_or_default());
-        base.join("mcp-bouncer")
+        base.join("app.mcp.bouncer")
     }
 }
 

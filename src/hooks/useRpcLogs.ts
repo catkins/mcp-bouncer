@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MCPService } from '../tauri/bridge';
+import { sqlLoggingService } from '../lib/sqlLogging';
 import type { RpcLog, LogsQueryParams } from '../types/logs';
 import { on, safeUnlisten, EVENT_LOGS_RPC_EVENT } from '../tauri/events';
 
@@ -55,7 +55,7 @@ export function useRpcLogs(initial: LogsQueryParams & { method?: string; ok?: bo
     try {
       const { params } = buildFilters(opts);
       if (!opts?.reset && cursor) params.after = cursor;
-      const page = await MCPService.LogsList(params as any);
+      const page = await sqlLoggingService.queryEvents(params as any);
       if (opts?.reset) {
         setItems(page);
       } else {
@@ -83,7 +83,7 @@ export function useRpcLogs(initial: LogsQueryParams & { method?: string; ok?: bo
     setLoading(true);
     try {
       const { params } = buildFilters({ server: effectiveServer, method: effectiveMethod, ok: effectiveOk, range: effectiveRange });
-      const page = await MCPService.LogsList(params as any);
+      const page = await sqlLoggingService.queryEvents(params as any);
       setItems(page);
       setHasMore(page.length >= 50);
       if (page[0]) topTsRef.current = Math.max(page[0].ts_ms, topTsRef.current);

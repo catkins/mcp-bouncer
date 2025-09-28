@@ -1,15 +1,8 @@
 {
-  "$schema": "https://schema.tauri.app/config/2",
+  "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "events",
   "description": "Allow listening to Tauri core events from the renderer.",
-  "windows": [
-    "main"
-  ],
-  "webviews": [
-    "main"
-  ],
-  "permissions": [
-    "core:event:default",
-    "core:event:allow-listen"
-  ]
+  "windows": ["main"],
+  "webviews": ["main"],
+  "permissions": ["core:event:default", "core:event:allow-listen"]
 }

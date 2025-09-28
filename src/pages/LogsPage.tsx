@@ -3,14 +3,17 @@ import { LogsFilterBar } from '../components/logs/LogsFilterBar';
 import { LogList } from '../components/logs/LogList';
 import { LogsHistogram } from '../components/logs/LogsHistogram';
 import { useRpcLogs } from '../hooks/useRpcLogs';
-import { MCPService } from '../tauri/bridge';
+import { sqlLoggingService } from '../lib/sqlLogging';
 
 export function LogsPage() {
   const { items, loading, hasMore, server, method, okFlag, timeRange, reset, loadMore } = useRpcLogs();
   const [count, setCount] = useState<number | null>(null);
 
   useEffect(() => {
-    MCPService.LogsCount(server).then(setCount).catch(() => setCount(null));
+    sqlLoggingService
+      .countEvents(server)
+      .then(setCount)
+      .catch(() => setCount(null));
   }, [server]);
 
   const handleRangeChange = useCallback(
