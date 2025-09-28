@@ -537,10 +537,8 @@ fn main() {
     if let Err(e) = fs::create_dir_all(&log_dir) {
         tracing::warn!(error = %e, "failed to create log directory");
     }
-    let log_path = log_dir.join("logs.sqlite");
-    let sqlite_uri = format!("sqlite:{}", log_path.to_string_lossy());
     let sql_plugin = tauri_plugin_sql::Builder::default()
-        .add_migrations(&sqlite_uri, mcp_bouncer::logging::migrations())
+        .add_migrations("sqlite:logs.sqlite", mcp_bouncer::logging::migrations())
         .build();
 
     let res = tauri::Builder::default()

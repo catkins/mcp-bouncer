@@ -1,6 +1,5 @@
 // SQL service using Tauri SQL plugin for logging database operations
 import Database from '@tauri-apps/plugin-sql';
-import { appConfigDir } from '@tauri-apps/api/path';
 import type { LogsHistogram, LogsHistogramBucket, LogsQueryParams, RpcLog } from '../types/logs';
 
 type EventRow = RpcLog;
@@ -80,12 +79,7 @@ class SQLLoggingService {
   }
 
   private async databaseUri(): Promise<string> {
-    const dir = await appConfigDir();
-    const normalized = dir.endsWith('/') ? dir : `${dir}/`;
-    const path = `${normalized}logs.sqlite`;
-    // SQLite URIs accept backslashes on Windows, but forward slashes are safe cross-platform
-    const sanitized = path.replace(/\\/g, '/');
-    return `sqlite:${sanitized}`;
+    return 'sqlite:logs.sqlite';
   }
 
   async queryEvents(params: QueryParams = {}): Promise<EventRow[]> {
