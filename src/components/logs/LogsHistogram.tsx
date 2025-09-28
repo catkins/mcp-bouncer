@@ -3,7 +3,7 @@ import ReactECharts from 'echarts-for-react';
 import type { EChartsOption } from 'echarts';
 import { format } from 'date-fns';
 import type { LogsHistogram as LogsHistogramPayload } from '../../types/logs';
-import { MCPService } from '../../tauri/bridge';
+import { sqlLoggingService } from '../../lib/sqlLogging';
 import { EVENT_LOGS_RPC_EVENT, on, safeUnlisten } from '../../tauri/events';
 
 const METHOD_COLORS: Record<MethodCategory, string> = {
@@ -72,13 +72,13 @@ export function LogsHistogram({ server, method, ok, range, onRangeChange }: Logs
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const histogramParams: { server?: string; method?: string; ok?: boolean; maxBuckets: number } = {
-        maxBuckets: 80,
+      const histogramParams: { server?: string; method?: string; ok?: boolean; max_buckets: number } = {
+        max_buckets: 80,
       };
       if (server !== undefined) histogramParams.server = server;
       if (method !== undefined) histogramParams.method = method;
       if (ok !== undefined) histogramParams.ok = ok;
-      const payload = await MCPService.LogsHistogram(histogramParams);
+      const payload = await sqlLoggingService.queryEventHistogram(histogramParams);
       setData(payload);
     } finally {
       setLoading(false);

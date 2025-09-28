@@ -55,14 +55,15 @@ MCP Bouncer acts as a centralized hub for managing Model Context Protocol server
 ### 🪵 JSON-RPC Logging (SQLite)
 - Always-on logging of all JSON-RPC requests/responses handled by the proxy.
 - Location: `logs.sqlite` in the app config directory:
-  - macOS: `~/Library/Application Support/mcp-bouncer/logs.sqlite`
-  - Linux: `~/.config/mcp-bouncer/logs.sqlite`
-  - Windows: `%APPDATA%\\mcp-bouncer\\logs.sqlite`
+  - macOS: `~/Library/Application Support/app.mcp.bouncer/logs.sqlite`
+  - Linux: `~/.config/app.mcp.bouncer/logs.sqlite`
+  - Windows: `%APPDATA%\\app.mcp.bouncer\\logs.sqlite`
 - Schema overview:
   - `sessions(session_id, created_at_ms, client_name, client_version, client_protocol, last_seen_at_ms)`
   - `rpc_events(id, ts_ms, session_id, method, server_name, server_version, server_protocol, duration_ms, ok, error, request_json, response_json)`
 - Sensitive fields are masked recursively (authorization, token, password, secret, api_key, access_token).
 - The logger batches writes (~250 ms), runs connections in WAL mode, and periodically triggers `PRAGMA wal_checkpoint(TRUNCATE)`; on shutdown it attempts a final flush + checkpoint.
+- The frontend queries this database directly through `@tauri-apps/plugin-sql` (`src/lib/sqlLogging.ts`), so there are no dedicated Tauri commands for log listing or histograms.
 - Quick queries:
   - `SELECT COUNT(*) FROM rpc_events;`
   - `SELECT DISTINCT method FROM rpc_events;`
@@ -112,9 +113,9 @@ cargo build --manifest-path src-tauri/Cargo.toml --release
 ### Settings Location
 The application automatically manages settings in platform-specific locations:
 
-- **macOS**: `~/Library/Application Support/mcp-bouncer/settings.json`
-- **Linux**: `~/.config/mcp-bouncer/settings.json`
-- **Windows**: `%APPDATA%\mcp-bouncer\settings.json`
+- **macOS**: `~/Library/Application Support/app.mcp.bouncer/settings.json`
+- **Linux**: `~/.config/app.mcp.bouncer/settings.json`
+- **Windows**: `%APPDATA%\app.mcp.bouncer\settings.json`
 
 ### Configuration Format
 
@@ -225,7 +226,7 @@ mcp-bouncer/
   - Code is split into focused modules (config, client, status, events) for testability; `main.rs` stays thin.
 - **Frontend**: React 19 + TypeScript + Tailwind CSS 4 + Vite.
   - Uses `@tauri-apps/api` and a small adapter at `src/tauri/bridge.ts` for commands and events.
-- **Settings**: JSON at `$XDG_CONFIG_HOME/mcp-bouncer/settings.json`.
+- **Settings**: JSON at `$XDG_CONFIG_HOME/app.mcp.bouncer/settings.json`.
 - TypeScript bindings for Tauri commands and shared structs are generated automatically in debug builds using specta + tauri-specta. The generated file is at `src/tauri/bindings.ts`, and the frontend uses a thin adapter `src/tauri/bridge.ts` for ergonomic calls.
 
 ### Dev Commands

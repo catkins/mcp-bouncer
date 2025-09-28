@@ -1,5 +1,7 @@
 This file provides guidance to coding agents when working with code in this repository.
 
+**Please use the standard edit tooling (`apply_patch`, etc.) for file changes; do not invoke ad-hoc Python scripts to rewrite files.**
+
 ## Development Commands (Tauri v2)
 
 ### App (dev/build)
@@ -59,7 +61,7 @@ This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the of
   - STDIO: `TokioChildProcess`
 - Emits events consumed by UI:
   - `mcp:servers_updated`, `settings:updated`, `mcp:client_status_changed`, `mcp:client_error`, `mcp:incoming_clients_updated`
-- Settings JSON: `$XDG_CONFIG_HOME/mcp-bouncer/settings.json`
+- Settings JSON: `$XDG_CONFIG_HOME/app.mcp.bouncer/settings.json`
 - Incoming clients: recorded when rmcp Initialize is received; `connected_at` uses RFC3339 (ISO 8601) strings for robust JS parsing.
 
 #### Intercepting transport architecture
@@ -68,7 +70,7 @@ This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the of
 - The interceptors store per-request state (start time, serialized payloads, inferred server metadata) so logs have consistent structure regardless of direction. When introducing a new transport, make sure it is wrapped before calling `.serve(...)`, and that the caller passes an emitter + logger through to `ensure_rmcp_client`.
 
 #### JSON-RPC Logging (SQLite)
-- Always-on: the backend persistently logs JSON-RPC requests/responses to a SQLite database at `$XDG_CONFIG_HOME/mcp-bouncer/logs.sqlite`.
+- Always-on: the backend persistently logs JSON-RPC requests/responses to a SQLite database at `$XDG_CONFIG_HOME/app.mcp.bouncer/logs.sqlite`.
 - Schema:
   - `sessions(session_id TEXT PRIMARY KEY, created_at_ms INTEGER, client_name TEXT, client_version TEXT, client_protocol TEXT, last_seen_at_ms INTEGER)`
   - `rpc_events(id TEXT PRIMARY KEY, ts_ms INTEGER, session_id TEXT, method TEXT, server_name TEXT, server_version TEXT, server_protocol TEXT, duration_ms INTEGER, ok INTEGER, error TEXT, request_json TEXT, response_json TEXT)`
@@ -78,6 +80,7 @@ This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the of
   - Events are buffered and flushed every ~250 ms or when batches reach 256 items.
   - The connection runs in WAL mode and triggers `PRAGMA wal_checkpoint(TRUNCATE)` roughly once per second and on explicit flush.
   - Tests may force a flush + checkpoint via `mcp_bouncer::logging::force_flush_and_checkpoint().await`.
+- The React app queries this database directly via `@tauri-apps/plugin-sql` (`src/lib/sqlLogging.ts`); the Rust crate no longer exposes Tauri commands for listing logs or histograms.
 - Querying examples:
   - `SELECT COUNT(*) FROM rpc_events;`
   - `SELECT DISTINCT method FROM rpc_events;`
@@ -108,6 +111,7 @@ This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the of
 ### Frontend (React)
 - Uses `src/tauri/bridge.ts` (which wraps the generated `src/tauri/bindings.ts`)
 - Hooks (`useMCPService`, `useIncomingClients`) subscribe via `event.listen`
+- Logs UI data flows through `src/lib/sqlLogging.ts`, which talks to the SQLite database via `@tauri-apps/plugin-sql`.
 
 ## Project Structure (Tauri standard)
 

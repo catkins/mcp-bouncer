@@ -1,48 +1,10 @@
 // SQL service using Tauri SQL plugin for logging database operations
 import Database from '@tauri-apps/plugin-sql';
+import type { LogsHistogram, LogsHistogramBucket, LogsQueryParams, RpcLog } from '../types/logs';
 
-export interface EventRow {
-  id: string;
-  ts_ms: number;
-  session_id: string;
-  method: string;
-  server_name?: string | undefined;
-  server_version?: string | undefined;
-  server_protocol?: string | undefined;
-  duration_ms?: number | undefined;
-  ok: boolean;
-  error?: string | undefined;
-  request_json?: Record<string, any> | undefined;
-  response_json?: Record<string, any> | undefined;
-}
+type EventRow = RpcLog;
 
-export interface HistogramCount {
-  method: string;
-  count: number;
-}
-
-export interface HistogramBucket {
-  start_ts_ms: number;
-  end_ts_ms: number;
-  counts: HistogramCount[];
-}
-
-export interface EventHistogram {
-  start_ts_ms?: number;
-  end_ts_ms?: number;
-  bucket_width_ms: number;
-  buckets: HistogramBucket[];
-}
-
-export interface QueryParams {
-  server?: string;
-  method?: string;
-  ok?: boolean;
-  limit?: number;
-  after?: { ts_ms: number; id: string };
-  start_ts_ms?: number;
-  end_ts_ms?: number;
-}
+type QueryParams = LogsQueryParams;
 
 export interface HistogramParams {
   server?: string;
@@ -164,32 +126,32 @@ class SQLLoggingService {
   }
 
   private mapEventRow = (row: any): EventRow => {
-    const requestJson = row.request_json ? this.safeJsonParse(row.request_json) : undefined;
-    const responseJson = row.response_json ? this.safeJsonParse(row.response_json) : undefined;
-    
+    const parseField = (value: unknown) => {
+      if (typeof value === 'string') {
+        try {
+          return JSON.parse(value);
+        } catch {
+          return null;
+        }
+      }
+      return value ?? null;
+    };
+
     return {
-      id: row.id,
-      ts_ms: row.ts_ms,
-      session_id: row.session_id,
-      method: row.method,
-      server_name: row.server_name || undefined,
-      server_version: row.server_version || undefined,
-      server_protocol: row.server_protocol || undefined,
-      duration_ms: row.duration_ms || undefined,
+      id: String(row.id),
+      ts_ms: Number(row.ts_ms),
+      session_id: String(row.session_id),
+      method: String(row.method),
+      server_name: row.server_name ?? null,
+      server_version: row.server_version ?? null,
+      server_protocol: row.server_protocol ?? null,
+      duration_ms: row.duration_ms != null ? Number(row.duration_ms) : null,
       ok: Boolean(row.ok),
-      error: row.error || undefined,
-      request_json: requestJson,
-      response_json: responseJson,
+      error: row.error ?? null,
+      request_json: parseField(row.request_json),
+      response_json: parseField(row.response_json),
     };
   };
-
-  private safeJsonParse(json: string): Record<string, any> | undefined {
-    try {
-      return JSON.parse(json);
-    } catch {
-      return undefined;
-    }
-  }
 
   async queryEventsSince(
     since_ts_ms: number,
@@ -225,14 +187,14 @@ class SQLLoggingService {
     return result[0]?.count || 0;
   }
 
-  async queryEventHistogram(params: HistogramParams = {}): Promise<EventHistogram> {
+  async queryEventHistogram(params: HistogramParams = {}): Promise<LogsHistogram> {
     if (!this.db) throw new Error('Database not initialized');
 
     // Get time range
     const { min_ts, max_ts } = await this.getTimeRange(params);
-    
-    if (!min_ts || !max_ts) {
-      return { bucket_width_ms: 0, buckets: [] };
+
+    if (min_ts == null || max_ts == null) {
+      return { start_ts_ms: null, end_ts_ms: null, bucket_width_ms: 0, buckets: [] };
     }
 
     const range_ms = max_ts - min_ts;
@@ -245,8 +207,8 @@ class SQLLoggingService {
     const buckets = this.buildHistogramBuckets(min_ts, range_ms, bucketWidth, histogramData);
 
     return {
-      start_ts_ms: min_ts,
-      end_ts_ms: max_ts,
+      start_ts_ms: Number(min_ts),
+      end_ts_ms: Number(max_ts),
       bucket_width_ms: bucketWidth,
       buckets,
     };
@@ -311,9 +273,9 @@ class SQLLoggingService {
     range_ms: number,
     bucketWidth: number,
     histogramData: Array<{ bucket_idx: number; method: string; count: number }>
-  ): HistogramBucket[] {
+  ): LogsHistogramBucket[] {
     const bucketCount = Math.floor(range_ms / bucketWidth) + 1;
-    const buckets: HistogramBucket[] = [];
+    const buckets: LogsHistogramBucket[] = [];
 
     // Initialize empty buckets
     for (let i = 0; i < bucketCount; i++) {
@@ -331,7 +293,7 @@ class SQLLoggingService {
       if (bucket && bucketIndex >= 0) {
         bucket.counts.push({
           method: row.method,
-          count: row.count,
+          count: Number(row.count),
         });
       }
     }

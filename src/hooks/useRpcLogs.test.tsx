@@ -3,7 +3,7 @@ import type { MockInstance } from 'vitest';
 import { renderHook, act, cleanup } from '@testing-library/react';
 import type { RpcLog } from '../types/logs';
 import { useRpcLogs } from './useRpcLogs';
-import { MCPService } from '../tauri/bridge';
+import { sqlLoggingService } from '../lib/sqlLogging';
 import * as events from '../tauri/events';
 
 describe('useRpcLogs', () => {
@@ -16,18 +16,12 @@ describe('useRpcLogs', () => {
   };
   let eventListener: ((evt: { payload: RpcLog }) => void) | null = null;
   let logsListSpy: MockInstance;
-  let logsListSinceSpy: MockInstance;
-  let logsCountSpy: MockInstance;
   let onSpy: MockInstance;
   let safeUnlistenSpy: MockInstance;
 
 beforeEach(() => {
-  logsListSpy = vi.spyOn(MCPService as any, 'LogsList');
+  logsListSpy = vi.spyOn(sqlLoggingService as any, 'queryEvents');
   logsListSpy.mockResolvedValue([baseLog]);
-  logsListSinceSpy = vi.spyOn(MCPService as any, 'LogsListSince');
-  logsListSinceSpy.mockResolvedValue([]);
-  logsCountSpy = vi.spyOn(MCPService as any, 'LogsCount');
-  logsCountSpy.mockResolvedValue(0);
   onSpy = vi.spyOn(events as any, 'on');
   onSpy.mockImplementation(async (_name: string, cb: (evt: { payload: RpcLog }) => void) => {
     eventListener = cb;
@@ -41,8 +35,6 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   logsListSpy.mockRestore();
-  logsListSinceSpy.mockRestore();
-  logsCountSpy.mockRestore();
   onSpy.mockRestore();
   safeUnlistenSpy.mockRestore();
   eventListener = null;

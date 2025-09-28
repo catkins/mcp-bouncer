@@ -17,9 +17,7 @@ pub mod unauthorized;
 pub mod logging {
     pub use crate::logging_core::{Event, RpcEventPublisher};
     pub use crate::logging_sqlite::{
-        EventHistogram, EventRow, HistogramBucket, HistogramCount, HistogramParams, QueryParams,
-        SqlitePublisher, count_events, db_path, force_flush_and_checkpoint, init_once,
-        init_once_with, log_rpc_event, migrations, query_event_histogram, query_events,
-        query_events_since,
+        SqlitePublisher, db_path, force_flush_and_checkpoint, init_once, init_once_with,
+        log_rpc_event, migrations,
     };
 }
