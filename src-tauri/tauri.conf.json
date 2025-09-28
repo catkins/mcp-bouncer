@@ -16,7 +16,7 @@
   },
   "app": {
     "security": {
-      "capabilities": ["events"]
+      "capabilities": ["events", "sql"]
     },
     "windows": [
       {
