@@ -27,34 +27,39 @@ export function TabSwitcher({
   const inactiveBadge = 'bg-purple-500/20 text-purple-700 dark:text-purple-200';
 
   return (
-    <div className="inline-flex gap-2 mb-4">
-      <button
-        className={`${base} ${value === 'servers' ? active : inactive}`}
-        onClick={() => onChange('servers')}
-      >
-        Servers
-        <span className={`${badge} ${value === 'servers' ? activeBadge : inactiveBadge}`}>
-          {serverCount}
-        </span>
-      </button>
-      <button
-        className={`${base} ${value === 'clients' ? active : inactive}`}
-        onClick={() => onChange('clients')}
-      >
-        Clients
-        <span className={`${badge} ${value === 'clients' ? activeBadge : inactiveBadge}`}>
-          {clientCount}
-        </span>
-      </button>
-      <button
-        className={`${base} ${value === 'logs' ? active : inactive}`}
-        onClick={() => onChange('logs')}
-      >
-        Logs
-        <span className={`${badge} ${value === 'logs' ? activeBadge : inactiveBadge}`}>
-          {logsCount}
-        </span>
-      </button>
-    </div>
+    <>
+      <div className="fixed top-14 left-0 right-0 z-30 bg-gray-50/90 dark:bg-gray-800/60 backdrop-blur-md border-b border-gray-200/70 dark:border-gray-700/50">
+        <div className="mx-auto flex max-w-5xl flex-wrap gap-2 px-6 py-2.5">
+          <button
+            className={`${base} ${value === 'servers' ? active : inactive}`}
+            onClick={() => onChange('servers')}
+          >
+            Servers
+            <span className={`${badge} ${value === 'servers' ? activeBadge : inactiveBadge}`}>
+              {serverCount}
+            </span>
+          </button>
+          <button
+            className={`${base} ${value === 'clients' ? active : inactive}`}
+            onClick={() => onChange('clients')}
+          >
+            Clients
+            <span className={`${badge} ${value === 'clients' ? activeBadge : inactiveBadge}`}>
+              {clientCount}
+            </span>
+          </button>
+          <button
+            className={`${base} ${value === 'logs' ? active : inactive}`}
+            onClick={() => onChange('logs')}
+          >
+            Logs
+            <span className={`${badge} ${value === 'logs' ? activeBadge : inactiveBadge}`}>
+              {logsCount}
+            </span>
+          </button>
+        </div>
+      </div>
+      <div className="h-[60px]" aria-hidden />
+    </>
   );
 }
