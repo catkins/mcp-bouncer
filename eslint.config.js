@@ -8,10 +8,18 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['node_modules/**', 'dist/**', 'storybook-static/**', 'src/tauri/bindings.ts', 'src-tauri/target/**', 'target/**'],
+    ignores: [
+      'node_modules/**',
+      'dist/**',
+      'storybook-static/**',
+      'src/tauri/bindings.ts',
+      'src-tauri/**',
+      'target/**',
+    ],
   },
   js.configs.recommended,
   {
+    files: ['**/*.{ts,tsx,js,jsx}'],
     plugins: { '@typescript-eslint': tsPlugin, react: reactPlugin, 'react-hooks': reactHooks },
     settings: { react: { version: 'detect' } },
     languageOptions: {
@@ -25,8 +33,10 @@ export default [
       'no-undef': 'off',
       'no-useless-escape': 'off',
       'no-redeclare': 'off',
-      // TS-specific sane defaults
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
     },
   },
   {
