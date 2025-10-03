@@ -332,8 +332,8 @@ async fn mcp_refresh_client_tools(
     }
     mcp_bouncer::tools_cache::set(&client_name, out.clone()).await;
     mcp_bouncer::overlay::set_tools(&client_name, out.len() as u32).await;
-    // Log listTools event for internal refresh + emit live update
-    let mut evt = Event::new("listTools", format!("internal::{client_name}"));
+    // Log tools/list event for internal refresh + emit live update
+    let mut evt = Event::new("tools/list", format!("internal::{client_name}"));
     evt.server_name = Some(client_name.clone());
     // Mirror the external JSON-RPC-ish shape used elsewhere
     evt.request_json = Some(serde_json::json!({

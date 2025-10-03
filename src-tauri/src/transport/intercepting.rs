@@ -194,6 +194,17 @@ fn client_notification_envelope_json(
     .ok()
 }
 
+fn method_from_envelope_or_fallback(
+    envelope: Option<&serde_json::Value>,
+    fallback: &str,
+) -> String {
+    envelope
+        .and_then(|payload| payload.get("method"))
+        .and_then(|method| method.as_str())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| fallback.to_string())
+}
+
 fn server_response_envelope_json(
     result: &ServerResult,
     id: &RequestId,
@@ -327,8 +338,11 @@ where
 
     async fn log_notification(&self, notification: &mcp::ClientNotification) {
         let session_id = self.current_session_id().await;
-        let mut event = Event::new("notification", session_id);
-        event.request_json = client_notification_envelope_json(notification);
+        let mut event = Event::new("notifications/unknown", session_id);
+        let request_json = client_notification_envelope_json(notification);
+        let method = method_from_envelope_or_fallback(request_json.as_ref(), "notifications/unknown");
+        event.request_json = request_json;
+        event.method = method;
         event.ok = true;
         self.logger.log_and_emit(&self.emitter, event);
     }
@@ -379,7 +393,9 @@ where
                     .map(|s| s.to_string());
                     event.client_protocol = Some("jsonrpc-2.0".into());
                 }
+                let method = method_from_envelope_or_fallback(request_json.as_ref(), "initialize");
                 event.request_json = request_json;
+                event.method = method;
                 Some(PendingRequest {
                     started_at: Instant::now(),
                     event,
@@ -388,9 +404,11 @@ where
             }
             ClientRequest::ListToolsRequest(_) => {
                 let session_id = self.current_session_id().await;
-                let mut event = Event::new("listTools", session_id);
+                let mut event = Event::new("tools/list", session_id);
                 event.server_name = Some("aggregate".into());
+                let method = method_from_envelope_or_fallback(request_json.as_ref(), "tools/list");
                 event.request_json = request_json;
+                event.method = method;
                 Some(PendingRequest {
                     started_at: Instant::now(),
                     event,
@@ -399,7 +417,7 @@ where
             }
             ClientRequest::CallToolRequest(req) => {
                 let session_id = self.current_session_id().await;
-                let mut event = Event::new("callTool", session_id);
+                let mut event = Event::new("tools/call", session_id);
                 let name = req.params.name.as_ref();
                 if let Some(server) = name
                     .split_once("::")
@@ -408,7 +426,9 @@ where
                 {
                     event.server_name = Some(server);
                 }
+                let method = method_from_envelope_or_fallback(request_json.as_ref(), "tools/call");
                 event.request_json = request_json;
+                event.method = method;
                 Some(PendingRequest {
                     started_at: Instant::now(),
                     event,
@@ -418,7 +438,9 @@ where
             _ => {
                 let session_id = self.current_session_id().await;
                 let mut event = Event::new("other", session_id);
+                let method = method_from_envelope_or_fallback(request_json.as_ref(), "other");
                 event.request_json = request_json;
+                event.method = method;
                 Some(PendingRequest {
                     started_at: Instant::now(),
                     event,
@@ -637,9 +659,12 @@ where
     }
 
     async fn log_server_notification(&self, notification: ServerNotification) {
-        let mut event = Event::new("notification", self.session_id.clone());
+        let mut event = Event::new("notifications/unknown", self.session_id.clone());
         event.server_name = Some(self.server_name.clone());
-        event.request_json = server_notification_envelope_json(&notification);
+        let request_json = server_notification_envelope_json(&notification);
+        let method = method_from_envelope_or_fallback(request_json.as_ref(), "notifications/unknown");
+        event.request_json = request_json;
+        event.method = method;
         self.populate_server_details(&mut event).await;
         self.logger.log_and_emit(&self.emitter, event);
     }
@@ -685,12 +710,12 @@ where
                 (event, PendingKind::Initialize)
             }
             ClientRequest::ListToolsRequest(_) => {
-                let mut event = Event::new("listTools", session_id);
+                let mut event = Event::new("tools/list", session_id);
                 event.server_name = Some(self.server_name.clone());
                 (event, PendingKind::ListTools)
             }
             ClientRequest::CallToolRequest(_) => {
-                let mut event = Event::new("callTool", session_id);
+                let mut event = Event::new("tools/call", session_id);
                 event.server_name = Some(self.server_name.clone());
                 (event, PendingKind::CallTool)
             }
@@ -700,7 +725,15 @@ where
                 (event, PendingKind::Other)
             }
         };
+        let fallback = match kind {
+            PendingKind::Initialize => "initialize",
+            PendingKind::ListTools => "tools/list",
+            PendingKind::CallTool => "tools/call",
+            PendingKind::Other => "other",
+        };
+        let method = method_from_envelope_or_fallback(request_json.as_ref(), fallback);
         event.request_json = request_json;
+        event.method = method;
         if !matches!(kind, PendingKind::Initialize) {
             self.populate_server_details(&mut event).await;
         }
@@ -1015,7 +1048,7 @@ mod tests {
         let events = logger.take();
         assert_eq!(events.len(), 1);
         let event = &events[0];
-        assert_eq!(event.method, "callTool");
+        assert_eq!(event.method, "tools/call");
         assert_eq!(event.server_name.as_deref(), Some("srv"));
         assert_eq!(event.server_version.as_deref(), Some("1.2.3"));
         assert_eq!(event.server_protocol.as_deref(), Some("jsonrpc-2.0"));

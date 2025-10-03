@@ -36,14 +36,14 @@ const histogramPayload = {
       end_ts_ms: 2_000,
       counts: [
         { method: 'initialize', count: 1 },
-        { method: 'listTools', count: 2 },
+        { method: 'tools/list', count: 2 },
       ],
     },
     {
       start_ts_ms: 2_000,
       end_ts_ms: 3_000,
       counts: [
-        { method: 'callTool', count: 3 },
+        { method: 'tools/call', count: 3 },
       ],
     },
     {

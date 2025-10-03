@@ -1,19 +1,34 @@
 import { format } from 'date-fns';
-import { CheckCircleIcon, XCircleIcon, RocketLaunchIcon, WrenchScrewdriverIcon, PlayCircleIcon, EllipsisHorizontalCircleIcon } from '@heroicons/react/20/solid';
+import { CheckCircleIcon, XCircleIcon, RocketLaunchIcon, WrenchScrewdriverIcon, PlayCircleIcon, EllipsisHorizontalCircleIcon, BellAlertIcon } from '@heroicons/react/20/solid';
 import type { RpcLog } from '../../types/logs';
 import { HighlightedJson } from './HighlightedJson';
 
+function isNotificationMethod(method: string) {
+  return method.startsWith('notifications/');
+}
+
+function isListToolsMethod(method: string) {
+  return method === 'tools/list';
+}
+
+function isCallToolMethod(method: string) {
+  return method === 'tools/call';
+}
+
 function methodIcon(method: string) {
-  switch (method) {
-    case 'initialize':
-      return <RocketLaunchIcon className="h-4 w-4 text-blue-500" />;
-    case 'listTools':
-      return <WrenchScrewdriverIcon className="h-4 w-4 text-purple-500" />;
-    case 'callTool':
-      return <PlayCircleIcon className="h-4 w-4 text-amber-500" />;
-    default:
-      return <EllipsisHorizontalCircleIcon className="h-4 w-4 text-gray-400" />;
+  if (isNotificationMethod(method)) {
+    return <BellAlertIcon className="h-4 w-4 text-teal-500" />;
   }
+  if (isListToolsMethod(method)) {
+    return <WrenchScrewdriverIcon className="h-4 w-4 text-purple-500" />;
+  }
+  if (isCallToolMethod(method)) {
+    return <PlayCircleIcon className="h-4 w-4 text-amber-500" />;
+  }
+  if (method === 'initialize') {
+    return <RocketLaunchIcon className="h-4 w-4 text-blue-500" />;
+  }
+  return <EllipsisHorizontalCircleIcon className="h-4 w-4 text-gray-400" />;
 }
 
 export function LogListItem({ item }: { item: RpcLog }) {
@@ -24,7 +39,9 @@ export function LogListItem({ item }: { item: RpcLog }) {
         <div className="flex items-center gap-1.5">
           {methodIcon(item.method)}
           <div className="text-sm font-medium leading-tight text-gray-800 dark:text-gray-100">
-            {item.method}
+            <code className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[11px] tracking-tight text-gray-700 dark:bg-gray-800 dark:text-gray-200">
+              {item.method}
+            </code>
             {item.server_name ? (
               <span className="ml-1 text-xs font-normal text-gray-500 dark:text-gray-400">· {item.server_name}</span>
             ) : null}

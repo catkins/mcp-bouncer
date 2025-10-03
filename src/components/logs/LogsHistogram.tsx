@@ -8,19 +8,33 @@ import { EVENT_LOGS_RPC_EVENT, on, safeUnlisten } from '../../tauri/events';
 
 const METHOD_COLORS: Record<MethodCategory, string> = {
   initialize: '#3B82F6',
-  listTools: '#A855F7',
-  callTool: '#F59E0B',
+  'tools/list': '#A855F7',
+  'tools/call': '#F59E0B',
+  notification: '#14B8A6',
   other: '#9CA3AF',
 };
 
 const METHOD_LABELS: Record<MethodCategory, string> = {
   initialize: 'initialize',
-  listTools: 'listTools',
-  callTool: 'callTool',
+  'tools/list': 'tools/list',
+  'tools/call': 'tools/call',
+  notification: 'notifications/*',
   other: 'other',
 };
 
-type MethodCategory = 'initialize' | 'listTools' | 'callTool' | 'other';
+type MethodCategory = 'initialize' | 'tools/list' | 'tools/call' | 'notification' | 'other';
+
+function isNotificationMethod(method: string) {
+  return method.startsWith('notifications/');
+}
+
+function isListToolsMethod(method: string) {
+  return method === 'tools/list';
+}
+
+function isCallToolMethod(method: string) {
+  return method === 'tools/call';
+}
 
 type LogsHistogramProps = {
   server?: string;
@@ -40,12 +54,10 @@ function categorizeMethod(method: string): MethodCategory {
   switch (method) {
     case 'initialize':
       return 'initialize';
-    case 'listTools':
-      return 'listTools';
-    case 'callTool':
-      return 'callTool';
     default:
-      return 'other';
+      if (isListToolsMethod(method)) return 'tools/list';
+      if (isCallToolMethod(method)) return 'tools/call';
+      return isNotificationMethod(method) ? 'notification' : 'other';
   }
 }
 
@@ -135,19 +147,21 @@ export function LogsHistogram({ server, method, ok, range, onRangeChange }: Logs
       return { option: null, hasData: false, startTs: null, endTs: null };
     }
 
-    const seriesOrder: MethodCategory[] = ['initialize', 'listTools', 'callTool', 'other'];
+    const seriesOrder: MethodCategory[] = ['initialize', 'tools/list', 'tools/call', 'notification', 'other'];
     const bucketPoints: Record<MethodCategory, ChartPoint[]> = {
       initialize: [],
-      listTools: [],
-      callTool: [],
+      'tools/list': [],
+      'tools/call': [],
+      notification: [],
       other: [],
     };
 
     for (const bucket of data.buckets) {
       const aggregated: Record<MethodCategory, number> = {
         initialize: 0,
-        listTools: 0,
-        callTool: 0,
+        'tools/list': 0,
+        'tools/call': 0,
+        notification: 0,
         other: 0,
       };
       for (const count of bucket.counts) {

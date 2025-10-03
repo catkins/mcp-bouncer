@@ -11,7 +11,7 @@ describe('useRpcLogs', () => {
     id: '1',
     ts_ms: 200,
     session_id: 's',
-    method: 'callTool',
+    method: 'tools/call',
     ok: true,
   };
   let eventListener: ((evt: { payload: RpcLog }) => void) | null = null;

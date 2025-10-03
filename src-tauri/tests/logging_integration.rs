@@ -210,7 +210,7 @@ async fn logging_persists_events_to_sqlite() {
         methods.push(row.try_get::<String, _>(0).expect("method column"));
     }
     assert!(methods.iter().any(|m| m == "initialize"));
-    assert!(methods.iter().any(|m| m == "listTools") || methods.iter().any(|m| m == "callTool"));
+    assert!(methods.iter().any(|m| m == "tools/list") || methods.iter().any(|m| m == "tools/call"));
 
     let sess_cnt: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sessions")
         .fetch_one(&mut conn)
@@ -373,16 +373,16 @@ async fn logging_persists_error_and_redacts_sensitive_fields() {
         .connect()
         .await
         .expect("open sqlite");
-    // Ensure at least one callTool event exists
+    // Ensure at least one tools/call event exists
     let call_cnt: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM rpc_events WHERE method='callTool'")
+        sqlx::query_scalar("SELECT COUNT(*) FROM rpc_events WHERE method='tools/call'")
             .fetch_one(&mut conn)
             .await
-            .expect("count callTool rows");
-    assert!(call_cnt >= 1, "expected at least one callTool event");
-    // Sensitive raw values should not appear in any callTool request_json
+            .expect("count tools/call rows");
+    assert!(call_cnt >= 1, "expected at least one tools/call event");
+    // Sensitive raw values should not appear in any tools/call request_json
     let leaked_cnt: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM rpc_events WHERE method='callTool' AND (request_json LIKE '%s3cr3t%' OR request_json LIKE '%Bearer abc%')",
+        "SELECT COUNT(*) FROM rpc_events WHERE method='tools/call' AND (request_json LIKE '%s3cr3t%' OR request_json LIKE '%Bearer abc%')",
     )
     .fetch_one(&mut conn)
     .await
@@ -393,10 +393,10 @@ async fn logging_persists_error_and_redacts_sensitive_fields() {
     );
 
     // Inspect stored rows to ensure sensitive values were redacted
-    let rows = sqlx::query("SELECT request_json FROM rpc_events WHERE method='callTool'")
+    let rows = sqlx::query("SELECT request_json FROM rpc_events WHERE method='tools/call'")
         .fetch_all(&mut conn)
         .await
-        .expect("load callTool rows");
+        .expect("load tools/call rows");
     for row in rows {
         let payload: Option<String> = row.try_get(0).ok();
         if let Some(body) = payload {
@@ -529,7 +529,7 @@ async fn logging_persists_many_calltool_events_in_batches() {
         };
     let url = format!("http://{}:{}/mcp", bound.ip(), bound.port());
 
-    // Client connects and sends many callTool requests
+    // Client connects and sends many tools/call requests
     let transport = StreamableHttpClientTransport::from_uri(url);
     let client = ().serve(transport).await.expect("serve client");
     let _ = client.list_all_tools().await.expect("list tools");
@@ -549,7 +549,7 @@ async fn logging_persists_many_calltool_events_in_batches() {
 
     mcp_bouncer::logging::force_flush_and_checkpoint().await;
 
-    // Verify enough callTool rows are present
+    // Verify enough tools/call rows are present
     let db_path = mcp_bouncer::logging::db_path().expect("logger should expose db_path");
     let mut conn = SqliteConnectOptions::new()
         .filename(&db_path)
@@ -558,13 +558,13 @@ async fn logging_persists_many_calltool_events_in_batches() {
         .await
         .expect("open sqlite");
     let call_cnt: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM rpc_events WHERE method='callTool'")
+        sqlx::query_scalar("SELECT COUNT(*) FROM rpc_events WHERE method='tools/call'")
             .fetch_one(&mut conn)
             .await
-            .expect("count callTool rows");
+            .expect("count tools/call rows");
     assert!(
         call_cnt >= 1,
-        "expected at least one callTool event, had {call_cnt}"
+        "expected at least one tools/call event, had {call_cnt}"
     );
 
     // keyset pagination sanity check using raw SQL
