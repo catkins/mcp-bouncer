@@ -6,7 +6,8 @@ import { useRpcLogs } from '../hooks/useRpcLogs';
 import { sqlLoggingService } from '../lib/sqlLogging';
 
 export function LogsPage() {
-  const { items, loading, hasMore, server, method, okFlag, timeRange, reset, loadMore } = useRpcLogs();
+  const { items, loading, hasMore, server, method, okFlag, timeRange, reset, loadMore } =
+    useRpcLogs();
   const [count, setCount] = useState<number | null>(null);
 
   useEffect(() => {
@@ -48,9 +49,9 @@ export function LogsPage() {
           {...(server !== undefined ? { server } : {})}
           {...(method !== undefined ? { method } : {})}
           {...(okFlag !== undefined ? { ok: okFlag } : {})}
-          onServerChange={(s) => reset({ server: s as string | undefined })}
-          onMethodChange={(m) => reset({ method: m as string | undefined })}
-          onOkChange={(v) => reset({ ok: v as boolean | undefined })}
+          onServerChange={s => reset({ server: s as string | undefined })}
+          onMethodChange={m => reset({ method: m as string | undefined })}
+          onOkChange={v => reset({ ok: v as boolean | undefined })}
         />
         <div className="text-xs text-gray-500">{count === null ? '—' : `${count} events`}</div>
       </div>
