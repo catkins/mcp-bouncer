@@ -6,6 +6,7 @@ interface ToggleSwitchProps {
   className?: string;
   label?: string;
   description?: string;
+  ariaLabel?: string;
 }
 
 export function ToggleSwitch({
@@ -16,6 +17,7 @@ export function ToggleSwitch({
   className = '',
   label,
   description,
+  ariaLabel,
 }: ToggleSwitchProps) {
   const sizeClasses = {
     sm: 'w-8 h-4',
@@ -56,7 +58,7 @@ export function ToggleSwitch({
           }
           ${disabled && checked ? 'animate-pulse' : ''}
         `}
-        aria-label={label || 'Toggle switch'}
+        aria-label={ariaLabel ?? label ?? 'Toggle switch'}
       >
         <span
           className={`

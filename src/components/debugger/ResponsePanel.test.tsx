@@ -59,8 +59,10 @@ describe('ResponsePanel', () => {
     render(<ResponsePanel callResult={baseOutcome} callError={null} selectedToolName="server::alpha" />);
 
     expect(screen.getByText('result')).toBeInTheDocument();
-    const toggle = screen.getByLabelText(/rich view/i);
-    fireEvent.click(toggle);
+    const viewModeLabel = screen.getByText(/View Mode/i);
+    const toggleButton = viewModeLabel.parentElement?.querySelector('button');
+    expect(toggleButton).toBeTruthy();
+    fireEvent.click(toggleButton!);
     expect(screen.getByText(/raw json/i)).toBeInTheDocument();
   });
 
