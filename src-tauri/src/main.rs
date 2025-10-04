@@ -355,8 +355,8 @@ async fn fetch_and_cache_tools(
             input_schema,
         });
     }
-    mcp_bouncer::tools_cache::set(&client_name, out.clone()).await;
-    mcp_bouncer::overlay::set_tools(&client_name, out.len() as u32).await;
+    mcp_bouncer::tools_cache::set(client_name, out.clone()).await;
+    mcp_bouncer::overlay::set_tools(client_name, out.len() as u32).await;
     // Log tools/list event for internal refresh + emit live update
     let mut evt = Event::new("tools/list", format!("internal::{client_name}"));
     evt.server_name = Some(client_name.to_string());
