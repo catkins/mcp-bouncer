@@ -84,7 +84,7 @@ export const MCPService = {
     return await invoke('mcp_debug_call_tool', {
       serverName,
       toolName,
-      arguments: args ?? null,
+      args: args ?? null,
     });
   },
 };
