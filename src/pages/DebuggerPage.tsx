@@ -9,6 +9,7 @@ import { MCPService } from '../tauri/bridge';
 import { LoadingButton } from '../components/LoadingButton';
 import { HighlightedJson } from '../components/logs/HighlightedJson';
 import { ToggleSwitch } from '../components/ToggleSwitch';
+import { DropdownSelect } from '../components/DropdownSelect';
 import {
   BugAntIcon,
   MagnifyingGlassIcon,
@@ -276,7 +277,7 @@ export default function DebuggerPage({
           </div>
         </div>
       ) : (
-        <div className="grid flex-1 min-w-0 gap-4 lg:grid-cols-[minmax(220px,280px)_1fr] lg:items-stretch">
+        <div className="grid flex-1 min-w-0 gap-4 lg:grid-cols-[minmax(220px,280px)_1fr] lg:items-start">
           <ToolListPanel
             tools={tools}
             filteredTools={filteredTools}
@@ -288,7 +289,7 @@ export default function DebuggerPage({
             search={search}
             onSearchChange={setSearch}
           />
-          <div className="grid min-h-0 min-w-0 gap-4 lg:grid-rows-[minmax(260px,360px)_minmax(240px,1fr)]">
+          <div className="grid min-w-0 gap-4 lg:grid-rows-[auto_minmax(240px,1fr)]">
             <RequestPanel
               tool={selectedTool}
               disabled={!serverEligible || toolsLoading}
@@ -339,25 +340,17 @@ function DebuggerHeader({
           <p className="text-sm text-gray-500 dark:text-gray-400">Select a connected server to inspect its tools.</p>
         )}
       </div>
-      <div className="flex items-center gap-2">
-        <label className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-          Server
-        </label>
-        <select
-          value={selectedServer ?? ''}
-          onChange={event => onSelectServer(event.target.value || null)}
-          className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-        >
-          <option value="" disabled>
-            Choose server
-          </option>
-          {serverOptions.map(option => (
-            <option key={option.name} value={option.name}>
-              {option.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      <DropdownSelect
+        label="Server"
+        size="sm"
+        value={selectedServer ?? ''}
+        onChange={event => onSelectServer(event.target.value || null)}
+        options={[
+          { value: '', label: 'Choose server', disabled: true },
+          ...serverOptions.map(option => ({ value: option.name, label: option.name })),
+        ]}
+        className="w-56"
+      />
     </div>
   );
 }
@@ -492,13 +485,13 @@ function RequestPanel({
 }) {
   return (
     <div className="flex min-h-0 min-w-0 flex-col rounded-lg border border-gray-200 bg-white/90 p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/60">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex flex-col gap-1">
         <div className="flex items-center gap-2">
           <DocumentTextIcon className="h-4 w-4 text-blue-500" />
           <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Request</h3>
         </div>
         {tool?.description ? (
-          <span className="text-xs text-gray-500 dark:text-gray-400">{tool.description}</span>
+          <p className="text-xs text-gray-600 dark:text-gray-300">{tool.description}</p>
         ) : null}
       </div>
       {!tool ? (
@@ -604,7 +597,7 @@ function parseSchema(schema: unknown): ParsedSchema {
     const additional = obj.additionalProperties;
     const pattern = obj.patternProperties;
     const hasLooseProperties =
-      additional === undefined || (additional !== null && additional !== false);
+      additional === true || (additional && typeof additional === 'object');
     const hasPatternProperties =
       pattern && typeof pattern === 'object' && Object.keys(pattern as Record<string, unknown>).length > 0;
     if (!hasLooseProperties && !hasPatternProperties) {
@@ -860,7 +853,7 @@ function ToolRequestForm({
             <textarea
               value={jsonInput}
               onChange={event => setJsonInput(event.target.value)}
-              className="min-h-[200px] flex-1 rounded-md border border-gray-300 bg-white p-3 font-mono text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+              className="min-h-[160px] flex-1 rounded-md border border-gray-300 bg-white p-3 font-mono text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
               spellCheck={false}
               disabled={disabled || loading}
             />
@@ -879,13 +872,13 @@ function ToolRequestForm({
         )
       ) : (
         <form
-          className="flex flex-1 flex-col gap-3"
+          className="flex flex-1 flex-col gap-2"
           onSubmit={event => {
             event.preventDefault();
             void submitForm();
           }}
         >
-          <div className="flex flex-1 flex-col gap-3 overflow-y-auto pr-1">
+          <div className="flex flex-col gap-2">
             {fields.length === 0 ? (
               <div className="text-sm text-gray-500 dark:text-gray-400">
                 This tool does not declare any arguments.
@@ -969,15 +962,21 @@ function FieldInput({
   error?: string;
   disabled: boolean;
 }) {
+  const typeBadgeLabel = describeFieldType(field);
+  const isBooleanField = field.type === 'boolean';
+
   if (field.type === 'array') {
     const items: any[] = Array.isArray(value) ? value : [];
     return (
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
-            {field.name}
-            {field.required && <span className="ml-1 text-red-500">*</span>}
-          </label>
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+              {field.name}
+              {field.required && <span className="ml-1 text-red-500">*</span>}
+            </label>
+            <TypeBadge label={typeBadgeLabel} />
+          </div>
           <button
             type="button"
             onClick={() => onArrayAdd(field)}
@@ -990,7 +989,7 @@ function FieldInput({
         {field.description && (
           <p className="text-xs text-gray-500 dark:text-gray-400">{field.description}</p>
         )}
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1.5">
           {items.length === 0 ? (
             <p className="text-xs text-gray-500 dark:text-gray-400">No values</p>
           ) : (
@@ -1019,13 +1018,30 @@ function FieldInput({
     );
   }
 
-  const inputId = `field-${field.name}`;
+  const inputId = isBooleanField ? undefined : `field-${field.name}`;
   return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={inputId} className="text-sm font-medium text-gray-700 dark:text-gray-200">
-        {field.name}
-        {field.required && <span className="ml-1 text-red-500">*</span>}
-      </label>
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-2">
+        <label
+          {...(inputId ? { htmlFor: inputId } : {})}
+          className={`text-sm font-medium text-gray-700 dark:text-gray-200 ${
+            isBooleanField && !disabled ? 'cursor-pointer' : ''
+          }`}
+          {...(isBooleanField
+            ? {
+                onClick: () => {
+                  if (!disabled) {
+                    onChange(field.name, !value);
+                  }
+                },
+              }
+            : {})}
+        >
+          {field.name}
+          {field.required && <span className="ml-1 text-red-500">*</span>}
+        </label>
+        <TypeBadge label={typeBadgeLabel} />
+      </div>
       {field.description && (
         <p className="text-xs text-gray-500 dark:text-gray-400">{field.description}</p>
       )}
@@ -1039,6 +1055,29 @@ function FieldInput({
       {error && <span className="text-xs text-red-500">{error}</span>}
     </div>
   );
+}
+
+function TypeBadge({ label }: { label: string }) {
+  return (
+    <span
+      className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-600 dark:bg-gray-800/70 dark:text-gray-200"
+      title={`Field type: ${label}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+function describeFieldType(field: SchemaField): string {
+  if (field.type === 'array') {
+    const item = field.itemType ? formatTypeToken(field.itemType) : 'VALUE';
+    return `ARRAY<${item}>`;
+  }
+  return formatTypeToken(field.type);
+}
+
+function formatTypeToken(value: PrimitiveFieldType | 'array'): string {
+  return String(value ?? 'value').toUpperCase();
 }
 
 function PrimitiveInput({
@@ -1056,17 +1095,14 @@ function PrimitiveInput({
 }) {
   if (type === 'boolean') {
     return (
-      <label htmlFor={id} className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
-        <input
-          type="checkbox"
-          checked={Boolean(value)}
-          onChange={event => onChange(event.target.checked)}
-          disabled={disabled}
-          id={id}
-          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-        />
-        <span>{value ? 'true' : 'false'}</span>
-      </label>
+      <ToggleSwitch
+        checked={Boolean(value)}
+        onChange={checked => onChange(checked)}
+        disabled={disabled}
+        size="sm"
+        className="justify-start"
+        label={Boolean(value) ? 'True' : 'False'}
+      />
     );
   }
 
@@ -1077,7 +1113,7 @@ function PrimitiveInput({
       onChange={event => onChange(event.target.value)}
       step={type === 'integer' ? '1' : undefined}
       id={id}
-      className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+      className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
       disabled={disabled}
     />
   );

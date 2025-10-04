@@ -62,10 +62,10 @@ export function LoadingButton({
         loading ? 'animate-pulse' : ''
       } ${variant === 'primary' && !loading ? 'animate-gradient' : ''}`}
     >
-      {loading && (
-        <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-      )}
-      <span className={`transition-all duration-200 ${loading ? 'opacity-75' : ''}`}>
+      <span className={`transition-all duration-200 inline-flex items-center gap-1.5 ${loading ? 'opacity-75' : ''}`}>
+        {loading && (
+          <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+        )}
         {children}
       </span>
       {variant === 'primary' && !loading && (

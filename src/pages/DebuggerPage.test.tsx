@@ -145,6 +145,39 @@ describe('DebuggerPage', () => {
     });
   });
 
+  it('shows empty state when schema has an empty object definition', async () => {
+    const tool: Tool = {
+      name: 'server::noargs',
+      description: 'no args tool',
+      input_schema: {
+        type: 'object',
+        properties: {},
+      },
+    };
+    vi.mocked(MCPService.GetClientTools).mockResolvedValue([tool]);
+
+    render(
+      <DebuggerPage
+        servers={[serverConfig]}
+        clientStatus={{ server: connectedStatus }}
+        eligibleServers={['server']}
+        selectedServer="server"
+        onSelectServer={() => {}}
+        statusLoaded
+      />,
+    );
+
+    await waitFor(() => expect(vi.mocked(MCPService.GetClientTools)).toHaveBeenCalled());
+
+    expect(screen.getByText(/No request parameters needed/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Call Tool/i }));
+
+    await waitFor(() => {
+      expect(vi.mocked(MCPService.DebugCallTool)).toHaveBeenCalledWith('server', 'server::noargs', null);
+    });
+  });
+
   it('surfaces tool error messages when call fails', async () => {
     const tool: Tool = {
       name: 'server::boom',
