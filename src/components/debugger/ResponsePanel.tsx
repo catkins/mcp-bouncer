@@ -37,6 +37,9 @@ export function ResponsePanel({ callResult, callError, selectedToolName }: Respo
     ? 'rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-700 dark:bg-red-900/30 dark:text-red-200'
     : 'rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-200';
 
+  const showTopLevelError = !callResult && derivedErrorMessage;
+  const inlineError = callResult ? derivedErrorMessage : null;
+
   return (
     <div className="flex min-h-0 min-w-0 flex-col rounded-lg border border-gray-200 bg-white/90 p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/60">
       <div className="mb-3 flex items-center justify-between">
@@ -66,7 +69,7 @@ export function ResponsePanel({ callResult, callError, selectedToolName }: Respo
           </span>
         )}
       </div>
-      {derivedErrorMessage ? <div className={errorStyle}>{derivedErrorMessage}</div> : null}
+      {showTopLevelError ? <div className={errorStyle}>{showTopLevelError}</div> : null}
 
       {callResult ? (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
@@ -86,7 +89,9 @@ export function ResponsePanel({ callResult, callError, selectedToolName }: Respo
                 Tool Result {selectedToolName ? `(${selectedToolName})` : ''}
               </span>
             </div>
-            {richViewEnabled ? (
+            {inlineError ? (
+              <div className={errorStyle}>{inlineError}</div>
+            ) : richViewEnabled ? (
               <RichToolResult result={callResult.result} />
             ) : (
               <HighlightedJson
@@ -97,7 +102,7 @@ export function ResponsePanel({ callResult, callError, selectedToolName }: Respo
             )}
           </div>
         </div>
-      ) : !derivedErrorMessage ? (
+      ) : !showTopLevelError ? (
         <div className="flex flex-1 items-center justify-center text-sm text-gray-500 dark:text-gray-400">
           Execute a tool call to see the response payload.
         </div>

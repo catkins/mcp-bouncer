@@ -15,8 +15,8 @@ use mcp_bouncer::logging_origin;
 use mcp_bouncer::oauth::start_oauth_for_server;
 use mcp_bouncer::server::{get_runtime_listen_addr, start_http_server};
 use mcp_bouncer::unauthorized;
-use rmcp::model as mcp;
-use serde_json::Value as JsonValue;
+use rmcp::{ServiceError, model as mcp};
+use serde_json::{Value as JsonValue, json};
 use specta::Type;
 #[cfg(debug_assertions)]
 use specta_typescript::Typescript;
@@ -431,20 +431,95 @@ async fn mcp_debug_call_tool(
                     arguments: args_for_call,
                 })
                 .await
-                .map_err(|e| e.to_string())
         }
     })
-    .await?;
+    .await;
     let duration_ms = (start.elapsed().as_secs_f64() * 1_000.0).round();
-    let ok = result.is_error != Some(true);
-    let result_json = serde_json::to_value(&result).map_err(|e| e.to_string())?;
 
-    Ok(DebugCallToolResponse {
-        duration_ms,
-        ok,
-        result: result_json,
-        request_arguments,
+    match result {
+        Ok(call_result) => {
+            let ok = call_result.is_error != Some(true);
+            let result_json = serde_json::to_value(&call_result).map_err(|e| e.to_string())?;
+            Ok(DebugCallToolResponse {
+                duration_ms,
+                ok,
+                result: result_json,
+                request_arguments,
+            })
+        }
+        Err(service_error) => {
+            let payload = match &service_error {
+                ServiceError::McpError(error) => build_debug_call_error_payload(error),
+                other => build_debug_call_service_error_payload(other),
+            };
+            Ok(DebugCallToolResponse {
+                duration_ms,
+                ok: false,
+                result: payload,
+                request_arguments,
+            })
+        }
+    }
+}
+
+fn build_debug_call_error_payload(error: &mcp::ErrorData) -> JsonValue {
+    let error_value = serde_json::to_value(error).unwrap_or_else(|_| {
+        json!({
+            "message": error.to_string(),
+        })
+    });
+    let message = error.message.clone().into_owned();
+    json!({
+        "type": "rpc_error",
+        "message": message,
+        "error": error_value,
     })
+}
+
+fn build_debug_call_service_error_payload(error: &ServiceError) -> JsonValue {
+    json!({
+        "type": "service_error",
+        "message": error.to_string(),
+        "kind": format!("{error:?}"),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn build_debug_call_error_payload_preserves_code_and_message() {
+        let detail = json!({ "expected": "object", "received": "undefined" });
+        let error = mcp::ErrorData::invalid_params("Required", Some(detail.clone()));
+        let payload = build_debug_call_error_payload(&error);
+        assert_eq!(payload["type"], json!("rpc_error"));
+        assert_eq!(payload["message"], json!("Required"));
+        assert_eq!(payload["error"]["message"], json!("Required"));
+        assert_eq!(
+            payload["error"]["code"],
+            json!(mcp::ErrorCode::INVALID_PARAMS.0)
+        );
+        assert_eq!(payload["error"]["data"], detail);
+    }
+
+    #[test]
+    fn build_debug_call_service_error_payload_includes_message_and_kind() {
+        let payload = build_debug_call_service_error_payload(&ServiceError::TransportClosed);
+        assert_eq!(payload["type"], json!("service_error"));
+        assert!(
+            payload["message"]
+                .as_str()
+                .unwrap()
+                .contains("Transport closed")
+        );
+        assert!(
+            payload["kind"]
+                .as_str()
+                .unwrap()
+                .contains("TransportClosed")
+        );
+    }
 }
 
 async fn connect_and_initialize<E>(emitter: &E, name: &str, cfg: &MCPServerConfig)

@@ -135,8 +135,10 @@ export default function DebuggerPage({
         request: response.request_arguments ?? (payload ?? null),
       };
       setCallResult(outcome);
+      setCallError(null);
     } catch (error) {
       console.error('Tool call failed', error);
+      setCallResult(null);
       setCallError(error instanceof Error ? error.message : 'Tool call failed');
     } finally {
       setCallLoading(false);

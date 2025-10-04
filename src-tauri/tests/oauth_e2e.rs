@@ -136,7 +136,7 @@ async fn end_to_end_oauth_flow_with_streamable_http() {
 
     timeout(
         Duration::from_secs(5),
-        state.start_authorization(&["mcp"], &redirect_uri),
+        state.start_authorization(&["mcp"], &redirect_uri, Some("mcp-bouncer")),
     )
     .await
     .expect("start_authorization timed out")
@@ -184,13 +184,19 @@ async fn end_to_end_oauth_flow_with_streamable_http() {
 
     // Extract code from callback URL
     let url = reqwest::Url::parse(loc).unwrap();
-    let code = url
-        .query_pairs()
-        .find(|(k, _)| k == "code")
-        .map(|(_, v)| v.to_string())
-        .unwrap();
+    let mut code = None;
+    let mut csrf = None;
+    for (key, value) in url.query_pairs() {
+        match key.as_ref() {
+            "code" => code = Some(value.to_string()),
+            "state" => csrf = Some(value.to_string()),
+            _ => {}
+        }
+    }
+    let code = code.expect("callback missing code param");
+    let csrf = csrf.expect("callback missing state param");
 
-    timeout(Duration::from_secs(5), state.handle_callback(&code))
+    timeout(Duration::from_secs(5), state.handle_callback(&code, &csrf))
         .await
         .expect("handle_callback timed out")
         .unwrap();
