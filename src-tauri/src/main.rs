@@ -298,12 +298,17 @@ use mcp_bouncer::types::ToolInfo;
 
 #[tauri::command]
 #[specta::specta]
-async fn mcp_get_client_tools(client_name: String) -> Result<Vec<ToolInfo>, String> {
-    // Use cached tools to avoid re-fetching every modal open
+async fn mcp_get_client_tools(
+    app: tauri::AppHandle,
+    client_name: String,
+) -> Result<Vec<ToolInfo>, String> {
     let list = mcp_bouncer::tools_cache::get(&client_name)
         .await
         .unwrap_or_default();
-    // Filter based on persisted toggles
+    let needs_schema = list.is_empty() || list.iter().any(|t| t.input_schema.is_none());
+    if needs_schema {
+        return fetch_and_cache_tools(&app, &client_name).await;
+    }
     Ok(mcp_bouncer::tools_cache::filter_enabled_with(
         &mcp_bouncer::config::OsConfigProvider,
         &client_name,
@@ -317,7 +322,14 @@ async fn mcp_refresh_client_tools(
     app: tauri::AppHandle,
     client_name: String,
 ) -> Result<(), String> {
-    let Some(cfg) = get_server_by_name(&client_name) else {
+    fetch_and_cache_tools(&app, &client_name).await.map(|_| ())
+}
+
+async fn fetch_and_cache_tools(
+    app: &tauri::AppHandle,
+    client_name: &str,
+) -> Result<Vec<ToolInfo>, String> {
+    let Some(cfg) = get_server_by_name(client_name) else {
         return Err("server not found".into());
     };
     let start = std::time::Instant::now();
@@ -347,7 +359,7 @@ async fn mcp_refresh_client_tools(
     mcp_bouncer::overlay::set_tools(&client_name, out.len() as u32).await;
     // Log tools/list event for internal refresh + emit live update
     let mut evt = Event::new("tools/list", format!("internal::{client_name}"));
-    evt.server_name = Some(client_name.clone());
+    evt.server_name = Some(client_name.to_string());
     evt.origin = Some("internal".into());
     // Mirror the external JSON-RPC-ish shape used elsewhere
     evt.request_json = Some(serde_json::json!({
@@ -362,7 +374,11 @@ async fn mcp_refresh_client_tools(
     }));
     evt.duration_ms = Some(start.elapsed().as_millis() as i64);
     logger.log_and_emit(&emitter, evt);
-    Ok(())
+    Ok(mcp_bouncer::tools_cache::filter_enabled_with(
+        &mcp_bouncer::config::OsConfigProvider,
+        client_name,
+        out,
+    ))
 }
 
 #[specta::specta]
@@ -419,7 +435,7 @@ async fn mcp_debug_call_tool(
         }
     })
     .await?;
-    let duration_ms = start.elapsed().as_secs_f64() * 1_000.0;
+    let duration_ms = (start.elapsed().as_secs_f64() * 1_000.0).round();
     let ok = result.is_error != Some(true);
     let result_json = serde_json::to_value(&result).map_err(|e| e.to_string())?;
 

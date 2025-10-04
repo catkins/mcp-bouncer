@@ -207,13 +207,13 @@ export default function DebuggerPage({
         selectedTool.name,
         payload ?? null,
       );
-      const outcome: CallOutcome = {
-        timestamp: Date.now(),
-        ok: response.ok,
-        durationMs: response.duration_ms,
-        result: response.result,
-        request: response.request_arguments ?? (payload ?? null),
-      };
+    const outcome: CallOutcome = {
+      timestamp: Date.now(),
+      ok: response.ok,
+      durationMs: Math.round(response.duration_ms ?? 0),
+      result: response.result,
+      request: response.request_arguments ?? (payload ?? null),
+    };
       setCallResult(outcome);
     } catch (error) {
       console.error('Tool call failed', error);
