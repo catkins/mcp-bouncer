@@ -109,9 +109,9 @@ async mcpRefreshClientTools(clientName: string) : Promise<Result<null, string>> 
     else return { status: "error", error: e  as any };
 }
 },
-async mcpDebugCallTool(serverName: string, toolName: string, arguments: JsonValue | null) : Promise<Result<DebugCallToolResponse, string>> {
+async mcpDebugCallTool(serverName: string, toolName: string, args: JsonValue | null) : Promise<Result<DebugCallToolResponse, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("mcp_debug_call_tool", { serverName, toolName, arguments }) };
+    return { status: "ok", data: await TAURI_INVOKE("mcp_debug_call_tool", { serverName, toolName, args }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };

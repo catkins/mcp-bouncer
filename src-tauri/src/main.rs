@@ -387,7 +387,7 @@ async fn mcp_debug_call_tool(
     app: tauri::AppHandle,
     server_name: String,
     tool_name: String,
-    arguments: Option<JsonValue>,
+    args: Option<JsonValue>,
 ) -> Result<DebugCallToolResponse, String> {
     let cfg = get_server_by_name(&server_name).ok_or_else(|| "server not found".to_string())?;
     if !cfg.enabled {
@@ -402,7 +402,7 @@ async fn mcp_debug_call_tool(
         return Err("server is not connected".into());
     }
 
-    let args_map = match arguments {
+    let args_map = match args {
         Some(JsonValue::Object(map)) => Some(map),
         Some(JsonValue::Null) => None,
         Some(_) => return Err("tool arguments must be a JSON object".into()),

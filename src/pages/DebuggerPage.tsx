@@ -35,6 +35,7 @@ interface SchemaField {
 interface ParsedSchema {
   fields: SchemaField[];
   supportsForm: boolean;
+  declaredNoParams: boolean;
 }
 
 interface CallOutcome {
@@ -588,20 +589,37 @@ function ResponsePanel({
 }
 
 function parseSchema(schema: unknown): ParsedSchema {
-  if (!schema || typeof schema !== 'object') {
-    return { fields: [], supportsForm: false };
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
+    return { fields: [], supportsForm: false, declaredNoParams: true };
   }
   const obj = schema as Record<string, unknown>;
   const properties = obj.properties as Record<string, any> | undefined;
   const type = (obj.type as string | undefined) ?? (properties ? 'object' : undefined);
+
+  if (type === 'null') {
+    return { fields: [], supportsForm: false, declaredNoParams: true };
+  }
+
+  if (type === 'object' && (!properties || Object.keys(properties).length === 0)) {
+    const additional = obj.additionalProperties;
+    const pattern = obj.patternProperties;
+    const hasLooseProperties =
+      additional === undefined || (additional !== null && additional !== false);
+    const hasPatternProperties =
+      pattern && typeof pattern === 'object' && Object.keys(pattern as Record<string, unknown>).length > 0;
+    if (!hasLooseProperties && !hasPatternProperties) {
+      return { fields: [], supportsForm: false, declaredNoParams: true };
+    }
+  }
+
   if (type !== 'object' || !properties) {
-    return { fields: [], supportsForm: false };
+    return { fields: [], supportsForm: false, declaredNoParams: false };
   }
   const required = Array.isArray(obj.required) ? (obj.required as string[]) : [];
   const fields: SchemaField[] = [];
   for (const [name, descriptor] of Object.entries(properties)) {
     if (!descriptor || typeof descriptor !== 'object') {
-      return { fields: [], supportsForm: false };
+      return { fields: [], supportsForm: false, declaredNoParams: false };
     }
     const fieldType = (descriptor.type as string | undefined) ?? 'string';
     if (['string', 'number', 'integer', 'boolean'].includes(fieldType)) {
@@ -627,7 +645,7 @@ function parseSchema(schema: unknown): ParsedSchema {
       const items = descriptor.items as Record<string, unknown> | undefined;
       const itemType = items && typeof items === 'object' ? (items.type as string | undefined) : undefined;
       if (!itemType || !['string', 'number', 'integer', 'boolean'].includes(itemType)) {
-        return { fields: [], supportsForm: false };
+        return { fields: [], supportsForm: false, declaredNoParams: false };
       }
       const description =
         typeof (descriptor as Record<string, unknown>).description === 'string'
@@ -648,9 +666,9 @@ function parseSchema(schema: unknown): ParsedSchema {
       fields.push(field);
       continue;
     }
-    return { fields: [], supportsForm: false };
+    return { fields: [], supportsForm: false, declaredNoParams: false };
   }
-  return { fields, supportsForm: true };
+  return { fields, supportsForm: true, declaredNoParams: fields.length === 0 };
 }
 
 function ToolRequestForm({
@@ -665,12 +683,13 @@ function ToolRequestForm({
   onSubmit: (payload?: Record<string, unknown>) => Promise<void>;
 }) {
   const parsed = useMemo(() => parseSchema(tool.input_schema ?? null), [tool.input_schema]);
-  const { fields, supportsForm } = parsed;
+  const { fields, supportsForm, declaredNoParams } = parsed;
   const [mode, setMode] = useState<'form' | 'json'>(supportsForm ? 'form' : 'json');
   const [formState, setFormState] = useState<Record<string, any>>({});
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [jsonInput, setJsonInput] = useState('');
   const [jsonError, setJsonError] = useState<string | null>(null);
+  const [showJsonEditor, setShowJsonEditor] = useState(false);
 
   useEffect(() => {
     if (!tool) {
@@ -678,6 +697,7 @@ function ToolRequestForm({
       return;
     }
     setMode(supportsForm ? 'form' : 'json');
+    setShowJsonEditor(false);
   }, [tool.name, supportsForm]);
 
   useEffect(() => {
@@ -776,6 +796,8 @@ function ToolRequestForm({
     }
   };
 
+  const showEmptyJsonState = mode === 'json' && declaredNoParams && !showJsonEditor;
+
   return (
     <div className="flex flex-1 flex-col gap-3">
       {supportsForm && (
@@ -792,26 +814,69 @@ function ToolRequestForm({
       )}
 
       {mode === 'json' ? (
-        <div className="flex flex-1 flex-col gap-2">
-          <textarea
-            value={jsonInput}
-            onChange={event => setJsonInput(event.target.value)}
-            className="min-h-[200px] flex-1 rounded-md border border-gray-300 bg-white p-3 font-mono text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-            spellCheck={false}
-            disabled={disabled || loading}
-          />
-          {jsonError && <p className="text-xs text-red-500">{jsonError}</p>}
-          <div className="mt-auto flex items-center justify-end gap-2">
-            <LoadingButton
-              onClick={submitJson}
-              loading={loading}
-              disabled={disabled}
-              className="px-3 py-1.5"
-            >
-              Call Tool
-            </LoadingButton>
+        showEmptyJsonState ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-md border border-dashed border-gray-300 bg-gray-50/60 px-4 py-8 text-center text-sm text-gray-600 dark:border-gray-600 dark:bg-gray-800/60 dark:text-gray-300">
+            <div className="max-w-xs space-y-1">
+              <p className="font-medium text-gray-700 dark:text-gray-100">No request parameters needed</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                This tool does not declare any input arguments. Call it directly or provide a JSON payload if you need to send custom data.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <LoadingButton
+                onClick={() => {
+                  void submitJson();
+                }}
+                loading={loading}
+                disabled={disabled}
+                className="px-3 py-1.5"
+              >
+                Call Tool
+              </LoadingButton>
+              <button
+                type="button"
+                onClick={() => setShowJsonEditor(true)}
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+                disabled={disabled || loading}
+              >
+                Provide JSON payload
+              </button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex flex-1 flex-col gap-2">
+            {declaredNoParams && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowJsonEditor(false)}
+                  className="text-xs text-gray-500 underline-offset-2 transition hover:text-gray-700 hover:underline dark:text-gray-300 dark:hover:text-gray-100"
+                  disabled={disabled || loading}
+                >
+                  Hide JSON editor
+                </button>
+              </div>
+            )}
+            <textarea
+              value={jsonInput}
+              onChange={event => setJsonInput(event.target.value)}
+              className="min-h-[200px] flex-1 rounded-md border border-gray-300 bg-white p-3 font-mono text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+              spellCheck={false}
+              disabled={disabled || loading}
+            />
+            {jsonError && <p className="text-xs text-red-500">{jsonError}</p>}
+            <div className="mt-auto flex items-center justify-end gap-2">
+              <LoadingButton
+                onClick={submitJson}
+                loading={loading}
+                disabled={disabled}
+                className="px-3 py-1.5"
+              >
+                Call Tool
+              </LoadingButton>
+            </div>
+          </div>
+        )
       ) : (
         <form
           className="flex flex-1 flex-col gap-3"

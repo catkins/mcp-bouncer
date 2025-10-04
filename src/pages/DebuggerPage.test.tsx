@@ -113,6 +113,38 @@ describe('DebuggerPage', () => {
     expect(screen.getByText(/ok · 42 ms/i)).toBeInTheDocument();
   });
 
+  it('shows empty state when a tool does not require parameters', async () => {
+    const tool: Tool = {
+      name: 'server::noop',
+      description: 'noop tool',
+      input_schema: null,
+    };
+    vi.mocked(MCPService.GetClientTools).mockResolvedValue([tool]);
+
+    render(
+      <DebuggerPage
+        servers={[serverConfig]}
+        clientStatus={{ server: connectedStatus }}
+        eligibleServers={['server']}
+        selectedServer="server"
+        onSelectServer={() => {}}
+        statusLoaded
+      />,
+    );
+
+    await waitFor(() => expect(vi.mocked(MCPService.GetClientTools)).toHaveBeenCalled());
+
+    expect(screen.getByText(/No request parameters needed/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Provide JSON payload/i })).toBeInTheDocument();
+
+    const callButton = screen.getByRole('button', { name: /Call Tool/i });
+    fireEvent.click(callButton);
+
+    await waitFor(() => {
+      expect(vi.mocked(MCPService.DebugCallTool)).toHaveBeenCalledWith('server', 'server::noop', null);
+    });
+  });
+
   it('surfaces tool error messages when call fails', async () => {
     const tool: Tool = {
       name: 'server::boom',
