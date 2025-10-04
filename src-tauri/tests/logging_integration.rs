@@ -220,7 +220,7 @@ async fn logging_persists_events_to_sqlite() {
 
     // Snapshot a handful of events for sanity checks
     let rows = sqlx::query(
-        "SELECT method, server_name FROM rpc_events ORDER BY ts_ms DESC, id DESC LIMIT 10",
+        "SELECT method, server_name, origin FROM rpc_events ORDER BY ts_ms DESC, id DESC LIMIT 10",
     )
     .fetch_all(&mut conn)
     .await
@@ -230,6 +230,12 @@ async fn logging_persists_events_to_sqlite() {
         rows.iter()
             .any(|row| row.try_get::<String, _>(0).unwrap() == "initialize")
     );
+    // ensure origin column exists and contains at least one debugger/internal/external tag
+    let origin_present = rows
+        .iter()
+        .filter_map(|row| row.try_get::<Option<String>, _>(2).ok().flatten())
+        .any(|origin| matches!(origin.as_str(), "external" | "internal" | "debugger"));
+    assert!(origin_present, "expected at least one origin tag");
 }
 
 #[tokio::test]

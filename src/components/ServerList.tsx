@@ -17,6 +17,7 @@ interface ServerListProps {
   onRestartServer: (name: string) => Promise<void>;
   onAuthorizeServer?: (name: string) => Promise<void>;
   onRefreshStatus?: (name: string) => Promise<void>;
+  onOpenDebugger?: (name: string) => void;
 }
 
 export function ServerList({
@@ -30,6 +31,7 @@ export function ServerList({
   onAuthorizeServer,
   isLoading,
   onRefreshStatus: _onRefreshStatus,
+  onOpenDebugger,
 }: ServerListProps) {
   const [showAddServer, setShowAddServer] = useState<boolean>(false);
   const [editingServer, setEditingServer] = useState<MCPServerConfig | null>(null);
@@ -202,6 +204,15 @@ export function ServerList({
                 onRestart={() => handleRestart(server.name)}
                 {...(onAuthorizeServer ? { onAuthorize: () => onAuthorizeServer(server.name) } : {})}
                 onOpenTools={handleOpenTools}
+                {...(onOpenDebugger
+                  ? {
+                      onOpenDebugger: (serverName: string) => {
+                        if (import.meta.env.DEV)
+                          console.log('Opening debugger for server:', serverName);
+                        onOpenDebugger(serverName);
+                      },
+                    }
+                  : {})}
                 loading={removeLoading[server.name] || false}
                 toggleLoading={toggleLoading[server.name] || false}
                 restartLoading={restartLoading[server.name] || false}

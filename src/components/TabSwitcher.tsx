@@ -1,4 +1,4 @@
-export type TabKey = 'servers' | 'clients' | 'logs';
+export type TabKey = 'servers' | 'clients' | 'logs' | 'debugger';
 
 export function TabSwitcher({
   value,
@@ -6,12 +6,14 @@ export function TabSwitcher({
   serverCount,
   clientCount,
   logsCount = 0,
+  debuggerCount = 0,
 }: {
   value: TabKey;
   onChange: (v: TabKey) => void;
   serverCount: number;
   clientCount: number;
   logsCount?: number;
+  debuggerCount?: number;
 }) {
   const base =
     'inline-flex items-center px-3 py-1.5 rounded-md text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/40 shadow-sm transform hover:scale-105 active:scale-95';
@@ -55,6 +57,15 @@ export function TabSwitcher({
             Logs
             <span className={`${badge} ${value === 'logs' ? activeBadge : inactiveBadge}`}>
               {logsCount}
+            </span>
+          </button>
+          <button
+            className={`${base} ${value === 'debugger' ? active : inactive}`}
+            onClick={() => onChange('debugger')}
+          >
+            Debugger
+            <span className={`${badge} ${value === 'debugger' ? activeBadge : inactiveBadge}`}>
+              {debuggerCount}
             </span>
           </button>
         </div>

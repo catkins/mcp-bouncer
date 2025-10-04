@@ -71,6 +71,7 @@ pub fn logs_rpc_event<E: EventEmitter>(emitter: &E, evt: &crate::logging::Event)
             "duration_ms": evt.duration_ms,
             "ok": evt.ok,
             "error": evt.error,
+            "origin": evt.origin,
             "request_json": evt.request_json,
             "response_json": evt.response_json,
         }),

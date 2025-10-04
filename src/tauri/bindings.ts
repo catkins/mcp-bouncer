@@ -109,6 +109,14 @@ async mcpRefreshClientTools(clientName: string) : Promise<Result<null, string>> 
     else return { status: "error", error: e  as any };
 }
 },
+async mcpDebugCallTool(serverName: string, toolName: string, arguments: JsonValue | null) : Promise<Result<DebugCallToolResponse, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mcp_debug_call_tool", { serverName, toolName, arguments }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async mcpToggleTool(clientName: string, toolName: string, enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("mcp_toggle_tool", { clientName, toolName, enabled }) };
@@ -155,6 +163,7 @@ async settingsUpdateSettings(settings: Settings | null) : Promise<Result<null, s
 
 export type ClientConnectionState = "disconnected" | "connecting" | "errored" | "connected" | "requires_authorization" | "authorizing"
 export type ClientStatus = { name: string; state: ClientConnectionState; tools: number; last_error?: string | null; authorization_required: boolean; oauth_authenticated: boolean }
+export type DebugCallToolResponse = { duration_ms: number; ok: boolean; result: JsonValue; request_arguments?: JsonValue | null }
 export type IncomingClient = { id: string; name: string; version: string; title?: string | null; connected_at?: string | null }
 export type JsonValue = null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>
 export type MCPServerConfig = { name: string; description: string; transport?: TransportType; command: string; args?: string[]; env?: Partial<{ [key in string]: string }>; endpoint?: string; headers?: Partial<{ [key in string]: string }>; requires_auth?: boolean; enabled: boolean }

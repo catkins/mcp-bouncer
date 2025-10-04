@@ -89,7 +89,7 @@ describe('ServerList', () => {
 
     const restartBtns = await screen.findAllByRole('button', { name: /restart svc/i });
     await userEvent.click(restartBtns[0]!);
-    expect(onRestartServer).toHaveBeenCalled();
+    await waitFor(() => expect(onRestartServer).toHaveBeenCalled());
 
     // Rerender with streamable_http + requires authorization state
     const authServers = [

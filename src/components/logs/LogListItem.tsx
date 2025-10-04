@@ -31,6 +31,32 @@ function methodIcon(method: string) {
   return <EllipsisHorizontalCircleIcon className="h-4 w-4 text-gray-400" />;
 }
 
+function originBadge(origin?: string | null) {
+  if (!origin) return null;
+  const normalized = origin.toLowerCase();
+  let label = normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  let classes = 'ml-1 inline-flex items-center rounded-full px-1.5 py-[1px] text-[10px] font-semibold';
+  switch (normalized) {
+    case 'debugger':
+      classes += ' bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300';
+      label = 'Debugger';
+      break;
+    case 'internal':
+      classes += ' bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-200';
+      label = 'Internal';
+      break;
+    case 'external':
+      classes += ' bg-gray-200 text-gray-700 dark:bg-gray-700/50 dark:text-gray-200';
+      label = 'External';
+      break;
+    default:
+      classes += ' bg-gray-200 text-gray-700 dark:bg-gray-700/50 dark:text-gray-200';
+      label = origin;
+      break;
+  }
+  return <span className={classes}>{label}</span>;
+}
+
 export function LogListItem({ item }: { item: RpcLog }) {
   const ts = new Date(item.ts_ms);
   return (
@@ -45,6 +71,7 @@ export function LogListItem({ item }: { item: RpcLog }) {
             {item.server_name ? (
               <span className="ml-1 text-xs font-normal text-gray-500 dark:text-gray-400">· {item.server_name}</span>
             ) : null}
+            {originBadge(item.origin)}
           </div>
         </div>
         <div className="flex items-center gap-1.5 text-[11px] leading-tight text-gray-600 dark:text-gray-300">

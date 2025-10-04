@@ -1,13 +1,24 @@
 import { useEffect } from 'react';
 import { ServerList } from '../components';
 import { useServersState } from '../hooks/mcp/useServersState';
-import { useClientStatusState } from '../hooks/mcp/useClientStatusState';
 import { useMCPActions } from '../hooks/mcp/useMCPActions';
 import { useMCPSubscriptions } from '../hooks/mcp/useMCPSubscriptions';
+import type { ClientStatus } from '../tauri/bridge';
 
-export default function ServersPage() {
+interface ServersPageProps {
+  clientStatus: Record<string, ClientStatus>;
+  loadClientStatus: () => Promise<void>;
+  statusLoaded: boolean;
+  onOpenDebugger: (serverName: string) => void;
+}
+
+export default function ServersPage({
+  clientStatus,
+  loadClientStatus,
+  statusLoaded,
+  onOpenDebugger,
+}: ServersPageProps) {
   const { servers, setServers, loadServers, loaded: serversLoaded } = useServersState();
-  const { clientStatus, loadClientStatus, loaded: statusLoaded } = useClientStatusState();
 
   const { addServer, updateServer, removeServer, toggleServer, restartServer, authorizeServer } = useMCPActions({
     servers,
@@ -50,6 +61,7 @@ export default function ServersPage() {
       onRestartServer={restartServer}
       onAuthorizeServer={authorizeServer}
       onRefreshStatus={handleRefreshStatus}
+      onOpenDebugger={onOpenDebugger}
     />
   );
 }

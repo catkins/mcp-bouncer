@@ -11,9 +11,13 @@ use mcp_bouncer::config::{
 use mcp_bouncer::events::{TauriEventEmitter, client_error, client_status_changed};
 use mcp_bouncer::incoming::list_incoming;
 use mcp_bouncer::logging::{Event, RpcEventPublisher, SqlitePublisher};
+use mcp_bouncer::logging_origin;
 use mcp_bouncer::oauth::start_oauth_for_server;
 use mcp_bouncer::server::{get_runtime_listen_addr, start_http_server};
 use mcp_bouncer::unauthorized;
+use rmcp::model as mcp;
+use serde_json::Value as JsonValue;
+use specta::Type;
 #[cfg(debug_assertions)]
 use specta_typescript::Typescript;
 #[cfg(debug_assertions)]
@@ -53,6 +57,15 @@ fn spawn_mcp_proxy(app: &tauri::AppHandle) {
             .await;
         }
     });
+}
+
+#[derive(serde::Serialize, Type)]
+struct DebugCallToolResponse {
+    duration_ms: f64,
+    ok: bool,
+    result: JsonValue,
+    #[specta(optional)]
+    request_arguments: Option<JsonValue>,
 }
 
 // ---------- STDIO client management ----------
@@ -335,6 +348,7 @@ async fn mcp_refresh_client_tools(
     // Log tools/list event for internal refresh + emit live update
     let mut evt = Event::new("tools/list", format!("internal::{client_name}"));
     evt.server_name = Some(client_name.clone());
+    evt.origin = Some("internal".into());
     // Mirror the external JSON-RPC-ish shape used elsewhere
     evt.request_json = Some(serde_json::json!({
         "method": "tools/list",
@@ -349,6 +363,72 @@ async fn mcp_refresh_client_tools(
     evt.duration_ms = Some(start.elapsed().as_millis() as i64);
     logger.log_and_emit(&emitter, evt);
     Ok(())
+}
+
+#[specta::specta]
+#[tauri::command]
+async fn mcp_debug_call_tool(
+    app: tauri::AppHandle,
+    server_name: String,
+    tool_name: String,
+    arguments: Option<JsonValue>,
+) -> Result<DebugCallToolResponse, String> {
+    let cfg = get_server_by_name(&server_name).ok_or_else(|| "server not found".to_string())?;
+    if !cfg.enabled {
+        return Err("server is disabled".into());
+    }
+    let overlay_snapshot = mcp_bouncer::overlay::snapshot().await;
+    let is_connected = overlay_snapshot
+        .get(&server_name)
+        .map(|entry| entry.state == ClientConnectionState::Connected)
+        .unwrap_or(false);
+    if !is_connected {
+        return Err("server is not connected".into());
+    }
+
+    let args_map = match arguments {
+        Some(JsonValue::Object(map)) => Some(map),
+        Some(JsonValue::Null) => None,
+        Some(_) => return Err("tool arguments must be a JSON object".into()),
+        None => None,
+    };
+    let request_arguments = args_map.as_ref().map(|m| JsonValue::Object(m.clone()));
+
+    let emitter = TauriEventEmitter(app.clone());
+    let logger = SqlitePublisher;
+    let client = ensure_rmcp_client(&server_name, &cfg, &emitter, &logger)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let call_client = client.clone();
+    let args_for_call = args_map.clone();
+    let tool_for_call = tool_name.clone();
+    let start = std::time::Instant::now();
+    let result = logging_origin::with_request_origin("debugger", move || {
+        let call_client = call_client.clone();
+        let args_for_call = args_for_call.clone();
+        let tool_for_call = tool_for_call.clone();
+        async move {
+            call_client
+                .call_tool(mcp::CallToolRequestParam {
+                    name: tool_for_call.into(),
+                    arguments: args_for_call,
+                })
+                .await
+                .map_err(|e| e.to_string())
+        }
+    })
+    .await?;
+    let duration_ms = start.elapsed().as_secs_f64() * 1_000.0;
+    let ok = result.is_error != Some(true);
+    let result_json = serde_json::to_value(&result).map_err(|e| e.to_string())?;
+
+    Ok(DebugCallToolResponse {
+        duration_ms,
+        ok,
+        result: result_json,
+        request_arguments,
+    })
 }
 
 async fn connect_and_initialize<E>(emitter: &E, name: &str, cfg: &MCPServerConfig)
@@ -510,6 +590,7 @@ fn main() {
             mcp_start_oauth,
             mcp_get_client_tools,
             mcp_refresh_client_tools,
+            mcp_debug_call_tool,
             mcp_toggle_tool,
             settings_get_settings,
             settings_open_config_directory,
@@ -583,6 +664,7 @@ fn main() {
             mcp_start_oauth,
             mcp_get_client_tools,
             mcp_refresh_client_tools,
+            mcp_debug_call_tool,
             mcp_toggle_tool,
             settings_get_settings,
             settings_open_config_directory,

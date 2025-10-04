@@ -11,6 +11,7 @@ import {
   ArrowPathIcon,
   KeyIcon,
   ShieldCheckIcon,
+  BugAntIcon,
 } from '@heroicons/react/24/outline';
 import type { MCPServerConfig, ClientStatus } from '../tauri/bridge';
 import { LoadingButton } from './LoadingButton';
@@ -24,6 +25,7 @@ interface ServerCardProps {
   onToggle: (serverName: string, enabled: boolean) => Promise<void>;
   onRestart?: () => Promise<void>;
   onOpenTools?: (serverName: string) => void;
+  onOpenDebugger?: (serverName: string) => void;
   onAuthorize?: (serverName: string) => Promise<void>;
   loading?: boolean;
   toggleLoading?: boolean;
@@ -237,6 +239,7 @@ export function ServerCard({
   onToggle,
   onRestart,
   onOpenTools,
+  onOpenDebugger,
   onAuthorize,
   loading = false,
   toggleLoading = false,
@@ -246,6 +249,12 @@ export function ServerCard({
   const handleToolsClick = () => {
     if (clientStatus?.state === 'connected' && clientStatus.tools > 0 && onOpenTools) {
       onOpenTools(server.name);
+    }
+  };
+
+  const handleDebuggerClick = () => {
+    if (clientStatus?.state === 'connected' && onOpenDebugger) {
+      onOpenDebugger(server.name);
     }
   };
 
@@ -276,6 +285,17 @@ export function ServerCard({
               <ClientStatusBadge clientStatus={clientStatus} toggleLoading={toggleLoading} transport={server.transport} onAuthorize={onAuthorize} serverName={server.name} />
               <TransportBadge transport={server.transport} />
               <ToolsButton clientStatus={clientStatus} toggleLoading={toggleLoading} onClick={handleToolsClick} serverName={server.name} />
+              {clientStatus?.state === 'connected' && onOpenDebugger && (
+                <button
+                  onClick={handleDebuggerClick}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-all duration-200 bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 hover:bg-amber-200/90 dark:hover:bg-amber-800/60 hover:scale-105 active:scale-95 ${toggleLoading ? 'pointer-events-none opacity-60' : ''}`}
+                  title="Open debugger"
+                  aria-label={`Open debugger for ${server.name}`}
+                >
+                  <BugAntIcon className="w-3 h-3" />
+                  Debug
+                </button>
+              )}
               {clientStatus?.oauth_authenticated && (
                 <span
                   className="inline-flex items-center p-1 bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-400 rounded-full"
