@@ -50,12 +50,10 @@ export function ResponsePanel({ callResult, callError, selectedToolName }: Respo
             checked={richViewEnabled}
             onChange={checked => setRichViewEnabled(checked)}
             size="sm"
-            ariaLabel="Toggle rich response view"
+            label={richViewEnabled ? 'Rich view' : 'Raw JSON'}
+            description="Toggle rich response view"
             disabled={!callResult}
           />
-          <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400">
-            {richViewEnabled ? 'Rich' : 'Raw JSON'}
-          </span>
         </div>
         {callResult && (
           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${

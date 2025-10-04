@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { HighlightedJson } from '../logs/HighlightedJson';
 
 interface ToolContentBase {
   type: string;
@@ -98,7 +97,14 @@ export function RichToolResult({ result }: RichToolResultProps) {
 function ContentCard({ item }: { item: ToolContentItem }) {
   switch (item.type) {
     case 'text':
-      return <TextCard item={item as ToolTextContent} />;
+      return (
+        <div className="rounded-lg border border-gray-200 bg-white/90 p-3 shadow-sm dark:border-gray-700 dark:bg-gray-900/60">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Text</h4>
+          <pre className="mt-2 whitespace-pre-wrap break-words text-sm text-gray-800 dark:text-gray-100">
+            {(item as ToolTextContent).text}
+          </pre>
+        </div>
+      );
     case 'image':
       return <ImageCard item={item as ToolImageContent} />;
     case 'audio':
@@ -119,32 +125,6 @@ function ContentCard({ item }: { item: ToolContentItem }) {
         </div>
       );
   }
-}
-
-function TextCard({ item }: { item: ToolTextContent }) {
-  const parsedJson = useMemo(() => tryParseJson(item.text), [item.text]);
-  const isJson = parsedJson !== null;
-
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white/90 p-3 shadow-sm dark:border-gray-700 dark:bg-gray-900/60">
-      <div className="flex items-center justify-between">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-          Text {isJson ? '(JSON)' : ''}
-        </h4>
-      </div>
-      {isJson ? (
-        <HighlightedJson
-          value={parsedJson as unknown}
-          className="mt-2 overflow-hidden rounded-md border border-gray-200 bg-gray-50 text-xs dark:border-gray-700 dark:bg-gray-800"
-          collapsedByDefault
-        />
-      ) : (
-        <pre className="mt-2 whitespace-pre-wrap break-words text-sm text-gray-800 dark:text-gray-100">
-          {item.text}
-        </pre>
-      )}
-    </div>
-  );
 }
 
 function ImageCard({ item }: { item: ToolImageContent }) {
@@ -289,16 +269,4 @@ function normalizeResult(result: unknown): { content: ToolContentItem[]; structu
     content: rawContent,
     structured,
   };
-}
-
-function tryParseJson(value: string | undefined): unknown | null {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  if (!(trimmed.startsWith('{') || trimmed.startsWith('['))) return null;
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    return null;
-  }
 }

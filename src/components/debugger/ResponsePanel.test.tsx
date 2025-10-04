@@ -59,22 +59,9 @@ describe('ResponsePanel', () => {
     render(<ResponsePanel callResult={baseOutcome} callError={null} selectedToolName="server::alpha" />);
 
     expect(screen.getByText('result')).toBeInTheDocument();
-    const viewModeLabel = screen.getByText(/View Mode/i);
-    const toggleButton = viewModeLabel.parentElement?.querySelector('button');
-    expect(toggleButton).toBeTruthy();
-    fireEvent.click(toggleButton!);
+    const toggle = screen.getByLabelText(/rich view/i);
+    fireEvent.click(toggle);
     expect(screen.getByText(/raw json/i)).toBeInTheDocument();
-  });
-
-  it('renders text content as highlighted JSON when applicable', () => {
-    const jsonOutcome: CallOutcome = {
-      ...baseOutcome,
-      result: { content: [{ type: 'text', text: '{"message":"hello"}' }] },
-    };
-
-    render(<ResponsePanel callResult={jsonOutcome} callError={null} selectedToolName="server::alpha" />);
-
-    expect(screen.getByText(/Text \(JSON\)/i)).toBeInTheDocument();
   });
 
   it('shows network error message when present', () => {
