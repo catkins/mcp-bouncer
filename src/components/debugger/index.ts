@@ -6,3 +6,4 @@ export { ResponsePanel } from './ResponsePanel';
 export { ToolRequestForm } from './ToolRequestForm';
 export * from './types';
 export * from './utils';
+export { RichToolResult } from './RichToolResult';

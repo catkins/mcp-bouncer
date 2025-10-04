@@ -13,7 +13,17 @@ const successOutcome: CallOutcome = {
         type: 'text',
         text: 'Quantum tunnelling is the ability of a particle to pass through a barrier it classically should not cross.',
       },
+      {
+        type: 'image',
+        alt: 'Simple potential diagram',
+        mimeType: 'image/png',
+        data:
+          'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEElEQVR4nGJ8+fLlPwMDAwMjAAADpQG80Ub9agAAAABJRU5ErkJggg==',
+      },
     ],
+    structuredContent: {
+      summary: 'Barrier penetration probability ≈ e^{-2γa}',
+    },
   },
 };
 
@@ -63,5 +73,34 @@ export const Empty: Story = {
   args: {
     callResult: null,
     callError: null,
+  },
+};
+
+export const MixedContent: Story = {
+  args: {
+    callResult: {
+      timestamp: Date.now(),
+      ok: true,
+      durationMs: 210,
+      request: { prompt: 'Play example audio and provide reference' },
+      result: {
+        content: [
+          {
+            type: 'audio',
+            mimeType: 'audio/mpeg',
+            data:
+              'SUQzAwAAAAAAQlRFMgAAAA1JRFIAAAAAAAAAAAAAAAAAAAAAAAAASUQzAwAAAAAAQlRFTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+            title: 'Synth example',
+          },
+          {
+            type: 'resource_link',
+            uri: 'https://modelcontextprotocol.io/',
+            name: 'MCP Docs',
+            description: 'Specification and guides for the Model Context Protocol.',
+          },
+        ],
+      },
+    },
+    selectedToolName: 'server::media-demo',
   },
 };

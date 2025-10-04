@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { ResponsePanel } from './ResponsePanel';
 import type { CallOutcome } from './types';
+import { fireEvent } from '@testing-library/react';
 
 afterEach(() => {
   cleanup();
@@ -36,7 +37,7 @@ describe('ResponsePanel', () => {
     render(<ResponsePanel callResult={failedOutcome} callError={null} selectedToolName="server::alpha" />);
 
     expect(screen.getByText(/error · 45 ms/i)).toBeInTheDocument();
-    expect(screen.getByText('tool exploded')).toBeInTheDocument();
+    expect(screen.getAllByText('tool exploded')[0]).toBeInTheDocument();
   });
 
   it('shows fallback message when error structure is nested', () => {
@@ -52,6 +53,15 @@ describe('ResponsePanel', () => {
     render(<ResponsePanel callResult={failedOutcome} callError={null} selectedToolName="server::alpha" />);
 
     expect(screen.getAllByText(/remote server rejected/i)[0]).toBeInTheDocument();
+  });
+
+  it('toggles between rich and raw result views', () => {
+    render(<ResponsePanel callResult={baseOutcome} callError={null} selectedToolName="server::alpha" />);
+
+    expect(screen.getByText('result')).toBeInTheDocument();
+    const toggle = screen.getByLabelText(/rich view/i);
+    fireEvent.click(toggle);
+    expect(screen.getByText(/raw json/i)).toBeInTheDocument();
   });
 
   it('shows network error message when present', () => {

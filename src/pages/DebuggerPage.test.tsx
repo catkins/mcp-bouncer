@@ -224,7 +224,7 @@ describe('DebuggerPage', () => {
       });
     });
 
-    expect(await screen.findByText('tool exploded')).toBeInTheDocument();
+    expect((await screen.findAllByText('tool exploded'))[0]).toBeInTheDocument();
     expect(screen.getByText(/error · 10 ms/i)).toBeInTheDocument();
   });
 });

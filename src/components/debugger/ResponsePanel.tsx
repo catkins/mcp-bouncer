@@ -1,8 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { HighlightedJson } from '../logs/HighlightedJson';
 import { ClockIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import type { CallOutcome } from './types';
 import { extractToolError } from './utils';
+import { RichToolResult } from './RichToolResult';
+import { ToggleSwitch } from '../ToggleSwitch';
 
 interface ResponsePanelProps {
   callResult: CallOutcome | null;
@@ -11,6 +13,8 @@ interface ResponsePanelProps {
 }
 
 export function ResponsePanel({ callResult, callError, selectedToolName }: ResponsePanelProps) {
+  const [showRaw, setShowRaw] = useState(false);
+
   const toolErrorMessage = useMemo(() => {
     if (!callResult) return null;
     const message = extractToolError(callResult.result);
@@ -40,6 +44,14 @@ export function ResponsePanel({ callResult, callError, selectedToolName }: Respo
           <ClockIcon className="h-4 w-4 text-purple-500" />
           <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Response</h3>
         </div>
+        <div className="flex items-center gap-3">
+          <ToggleSwitch
+            checked={showRaw}
+            onChange={checked => setShowRaw(checked)}
+            size="sm"
+            label={showRaw ? 'Raw JSON' : 'Rich view'}
+          />
+        </div>
         {callResult && (
           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
             callResult.ok
@@ -51,9 +63,8 @@ export function ResponsePanel({ callResult, callError, selectedToolName }: Respo
           </span>
         )}
       </div>
-      {derivedErrorMessage ? (
-        <div className={errorStyle}>{derivedErrorMessage}</div>
-      ) : null}
+      {derivedErrorMessage ? <div className={errorStyle}>{derivedErrorMessage}</div> : null}
+
       {callResult ? (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
           <div>
@@ -66,15 +77,21 @@ export function ResponsePanel({ callResult, callError, selectedToolName }: Respo
               collapsedByDefault
             />
           </div>
-          <div className="flex min-w-0 flex-1 flex-col">
-            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              Tool Result {selectedToolName ? `(${selectedToolName})` : ''}
+          <div className="flex min-w-0 flex-1 flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                Tool Result {selectedToolName ? `(${selectedToolName})` : ''}
+              </span>
             </div>
-            <HighlightedJson
-              value={callResult.result}
-              className="mt-1 flex-1 overflow-auto rounded-md border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
-              collapsedByDefault
-            />
+            {showRaw ? (
+              <HighlightedJson
+                value={callResult.result}
+                className="flex-1 overflow-auto rounded-md border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
+                collapsedByDefault
+              />
+            ) : (
+              <RichToolResult result={callResult.result} />
+            )}
           </div>
         </div>
       ) : !derivedErrorMessage ? (
