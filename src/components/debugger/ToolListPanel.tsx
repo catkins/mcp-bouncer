@@ -117,7 +117,7 @@ export function ToolListPanel({
                         : 'text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800/50'
                     }`}
                   >
-                    <span className="text-sm font-medium">{tool.name}</span>
+                    <code className="font-mono text-sm">{tool.name}</code>
                     {tool.description ? (
                       <span className="text-xs text-gray-500 dark:text-gray-400">{tool.description}</span>
                     ) : null}
