@@ -1,6 +1,7 @@
 import type { ClientStatus } from '../../tauri/bridge';
 
 export type PrimitiveFieldType = 'string' | 'number' | 'integer' | 'boolean';
+export type SchemaEnumValue = string | number | boolean;
 
 export interface SchemaField {
   name: string;
@@ -9,6 +10,7 @@ export interface SchemaField {
   required: boolean;
   description?: string;
   defaultValue?: unknown;
+  enumValues?: SchemaEnumValue[];
 }
 
 export interface ParsedSchema {

@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { HighlightedJson } from '../logs/HighlightedJson';
 
 interface ToolContentBase {
   type: string;
@@ -96,15 +97,22 @@ export function RichToolResult({ result }: RichToolResultProps) {
 
 function ContentCard({ item }: { item: ToolContentItem }) {
   switch (item.type) {
-    case 'text':
+    case 'text': {
+      const textContent = (item as ToolTextContent).text;
+      const parsedJson = parseJsonText(textContent);
       return (
         <div className="rounded-lg border border-gray-200 bg-white/90 p-3 shadow-sm dark:border-gray-700 dark:bg-gray-900/60">
           <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Text</h4>
-          <pre className="mt-2 whitespace-pre-wrap break-words text-sm text-gray-800 dark:text-gray-100">
-            {(item as ToolTextContent).text}
-          </pre>
+          {parsedJson ? (
+            <HighlightedJson value={parsedJson} className="mt-2" />
+          ) : (
+            <pre className="mt-2 whitespace-pre-wrap break-words text-sm text-gray-800 dark:text-gray-100">
+              {textContent}
+            </pre>
+          )}
         </div>
       );
+    }
     case 'image':
       return <ImageCard item={item as ToolImageContent} />;
     case 'audio':
@@ -210,6 +218,7 @@ function ResourceLinkCard({ item }: { item: ToolResourceLinkContent }) {
 function EmbeddedResourceCard({ item }: { item: ToolEmbeddedResourceContent }) {
   const { resource } = item;
   const hasText = typeof resource.text === 'string' && resource.text.length > 0;
+  const parsedResourceJson = hasText ? parseJsonText(resource.text as string) : null;
   const hasBlob = typeof resource.blob === 'string' && resource.blob.length > 0;
   const blobLength = hasBlob ? (resource.blob as string).length : 0;
 
@@ -231,9 +240,13 @@ function EmbeddedResourceCard({ item }: { item: ToolEmbeddedResourceContent }) {
         <p className="mt-2 text-xs text-purple-700/80 dark:text-purple-200/80">{resource.description}</p>
       ) : null}
       {hasText ? (
-        <pre className="mt-3 max-h-48 overflow-auto rounded-md bg-purple-900/10 p-3 text-xs text-purple-900 dark:bg-purple-200/10 dark:text-purple-100">
-          {resource.text}
-        </pre>
+        parsedResourceJson ? (
+          <HighlightedJson value={parsedResourceJson} className="mt-3" />
+        ) : (
+          <pre className="mt-3 max-h-48 overflow-auto rounded-md bg-purple-900/10 p-3 text-xs text-purple-900 dark:bg-purple-200/10 dark:text-purple-100">
+            {resource.text}
+          </pre>
+        )
       ) : null}
       {hasBlob ? (
         <p className="mt-3 text-xs text-purple-700 dark:text-purple-200">
@@ -269,4 +282,17 @@ function normalizeResult(result: unknown): { content: ToolContentItem[]; structu
     content: rawContent,
     structured,
   };
+}
+
+function parseJsonText(text: string | undefined): unknown | null {
+  if (typeof text !== 'string') return null;
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const startsLikeJson = trimmed.startsWith('{') || trimmed.startsWith('[');
+  if (!startsLikeJson) return null;
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return null;
+  }
 }

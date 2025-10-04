@@ -6,12 +6,7 @@ import type {
   DebugCallToolResponse,
 } from '../tauri/bridge';
 import { MCPService } from '../tauri/bridge';
-import {
-  DebuggerHeader,
-  ToolListPanel,
-  RequestPanel,
-  ResponsePanel,
-} from '../components/debugger';
+import { ToolListPanel, RequestPanel, ResponsePanel } from '../components/debugger';
 import type { CallOutcome, DebuggerServerOption } from '../components/debugger';
 import {
   ArrowPathIcon,
@@ -122,17 +117,18 @@ export default function DebuggerPage({
     setCallError(null);
     setCallLoading(true);
     try {
+      const args = payload ?? {};
       const response: DebugCallToolResponse = await MCPService.DebugCallTool(
         selectedServer,
         selectedTool.name,
-        payload ?? null,
+        args,
       );
       const outcome: CallOutcome = {
         timestamp: Date.now(),
         ok: response.ok,
         durationMs: Math.round(response.duration_ms ?? 0),
         result: response.result,
-        request: response.request_arguments ?? (payload ?? null),
+        request: response.request_arguments ?? args,
       };
       setCallResult(outcome);
       setCallError(null);
@@ -177,38 +173,35 @@ export default function DebuggerPage({
 
   return (
     <div className="flex min-h-[calc(100vh-220px)] flex-col gap-4">
-      <DebuggerHeader
-        selectedServer={selectedServer}
-        serverOptions={serverOptions}
-        onSelectServer={onSelectServer}
-        serverEligible={serverEligible}
-        {...(selectedStatus ? { status: selectedStatus } : {})}
-      />
-
-      {!selectedServer || !serverEligible ? (
-        <div className="flex min-h-[240px] flex-1 items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-800/40">
-          <div className="flex max-w-md flex-col items-center gap-2 text-center text-sm text-gray-600 dark:text-gray-300">
-            <DocumentTextIcon className="h-8 w-8 text-blue-500" />
-            <p className="font-medium">
-              {selectedServer
-                ? 'Debugger is available only for connected servers with tools.'
-                : 'Select a server to begin debugging its tools.'}
-            </p>
+      <div className="grid flex-1 min-w-0 gap-4 lg:grid-cols-[minmax(220px,280px)_1fr] lg:items-start">
+        <ToolListPanel
+          tools={tools}
+          filteredTools={filteredTools}
+          selectedToolName={selectedToolName}
+          onSelectTool={setSelectedToolName}
+          loading={toolsLoading}
+          error={toolsError}
+          onRefresh={handleRefreshTools}
+          search={search}
+          onSearchChange={setSearch}
+          serverOptions={serverOptions}
+          selectedServer={selectedServer}
+          onSelectServer={onSelectServer}
+          serverEligible={serverEligible}
+          {...(selectedStatus ? { serverStatus: selectedStatus } : {})}
+        />
+        {!selectedServer || !serverEligible ? (
+          <div className="flex min-h-[240px] flex-1 items-center justify-center rounded-lg border border-gray-200 bg-white/70 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800/40 dark:text-gray-300">
+            <div className="flex max-w-md flex-col items-center gap-2 text-center">
+              <DocumentTextIcon className="h-8 w-8 text-blue-500" />
+              <p className="font-medium">
+                {selectedServer
+                  ? 'Debugger is available only for connected servers with tools.'
+                  : 'Select a server to begin debugging its tools using the server picker.'}
+              </p>
+            </div>
           </div>
-        </div>
-      ) : (
-        <div className="grid flex-1 min-w-0 gap-4 lg:grid-cols-[minmax(220px,280px)_1fr] lg:items-start">
-          <ToolListPanel
-            tools={tools}
-            filteredTools={filteredTools}
-            selectedToolName={selectedToolName}
-            onSelectTool={setSelectedToolName}
-            loading={toolsLoading}
-            error={toolsError}
-            onRefresh={handleRefreshTools}
-            search={search}
-            onSearchChange={setSearch}
-          />
+        ) : (
           <div className="grid min-w-0 gap-4 lg:grid-rows-[auto_minmax(240px,1fr)]">
             <RequestPanel
               tool={selectedTool}
@@ -222,8 +215,8 @@ export default function DebuggerPage({
               selectedToolName={selectedTool?.name ?? null}
             />
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

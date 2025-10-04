@@ -86,7 +86,12 @@ export function ResponsePanel({ callResult, callError, selectedToolName }: Respo
           <div className="flex min-w-0 flex-1 flex-col gap-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                Tool Result {selectedToolName ? `(${selectedToolName})` : ''}
+                TOOL RESULT
+                {selectedToolName ? (
+                  <code className="ml-2 rounded bg-gray-200 px-1 py-[2px] font-mono text-[11px] font-semibold normal-case text-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                    {selectedToolName}
+                  </code>
+                ) : null}
               </span>
             </div>
             {inlineError ? (

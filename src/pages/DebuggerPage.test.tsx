@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, cleanup, within } from '@testing-library/react';
 import DebuggerPage from './DebuggerPage';
 import type { MCPServerConfig, ClientStatus, DebugCallToolResponse, Tool } from '../tauri/bridge';
 import { MCPService } from '../tauri/bridge';
@@ -34,7 +34,7 @@ describe('DebuggerPage', () => {
       duration_ms: 0,
       ok: true,
       result: {},
-      request_arguments: null,
+      request_arguments: {},
     });
     vi.spyOn(MCPService, 'RefreshClientTools').mockResolvedValue();
   });
@@ -141,7 +141,7 @@ describe('DebuggerPage', () => {
     fireEvent.click(callButton);
 
     await waitFor(() => {
-      expect(vi.mocked(MCPService.DebugCallTool)).toHaveBeenCalledWith('server', 'server::noop', null);
+      expect(vi.mocked(MCPService.DebugCallTool)).toHaveBeenCalledWith('server', 'server::noop', {});
     });
   });
 
@@ -174,8 +174,58 @@ describe('DebuggerPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Call Tool/i }));
 
     await waitFor(() => {
-      expect(vi.mocked(MCPService.DebugCallTool)).toHaveBeenCalledWith('server', 'server::noargs', null);
+      expect(vi.mocked(MCPService.DebugCallTool)).toHaveBeenCalledWith('server', 'server::noargs', {});
     });
+  });
+
+  it('renders enum fields as dropdowns and submits selected value', async () => {
+    const tool: Tool = {
+      name: 'server::enumTool',
+      description: 'enum tool',
+      input_schema: {
+        type: 'object',
+        required: ['tier'],
+        properties: {
+          tier: { type: 'string', enum: ['basic', 'pro', 'enterprise'] },
+        },
+      },
+    };
+    vi.mocked(MCPService.GetClientTools).mockResolvedValue([tool]);
+    const response: DebugCallToolResponse = {
+      duration_ms: 12,
+      ok: true,
+      result: { content: [{ type: 'text', text: 'selected' }] },
+      request_arguments: { tier: 'pro' },
+    };
+    vi.mocked(MCPService.DebugCallTool).mockResolvedValue(response);
+
+    render(
+      <DebuggerPage
+        servers={[serverConfig]}
+        clientStatus={{ server: connectedStatus }}
+        eligibleServers={['server']}
+        selectedServer="server"
+        onSelectServer={() => {}}
+        statusLoaded
+      />,
+    );
+
+    await waitFor(() => expect(vi.mocked(MCPService.GetClientTools)).toHaveBeenCalled());
+
+    const select = await screen.findByRole('combobox', { name: /tier/i });
+    const option = within(select).getByRole('option', { name: 'pro' }) as HTMLOptionElement;
+    fireEvent.change(select, { target: { value: option.value } });
+
+    fireEvent.click(screen.getByRole('button', { name: /Call Tool/i }));
+
+    await waitFor(() => {
+      expect(vi.mocked(MCPService.DebugCallTool)).toHaveBeenCalledWith('server', 'server::enumTool', {
+        tier: 'pro',
+      });
+    });
+
+    expect(await screen.findByText(/ok · 12 ms/i)).toBeInTheDocument();
+    expect(document.body.textContent).toContain('"tier": "pro"');
   });
 
   it('surfaces tool error messages when call fails', async () => {

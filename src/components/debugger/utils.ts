@@ -1,4 +1,38 @@
-import type { PrimitiveFieldType, SchemaField, ParsedSchema } from './types';
+import type { PrimitiveFieldType, SchemaField, ParsedSchema, SchemaEnumValue } from './types';
+
+function isEnumValueForType(value: unknown, type: PrimitiveFieldType): value is SchemaEnumValue {
+  if (type === 'string') {
+    return typeof value === 'string';
+  }
+  if (type === 'boolean') {
+    return typeof value === 'boolean';
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return false;
+  }
+  if (type === 'integer') {
+    return Number.isInteger(value);
+  }
+  return true;
+}
+
+function parseEnumValues(
+  descriptor: Record<string, unknown>,
+  fieldType: PrimitiveFieldType,
+): SchemaEnumValue[] | undefined {
+  const rawEnum = descriptor['enum'];
+  if (!Array.isArray(rawEnum) || rawEnum.length === 0) {
+    return undefined;
+  }
+  const values: SchemaEnumValue[] = [];
+  for (const entry of rawEnum) {
+    if (!isEnumValueForType(entry, fieldType)) {
+      return undefined;
+    }
+    values.push(entry as SchemaEnumValue);
+  }
+  return values;
+}
 
 export function extractToolError(result: unknown): string | null {
   if (!result || typeof result !== 'object') return null;
@@ -151,6 +185,10 @@ export function parseSchema(schema: unknown): ParsedSchema {
       if (Object.prototype.hasOwnProperty.call(descriptor, 'default')) {
         field.defaultValue = (descriptor as Record<string, unknown>).default;
       }
+      const enumValues = parseEnumValues(descriptor as Record<string, unknown>, field.type as PrimitiveFieldType);
+      if (enumValues) {
+        field.enumValues = enumValues;
+      }
       fields.push(field);
       continue;
     }
@@ -236,6 +274,15 @@ export function preparePayload(
       return;
     }
     if (result.value !== undefined) {
+      if (field.enumValues && field.enumValues.length > 0) {
+        const isAllowed = field.enumValues.some(enumValue => enumValue === result.value);
+        if (!isAllowed) {
+          if (strict) {
+            errors[field.name] = 'Value must be one of the allowed options.';
+          }
+          return;
+        }
+      }
       payload[field.name] = result.value;
     }
   });

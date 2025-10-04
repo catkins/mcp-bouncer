@@ -1,6 +1,9 @@
 import { LoadingButton } from '../LoadingButton';
-import { MagnifyingGlassIcon, ArrowPathIcon, WrenchScrewdriverIcon } from '@heroicons/react/24/outline';
+import { DropdownSelect } from '../DropdownSelect';
+import { MagnifyingGlassIcon, ArrowPathIcon, WrenchScrewdriverIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
 import type { Tool } from '../../tauri/bridge';
+import type { ClientStatus, DebuggerServerOption } from './types';
+import { StatusPill } from './StatusPill';
 
 interface ToolListPanelProps {
   tools: Tool[];
@@ -12,6 +15,11 @@ interface ToolListPanelProps {
   onRefresh: () => void | Promise<void>;
   search: string;
   onSearchChange: (value: string) => void;
+  serverOptions: DebuggerServerOption[];
+  selectedServer: string | null;
+  onSelectServer: (name: string | null) => void;
+  serverStatus?: ClientStatus;
+  serverEligible: boolean;
 }
 
 export function ToolListPanel({
@@ -24,9 +32,38 @@ export function ToolListPanel({
   onRefresh,
   search,
   onSearchChange,
+  serverOptions,
+  selectedServer,
+  onSelectServer,
+  serverStatus,
+  serverEligible,
 }: ToolListPanelProps) {
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col rounded-lg border border-gray-200 bg-white/90 shadow-sm dark:border-gray-700 dark:bg-gray-900/60">
+      <div className="border-b border-gray-200 px-3 py-3 dark:border-gray-700">
+        <div className="flex flex-col gap-2">
+          <DropdownSelect
+            label="Server"
+            value={selectedServer ?? ''}
+            onChange={event => onSelectServer(event.target.value || null)}
+            options={[
+              { value: '', label: serverOptions.length > 0 ? 'Select a server' : 'No servers available', disabled: true },
+              ...serverOptions.map(option => ({ value: option.name, label: option.name })),
+            ]}
+            disabled={serverOptions.length === 0}
+            size="sm"
+            fullWidth
+            className="min-w-0"
+          />
+          {selectedServer && serverStatus ? <StatusPill status={serverStatus} /> : null}
+          {selectedServer && !serverEligible ? (
+            <span className="inline-flex max-w-full items-center gap-1 rounded-md bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+              <ExclamationCircleIcon className="h-3 w-3" />
+              Not connected
+            </span>
+          ) : null}
+        </div>
+      </div>
       <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2 dark:border-gray-700">
         <div className="flex items-center gap-1 text-sm font-semibold text-gray-700 dark:text-gray-200">
           <WrenchScrewdriverIcon className="h-4 w-4" />

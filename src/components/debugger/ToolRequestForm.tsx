@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Tool } from '../../tauri/bridge';
 import { LoadingButton } from '../LoadingButton';
 import { ToggleSwitch } from '../ToggleSwitch';
-import type { ParsedSchema, PrimitiveFieldType, SchemaField } from './types';
+import type { ParsedSchema, PrimitiveFieldType, SchemaField, SchemaEnumValue } from './types';
 import { parseSchema, preparePayload, describeFieldType } from './utils';
+import { DropdownSelect } from '../DropdownSelect';
 
 interface ToolRequestFormProps {
   tool: Tool;
@@ -406,6 +407,8 @@ function FieldInput({
 }: FieldInputProps) {
   const typeBadgeLabel = describeFieldType(field);
   const isBooleanField = field.type === 'boolean';
+  const enumValues = Array.isArray(field.enumValues) ? field.enumValues : [];
+  const hasEnumOptions = enumValues.length > 0 && !isBooleanField;
 
   if (field.type === 'array') {
     const items: any[] = Array.isArray(value) ? value : [];
@@ -483,13 +486,33 @@ function FieldInput({
         <TypeBadge label={typeBadgeLabel} />
       </div>
       {field.description && <p className="text-xs text-gray-500 dark:text-gray-400">{field.description}</p>}
-      <PrimitiveInput
-        type={field.type as PrimitiveFieldType}
-        value={value}
-        onChange={val => onChange(field.name, val)}
-        disabled={disabled}
-        {...(inputId ? { id: inputId } : {})}
-      />
+      {hasEnumOptions ? (
+        <DropdownSelect
+          value={normalizeEnumSelection(value)}
+          onChange={event => {
+            const selected = event.target.value;
+            if (!selected) {
+              onChange(field.name, '');
+              return;
+            }
+            const decoded = decodeEnumValue(selected, enumValues);
+            onChange(field.name, decoded ?? '');
+          }}
+          options={buildEnumOptions(enumValues, field.required)}
+          disabled={disabled}
+          fullWidth
+          size="sm"
+          {...(inputId ? { id: inputId } : {})}
+        />
+      ) : (
+        <PrimitiveInput
+          type={field.type as PrimitiveFieldType}
+          value={value}
+          onChange={val => onChange(field.name, val)}
+          disabled={disabled}
+          {...(inputId ? { id: inputId } : {})}
+        />
+      )}
       {error && <span className="text-xs text-red-500">{error}</span>}
     </div>
   );
@@ -504,6 +527,43 @@ function TypeBadge({ label }: { label: string }) {
       {label}
     </span>
   );
+}
+
+function encodeEnumValue(value: SchemaEnumValue): string {
+  if (typeof value === 'string') {
+    return `s:${value}`;
+  }
+  if (typeof value === 'number') {
+    return `n:${value}`;
+  }
+  return value ? 'b:true' : 'b:false';
+}
+
+function normalizeEnumSelection(value: unknown): string {
+  if (value === '' || value === undefined || value === null) {
+    return '';
+  }
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return encodeEnumValue(value as SchemaEnumValue);
+  }
+  return '';
+}
+
+function decodeEnumValue(token: string, values: SchemaEnumValue[]): SchemaEnumValue | undefined {
+  return values.find(option => encodeEnumValue(option) === token);
+}
+
+function buildEnumOptions(values: SchemaEnumValue[], required: boolean) {
+  return [
+    {
+      value: '',
+      label: required ? 'Select a value' : 'None',
+    },
+    ...values.map(value => ({
+      value: encodeEnumValue(value),
+      label: String(value),
+    })),
+  ];
 }
 
 interface PrimitiveInputProps {
