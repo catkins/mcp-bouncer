@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
-import { render, screen, waitFor } from '../test/render';
+import { render, screen, waitFor, fireEvent } from '../test/render';
 import { ServerList } from './ServerList';
 
 // Mock bridge for ToolsModal to avoid real fetches
@@ -88,7 +88,7 @@ describe('ServerList', () => {
     );
 
     const restartBtns = await screen.findAllByRole('button', { name: /restart svc/i });
-    await userEvent.click(restartBtns[0]!);
+    fireEvent.click(restartBtns[0]!);
     await waitFor(() => expect(onRestartServer).toHaveBeenCalled());
 
     // Rerender with streamable_http + requires authorization state
