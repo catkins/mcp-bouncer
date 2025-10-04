@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { MCPService, type MCPServerConfig } from '../../tauri/bridge';
-import { ChevronDownIcon } from '@heroicons/react/24/outline';
+import { DropdownSelect } from '../DropdownSelect';
 
 export function LogsFilterBar({ server, method, ok, onServerChange, onMethodChange, onOkChange }: {
   server?: string;
@@ -16,9 +16,6 @@ export function LogsFilterBar({ server, method, ok, onServerChange, onMethodChan
     MCPService.List().then(setServers).catch(() => {});
   }, []);
 
-  const selectClass =
-    'w-44 px-3 py-2 pr-10 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-purple-500 dark:focus:border-purple-400 text-sm appearance-none cursor-pointer transition-all duration-200 hover:border-gray-400 dark:hover:border-gray-600';
-
   const methodOptions = [
     { value: '', label: 'All' },
     { value: 'initialize', label: 'initialize' },
@@ -29,51 +26,42 @@ export function LogsFilterBar({ server, method, ok, onServerChange, onMethodChan
   ];
 
   return (
-    <div className="flex flex-wrap items-center gap-4 mb-3">
-      <label className="text-sm text-gray-600 dark:text-gray-300">Server</label>
-      <div className="relative">
-        <select
-          className={selectClass}
-          value={server ?? ''}
-          onChange={(e) => onServerChange(e.target.value || undefined)}
-        >
-          <option value="">All</option>
-          {servers.map(s => (
-            <option key={s.name} value={s.name}>{s.name}</option>
-          ))}
-        </select>
-        <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
-      </div>
+    <div className="mb-3 flex flex-wrap items-end gap-4 text-sm text-gray-600 dark:text-gray-300">
+      <DropdownSelect
+        label="Server"
+        size="sm"
+        value={server ?? ''}
+        onChange={event => onServerChange(event.target.value || undefined)}
+        options={[
+          { value: '', label: 'All' },
+          ...servers.map(s => ({ value: s.name, label: s.name })),
+        ]}
+        className="w-44"
+      />
 
-      <label className="text-sm text-gray-600 dark:text-gray-300">Method</label>
-      <div className="relative">
-        <select
-          className={selectClass}
-          value={method ?? ''}
-          onChange={(e) => onMethodChange(e.target.value || undefined)}
-        >
-          {methodOptions.map((opt) => (
-            <option key={opt.value || '__all__'} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-        <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
-      </div>
+      <DropdownSelect
+        label="Method"
+        size="sm"
+        value={method ?? ''}
+        onChange={event => onMethodChange(event.target.value || undefined)}
+        options={methodOptions}
+        className="w-44"
+      />
 
-      <label className="text-sm text-gray-600 dark:text-gray-300">Status</label>
-      <div className="relative">
-        <select
-          className={selectClass}
-          value={ok === undefined ? '' : ok ? 'ok' : 'err'}
-          onChange={(e) => onOkChange(e.target.value === '' ? undefined : e.target.value === 'ok')}
-        >
-          <option value="">All</option>
-          <option value="ok">Success</option>
-          <option value="err">Errors</option>
-        </select>
-        <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
-      </div>
+      <DropdownSelect
+        label="Status"
+        size="sm"
+        value={ok === undefined ? '' : ok ? 'ok' : 'err'}
+        onChange={event =>
+          onOkChange(event.target.value === '' ? undefined : event.target.value === 'ok')
+        }
+        options={[
+          { value: '', label: 'All' },
+          { value: 'ok', label: 'Success' },
+          { value: 'err', label: 'Errors' },
+        ]}
+        className="w-44"
+      />
     </div>
   );
 }

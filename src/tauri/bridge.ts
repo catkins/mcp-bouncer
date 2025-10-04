@@ -19,6 +19,12 @@ export type ClientConnectionState = 'disconnected' | 'connecting' | 'errored' | 
 export type ClientStatus = { name: string; state: ClientConnectionState; tools: number; last_error?: string | null; authorization_required: boolean; oauth_authenticated: boolean };
 export type IncomingClient = { id: string; name: string; version: string; title?: string | null; connected_at?: string | null };
 export type Tool = { name: string; description?: string | null; input_schema?: unknown | null };
+export type DebugCallToolResponse = {
+  duration_ms: number;
+  ok: boolean;
+  result: unknown;
+  request_arguments?: unknown | null;
+};
 
 export const TransportType = {
   Stdio: 'stdio',
@@ -69,6 +75,17 @@ export const MCPService = {
   },
   async ToggleTool(clientName: string, toolName: string, enabled: boolean): Promise<void> {
     await invoke('mcp_toggle_tool', { clientName, toolName, enabled });
+  },
+  async DebugCallTool(
+    serverName: string,
+    toolName: string,
+    args?: Record<string, unknown> | null,
+  ): Promise<DebugCallToolResponse> {
+    return await invoke('mcp_debug_call_tool', {
+      serverName,
+      toolName,
+      args: args ?? null,
+    });
   },
 };
 

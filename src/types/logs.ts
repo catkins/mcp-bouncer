@@ -11,6 +11,7 @@ export interface RpcLog {
   error?: string | null;
   request_json?: unknown | null;
   response_json?: unknown | null;
+  origin?: string | null;
 }
 
 export interface LogsQueryParams {

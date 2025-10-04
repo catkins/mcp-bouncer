@@ -18,12 +18,13 @@ export function HighlightedJson({ value, collapsedByDefault, className }: {
   const theme = typeof document !== 'undefined' && document.documentElement.classList.contains('dark') ? themes.vsDark : themes.vsLight;
   return (
     <div className={clsx('flex flex-col gap-1', className)}>
-      <div
-        className={clsx(
-          'relative flex-1 rounded border border-gray-200 bg-gray-50 text-xs dark:border-gray-700 dark:bg-gray-900',
-          showFull ? 'no-scrollbar overflow-auto' : 'overflow-hidden'
-        )}
-      >
+  <div
+    className={clsx(
+      'relative flex-1 rounded border border-gray-200 bg-gray-50 text-xs dark:border-gray-700 dark:bg-gray-900',
+      showFull ? 'overflow-auto' : 'overflow-hidden',
+      'overflow-x-auto w-full max-w-full min-w-0'
+    )}
+  >
         <Highlight
           theme={theme}
           code={showFull ? json : preview}

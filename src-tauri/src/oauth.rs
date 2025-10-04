@@ -144,7 +144,7 @@ pub fn save_credentials_for(
 struct CallbackQuery {
     code: String,
     #[serde(rename = "state")]
-    _state: Option<String>,
+    state: Option<String>,
 }
 
 /// Start an OAuth flow for a server. Spawns a temporary callback server on localhost, opens the browser,
@@ -244,7 +244,7 @@ where
 
         match tokio::time::timeout(
             REQUEST_TIMEOUT,
-            state.start_authorization(&["mcp"], &redirect_uri),
+            state.start_authorization(&["mcp"], &redirect_uri, Some("mcp-bouncer")),
         )
         .await
         {
@@ -279,7 +279,12 @@ where
         }
 
         // Complete the code exchange
-        match tokio::time::timeout(REQUEST_TIMEOUT, state.handle_callback(&q.code)).await {
+        let csrf_token = q
+            .state
+            .as_deref()
+            .ok_or_else(|| anyhow!("oauth callback missing state parameter"))?;
+
+        match tokio::time::timeout(REQUEST_TIMEOUT, state.handle_callback(&q.code, csrf_token)).await {
             Ok(res) => res.context("oauth exchange")?,
             Err(_) => {
                 return Err(anyhow!(

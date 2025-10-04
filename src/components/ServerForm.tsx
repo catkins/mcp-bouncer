@@ -1,17 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import {
-  XMarkIcon,
-  ExclamationTriangleIcon,
-  PlusIcon,
-  TrashIcon,
-  ChevronDownIcon,
-} from '@heroicons/react/24/outline';
+import { XMarkIcon, ExclamationTriangleIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { TransportType } from '../tauri/bridge';
 import type { MCPServerConfig } from '../tauri/bridge';
 import { LoadingButton } from './LoadingButton';
 import { ToggleSwitch } from './ToggleSwitch';
 import { FormInput } from './FormInput';
 import { KeyValueList } from './KeyValueList';
+import { DropdownSelect } from './DropdownSelect';
 
 // FormInput moved to components/FormInput.tsx
 
@@ -261,37 +256,30 @@ export function ServerForm({
             onChange={value => setFormData((prev: MCPServerConfig) => ({ ...prev, description: value }))}
           />
 
-          <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Transport Type *
-            </label>
-            <div className="relative">
-              <select
-                value={formData.transport}
-                onChange={e => {
-                  const newTransport = e.target.value as TransportType;
-                  setFormData((prev: MCPServerConfig) => ({ ...prev, transport: newTransport }));
-                  // Clear validation errors when switching transport types
-                  setErrors((prev: Record<string, string>) => {
-                    const newErrors = { ...prev };
-                  if (newTransport !== TransportType.Stdio) {
-                        delete newErrors.command;
-                      }
-                      if (newTransport === TransportType.Stdio) {
-                        delete newErrors.endpoint;
-                      }
-                      return newErrors;
-                  });
-                }}
-                className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-purple-500 dark:focus:border-purple-400 text-sm appearance-none cursor-pointer transition-all duration-200 hover:border-gray-400 dark:hover:border-gray-600"
-              >
-                <option value={TransportType.Stdio}>stdio</option>
-                <option value={TransportType.Sse}>sse</option>
-                <option value={TransportType.StreamableHttp}>streamable http</option>
-              </select>
-              <ChevronDownIcon className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
-            </div>
-          </div>
+          <DropdownSelect
+            label="Transport Type *"
+            value={formData.transport}
+            onChange={event => {
+              const newTransport = event.target.value as TransportType;
+              setFormData((prev: MCPServerConfig) => ({ ...prev, transport: newTransport }));
+              setErrors((prev: Record<string, string>) => {
+                const newErrors = { ...prev };
+                if (newTransport !== TransportType.Stdio) {
+                  delete newErrors.command;
+                }
+                if (newTransport === TransportType.Stdio) {
+                  delete newErrors.endpoint;
+                }
+                return newErrors;
+              });
+            }}
+            options={[
+              { value: TransportType.Stdio, label: 'stdio' },
+              { value: TransportType.Sse, label: 'sse' },
+              { value: TransportType.StreamableHttp, label: 'streamable http' },
+            ]}
+            fullWidth
+          />
 
           {(formData.transport === TransportType.Sse ||
             formData.transport === TransportType.StreamableHttp) && (

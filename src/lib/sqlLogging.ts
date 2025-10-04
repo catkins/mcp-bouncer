@@ -35,6 +35,7 @@ const SCHEMA_QUERIES = [
     duration_ms INTEGER,
     ok INTEGER NOT NULL,
     error TEXT,
+    origin TEXT,
     request_json TEXT,
     response_json TEXT
   )`,
@@ -49,6 +50,13 @@ const HISTOGRAM_BUCKET_CANDIDATES = [
   120_000, 300_000, 600_000, 1_800_000, 3_600_000,
   7_200_000, 14_400_000, 43_200_000, 86_400_000,
 ] as const;
+
+function isDuplicateColumnError(error: unknown): boolean {
+  if (error instanceof Error) {
+    return /duplicate column name/i.test(error.message);
+  }
+  return false;
+}
 
 class SQLLoggingService {
   private db: Database | null = null;
@@ -71,7 +79,14 @@ class SQLLoggingService {
     const db = this.db!;
     if (!this.initialized) {
       for (const query of SCHEMA_QUERIES) {
-        await db.execute(query);
+        try {
+          await db.execute(query);
+        } catch (error) {
+          const alterOrigin = query.startsWith('ALTER TABLE rpc_events ADD COLUMN origin');
+          if (!alterOrigin || !isDuplicateColumnError(error)) {
+            throw error;
+          }
+        }
       }
       this.initialized = true;
     }
@@ -92,7 +107,7 @@ class SQLLoggingService {
   private buildEventsQuery(params: QueryParams): { sql: string; values: any[] } {
     let sql = `
       SELECT id, ts_ms, session_id, method, server_name, server_version, 
-             server_protocol, duration_ms, ok, error, request_json, response_json 
+             server_protocol, duration_ms, ok, error, origin, request_json, response_json 
       FROM rpc_events
     `;
     
@@ -159,6 +174,7 @@ class SQLLoggingService {
       error: row.error ?? null,
       request_json: parseField(row.request_json),
       response_json: parseField(row.response_json),
+      origin: row.origin ?? null,
     };
   };
 

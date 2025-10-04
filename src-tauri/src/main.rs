@@ -11,9 +11,13 @@ use mcp_bouncer::config::{
 use mcp_bouncer::events::{TauriEventEmitter, client_error, client_status_changed};
 use mcp_bouncer::incoming::list_incoming;
 use mcp_bouncer::logging::{Event, RpcEventPublisher, SqlitePublisher};
+use mcp_bouncer::logging_origin;
 use mcp_bouncer::oauth::start_oauth_for_server;
 use mcp_bouncer::server::{get_runtime_listen_addr, start_http_server};
 use mcp_bouncer::unauthorized;
+use rmcp::{ServiceError, model as mcp};
+use serde_json::{Value as JsonValue, json};
+use specta::Type;
 #[cfg(debug_assertions)]
 use specta_typescript::Typescript;
 #[cfg(debug_assertions)]
@@ -53,6 +57,15 @@ fn spawn_mcp_proxy(app: &tauri::AppHandle) {
             .await;
         }
     });
+}
+
+#[derive(serde::Serialize, Type)]
+struct DebugCallToolResponse {
+    duration_ms: f64,
+    ok: bool,
+    result: JsonValue,
+    #[specta(optional)]
+    request_arguments: Option<JsonValue>,
 }
 
 // ---------- STDIO client management ----------
@@ -285,12 +298,17 @@ use mcp_bouncer::types::ToolInfo;
 
 #[tauri::command]
 #[specta::specta]
-async fn mcp_get_client_tools(client_name: String) -> Result<Vec<ToolInfo>, String> {
-    // Use cached tools to avoid re-fetching every modal open
+async fn mcp_get_client_tools(
+    app: tauri::AppHandle,
+    client_name: String,
+) -> Result<Vec<ToolInfo>, String> {
     let list = mcp_bouncer::tools_cache::get(&client_name)
         .await
         .unwrap_or_default();
-    // Filter based on persisted toggles
+    let needs_schema = list.is_empty() || list.iter().any(|t| t.input_schema.is_none());
+    if needs_schema {
+        return fetch_and_cache_tools(&app, &client_name).await;
+    }
     Ok(mcp_bouncer::tools_cache::filter_enabled_with(
         &mcp_bouncer::config::OsConfigProvider,
         &client_name,
@@ -304,7 +322,14 @@ async fn mcp_refresh_client_tools(
     app: tauri::AppHandle,
     client_name: String,
 ) -> Result<(), String> {
-    let Some(cfg) = get_server_by_name(&client_name) else {
+    fetch_and_cache_tools(&app, &client_name).await.map(|_| ())
+}
+
+async fn fetch_and_cache_tools(
+    app: &tauri::AppHandle,
+    client_name: &str,
+) -> Result<Vec<ToolInfo>, String> {
+    let Some(cfg) = get_server_by_name(client_name) else {
         return Err("server not found".into());
     };
     let start = std::time::Instant::now();
@@ -330,11 +355,12 @@ async fn mcp_refresh_client_tools(
             input_schema,
         });
     }
-    mcp_bouncer::tools_cache::set(&client_name, out.clone()).await;
-    mcp_bouncer::overlay::set_tools(&client_name, out.len() as u32).await;
+    mcp_bouncer::tools_cache::set(client_name, out.clone()).await;
+    mcp_bouncer::overlay::set_tools(client_name, out.len() as u32).await;
     // Log tools/list event for internal refresh + emit live update
     let mut evt = Event::new("tools/list", format!("internal::{client_name}"));
-    evt.server_name = Some(client_name.clone());
+    evt.server_name = Some(client_name.to_string());
+    evt.origin = Some("internal".into());
     // Mirror the external JSON-RPC-ish shape used elsewhere
     evt.request_json = Some(serde_json::json!({
         "method": "tools/list",
@@ -348,7 +374,152 @@ async fn mcp_refresh_client_tools(
     }));
     evt.duration_ms = Some(start.elapsed().as_millis() as i64);
     logger.log_and_emit(&emitter, evt);
-    Ok(())
+    Ok(mcp_bouncer::tools_cache::filter_enabled_with(
+        &mcp_bouncer::config::OsConfigProvider,
+        client_name,
+        out,
+    ))
+}
+
+#[specta::specta]
+#[tauri::command]
+async fn mcp_debug_call_tool(
+    app: tauri::AppHandle,
+    server_name: String,
+    tool_name: String,
+    args: Option<JsonValue>,
+) -> Result<DebugCallToolResponse, String> {
+    let cfg = get_server_by_name(&server_name).ok_or_else(|| "server not found".to_string())?;
+    if !cfg.enabled {
+        return Err("server is disabled".into());
+    }
+    let overlay_snapshot = mcp_bouncer::overlay::snapshot().await;
+    let is_connected = overlay_snapshot
+        .get(&server_name)
+        .map(|entry| entry.state == ClientConnectionState::Connected)
+        .unwrap_or(false);
+    if !is_connected {
+        return Err("server is not connected".into());
+    }
+
+    let args_map = match args {
+        Some(JsonValue::Object(map)) => Some(map),
+        Some(JsonValue::Null) => None,
+        Some(_) => return Err("tool arguments must be a JSON object".into()),
+        None => None,
+    };
+    let request_arguments = args_map.as_ref().map(|m| JsonValue::Object(m.clone()));
+
+    let emitter = TauriEventEmitter(app.clone());
+    let logger = SqlitePublisher;
+    let client = ensure_rmcp_client(&server_name, &cfg, &emitter, &logger)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let call_client = client.clone();
+    let args_for_call = args_map.clone();
+    let tool_for_call = tool_name.clone();
+    let start = std::time::Instant::now();
+    let result = logging_origin::with_request_origin("debugger", move || {
+        let call_client = call_client.clone();
+        let args_for_call = args_for_call.clone();
+        let tool_for_call = tool_for_call.clone();
+        async move {
+            call_client
+                .call_tool(mcp::CallToolRequestParam {
+                    name: tool_for_call.into(),
+                    arguments: args_for_call,
+                })
+                .await
+        }
+    })
+    .await;
+    let duration_ms = (start.elapsed().as_secs_f64() * 1_000.0).round();
+
+    match result {
+        Ok(call_result) => {
+            let ok = call_result.is_error != Some(true);
+            let result_json = serde_json::to_value(&call_result).map_err(|e| e.to_string())?;
+            Ok(DebugCallToolResponse {
+                duration_ms,
+                ok,
+                result: result_json,
+                request_arguments,
+            })
+        }
+        Err(service_error) => {
+            let payload = match &service_error {
+                ServiceError::McpError(error) => build_debug_call_error_payload(error),
+                other => build_debug_call_service_error_payload(other),
+            };
+            Ok(DebugCallToolResponse {
+                duration_ms,
+                ok: false,
+                result: payload,
+                request_arguments,
+            })
+        }
+    }
+}
+
+fn build_debug_call_error_payload(error: &mcp::ErrorData) -> JsonValue {
+    let error_value = serde_json::to_value(error).unwrap_or_else(|_| {
+        json!({
+            "message": error.to_string(),
+        })
+    });
+    let message = error.message.clone().into_owned();
+    json!({
+        "type": "rpc_error",
+        "message": message,
+        "error": error_value,
+    })
+}
+
+fn build_debug_call_service_error_payload(error: &ServiceError) -> JsonValue {
+    json!({
+        "type": "service_error",
+        "message": error.to_string(),
+        "kind": format!("{error:?}"),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn build_debug_call_error_payload_preserves_code_and_message() {
+        let detail = json!({ "expected": "object", "received": "undefined" });
+        let error = mcp::ErrorData::invalid_params("Required", Some(detail.clone()));
+        let payload = build_debug_call_error_payload(&error);
+        assert_eq!(payload["type"], json!("rpc_error"));
+        assert_eq!(payload["message"], json!("Required"));
+        assert_eq!(payload["error"]["message"], json!("Required"));
+        assert_eq!(
+            payload["error"]["code"],
+            json!(mcp::ErrorCode::INVALID_PARAMS.0)
+        );
+        assert_eq!(payload["error"]["data"], detail);
+    }
+
+    #[test]
+    fn build_debug_call_service_error_payload_includes_message_and_kind() {
+        let payload = build_debug_call_service_error_payload(&ServiceError::TransportClosed);
+        assert_eq!(payload["type"], json!("service_error"));
+        assert!(
+            payload["message"]
+                .as_str()
+                .unwrap()
+                .contains("Transport closed")
+        );
+        assert!(
+            payload["kind"]
+                .as_str()
+                .unwrap()
+                .contains("TransportClosed")
+        );
+    }
 }
 
 async fn connect_and_initialize<E>(emitter: &E, name: &str, cfg: &MCPServerConfig)
@@ -510,6 +681,7 @@ fn main() {
             mcp_start_oauth,
             mcp_get_client_tools,
             mcp_refresh_client_tools,
+            mcp_debug_call_tool,
             mcp_toggle_tool,
             settings_get_settings,
             settings_open_config_directory,
@@ -583,6 +755,7 @@ fn main() {
             mcp_start_oauth,
             mcp_get_client_tools,
             mcp_refresh_client_tools,
+            mcp_debug_call_tool,
             mcp_toggle_tool,
             settings_get_settings,
             settings_open_config_directory,

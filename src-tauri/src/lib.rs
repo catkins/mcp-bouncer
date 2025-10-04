@@ -4,6 +4,7 @@ pub mod config;
 pub mod events;
 pub mod incoming;
 mod logging_core;
+pub mod logging_origin;
 mod logging_sqlite;
 pub mod oauth;
 pub mod overlay;

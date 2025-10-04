@@ -21,6 +21,7 @@ if (typeof window !== 'undefined' && !('matchMedia' in window)) {
 ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 // Extend expect with jest-dom matchers for better DOM assertions
 import '@testing-library/jest-dom/vitest';
+import { cleanup } from '@testing-library/react';
 import { vi } from 'vitest';
 import { mockIPC, clearMocks } from '@tauri-apps/api/mocks';
 
@@ -30,6 +31,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  cleanup();
   clearMocks();
 });
 

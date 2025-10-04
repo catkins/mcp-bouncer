@@ -19,6 +19,7 @@ use crate::{
     events::{self, EventEmitter},
     incoming::record_connect,
     logging::{Event, RpcEventPublisher},
+    logging_origin::current_request_origin,
 };
 
 #[derive(Clone)]
@@ -339,8 +340,10 @@ where
     async fn log_notification(&self, notification: &mcp::ClientNotification) {
         let session_id = self.current_session_id().await;
         let mut event = Event::new("notifications/unknown", session_id);
+        event.origin = Some("external".into());
         let request_json = client_notification_envelope_json(notification);
-        let method = method_from_envelope_or_fallback(request_json.as_ref(), "notifications/unknown");
+        let method =
+            method_from_envelope_or_fallback(request_json.as_ref(), "notifications/unknown");
         event.request_json = request_json;
         event.method = method;
         event.ok = true;
@@ -366,6 +369,7 @@ where
                     None => self.current_session_id().await,
                 };
                 let mut event = Event::new("initialize", session_id);
+                event.origin = Some("external".into());
                 if let Some(val) = request_val {
                     event.client_name = extract_str(
                         &val,
@@ -405,6 +409,7 @@ where
             ClientRequest::ListToolsRequest(_) => {
                 let session_id = self.current_session_id().await;
                 let mut event = Event::new("tools/list", session_id);
+                event.origin = Some("external".into());
                 event.server_name = Some("aggregate".into());
                 let method = method_from_envelope_or_fallback(request_json.as_ref(), "tools/list");
                 event.request_json = request_json;
@@ -418,6 +423,7 @@ where
             ClientRequest::CallToolRequest(req) => {
                 let session_id = self.current_session_id().await;
                 let mut event = Event::new("tools/call", session_id);
+                event.origin = Some("external".into());
                 let name = req.params.name.as_ref();
                 if let Some(server) = name
                     .split_once("::")
@@ -438,6 +444,7 @@ where
             _ => {
                 let session_id = self.current_session_id().await;
                 let mut event = Event::new("other", session_id);
+                event.origin = Some("external".into());
                 let method = method_from_envelope_or_fallback(request_json.as_ref(), "other");
                 event.request_json = request_json;
                 event.method = method;
@@ -661,8 +668,13 @@ where
     async fn log_server_notification(&self, notification: ServerNotification) {
         let mut event = Event::new("notifications/unknown", self.session_id.clone());
         event.server_name = Some(self.server_name.clone());
+        event.origin = current_request_origin().or_else(|| Some("internal".into()));
+        if let Some(origin) = event.origin.clone() {
+            event.session_id = format!("{origin}::{}", self.server_name);
+        }
         let request_json = server_notification_envelope_json(&notification);
-        let method = method_from_envelope_or_fallback(request_json.as_ref(), "notifications/unknown");
+        let method =
+            method_from_envelope_or_fallback(request_json.as_ref(), "notifications/unknown");
         event.request_json = request_json;
         event.method = method;
         self.populate_server_details(&mut event).await;
@@ -679,6 +691,7 @@ where
         let (mut event, kind) = match request {
             ClientRequest::InitializeRequest(_req) => {
                 let mut event = Event::new("initialize", session_id);
+                event.origin = Some("internal".into());
                 event.server_name = Some(self.server_name.clone());
                 if let Some(val) = request_json.as_ref() {
                     event.client_name = extract_str(
@@ -711,16 +724,19 @@ where
             }
             ClientRequest::ListToolsRequest(_) => {
                 let mut event = Event::new("tools/list", session_id);
+                event.origin = Some("internal".into());
                 event.server_name = Some(self.server_name.clone());
                 (event, PendingKind::ListTools)
             }
             ClientRequest::CallToolRequest(_) => {
                 let mut event = Event::new("tools/call", session_id);
+                event.origin = Some("internal".into());
                 event.server_name = Some(self.server_name.clone());
                 (event, PendingKind::CallTool)
             }
             _ => {
                 let mut event = Event::new("other", session_id);
+                event.origin = Some("internal".into());
                 event.server_name = Some(self.server_name.clone());
                 (event, PendingKind::Other)
             }
@@ -734,6 +750,10 @@ where
         let method = method_from_envelope_or_fallback(request_json.as_ref(), fallback);
         event.request_json = request_json;
         event.method = method;
+        if let Some(origin) = current_request_origin() {
+            event.origin = Some(origin.clone());
+            event.session_id = format!("{origin}::{}", self.server_name);
+        }
         if !matches!(kind, PendingKind::Initialize) {
             self.populate_server_details(&mut event).await;
         }
@@ -911,6 +931,7 @@ mod tests {
     use super::*;
     use crate::events::{BufferingEventEmitter, EVENT_INCOMING_CLIENTS_UPDATED};
     use crate::incoming;
+    use crate::logging_origin;
     use tokio::sync::mpsc;
 
     #[derive(Clone, Default)]
@@ -1049,6 +1070,7 @@ mod tests {
         assert_eq!(events.len(), 1);
         let event = &events[0];
         assert_eq!(event.method, "tools/call");
+        assert_eq!(event.origin.as_deref(), Some("external"));
         assert_eq!(event.server_name.as_deref(), Some("srv"));
         assert_eq!(event.server_version.as_deref(), Some("1.2.3"));
         assert_eq!(event.server_protocol.as_deref(), Some("jsonrpc-2.0"));
@@ -1148,6 +1170,7 @@ mod tests {
         assert_eq!(events.len(), 1);
         let event = &events[0];
         assert_eq!(event.method, "initialize");
+        assert_eq!(event.origin.as_deref(), Some("external"));
         assert_eq!(event.client_name.as_deref(), Some("cli"));
         assert!(event.ok);
         let request_json = event.request_json.as_ref().expect("request json");
@@ -1185,5 +1208,46 @@ mod tests {
         }));
 
         incoming::clear_incoming().await;
+    }
+
+    #[tokio::test]
+    async fn outbound_defaults_to_internal_origin() {
+        let emitter = BufferingEventEmitter::default();
+        let logger = TestLogger::default();
+        let state = OutboundInterceptState::new("srv", emitter, logger);
+        let request_id = mcp::RequestId::Number(7);
+        let request = mcp::ClientRequest::CallToolRequest(mcp::CallToolRequest::new(
+            mcp::CallToolRequestParam {
+                name: "srv::tool".into(),
+                arguments: None,
+            },
+        ));
+        let pending = state
+            .build_pending(&request, &request_id)
+            .await
+            .expect("pending");
+        assert_eq!(pending.event.origin.as_deref(), Some("internal"));
+        assert_eq!(pending.event.session_id, "internal::srv");
+    }
+
+    #[tokio::test]
+    async fn outbound_respects_debugger_origin_scope() {
+        let emitter = BufferingEventEmitter::default();
+        let logger = TestLogger::default();
+        let state = OutboundInterceptState::new("srv", emitter, logger);
+        let request_id = mcp::RequestId::Number(11);
+        let request = mcp::ClientRequest::CallToolRequest(mcp::CallToolRequest::new(
+            mcp::CallToolRequestParam {
+                name: "srv::tool".into(),
+                arguments: None,
+            },
+        ));
+        let pending = logging_origin::with_request_origin("debugger", || async {
+            state.build_pending(&request, &request_id).await
+        })
+        .await
+        .expect("pending");
+        assert_eq!(pending.event.origin.as_deref(), Some("debugger"));
+        assert_eq!(pending.event.session_id, "debugger::srv");
     }
 }

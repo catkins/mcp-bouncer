@@ -24,6 +24,7 @@ pub struct Event {
     pub client_name: Option<String>,
     pub client_version: Option<String>,
     pub client_protocol: Option<String>,
+    pub origin: Option<String>,
 }
 
 impl Event {
@@ -44,6 +45,7 @@ impl Event {
             client_name: None,
             client_version: None,
             client_protocol: None,
+            origin: None,
         }
     }
 }

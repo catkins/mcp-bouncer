@@ -16,6 +16,7 @@ const FLUSH_INTERVAL: Duration = Duration::from_millis(250);
 const CHECKPOINT_INTERVAL: Duration = Duration::from_secs(1);
 
 const MIGRATION_SQL: &str = include_str!("sql/migrations/0001_logging_init.sql");
+const MIGRATION_ADD_ORIGIN: &str = include_str!("sql/migrations/0002_logging_add_origin.sql");
 
 #[derive(Clone)]
 pub struct LoggerCfg {
@@ -231,6 +232,14 @@ async fn open_connection(cfg: &LoggerCfg) -> Result<SqliteConnection, sqlx::Erro
 
 async fn ensure_schema(conn: &mut SqliteConnection) -> Result<(), sqlx::Error> {
     for stmt in migration_statements() {
+        if stmt.starts_with("ALTER TABLE") {
+            match sqlx::query(stmt).execute(&mut *conn).await {
+                Err(e) if stmt.contains("origin") && is_duplicate_column_error(&e) => {}
+                Err(e) => return Err(e),
+                Ok(_) => {}
+            }
+            continue;
+        }
         sqlx::query(stmt).execute(&mut *conn).await?;
     }
     Ok(())
@@ -272,8 +281,8 @@ async fn flush_events(conn: &mut SqliteConnection, events: &[Event]) -> Result<(
             .map(|v| serde_json::to_string(v).unwrap_or_default());
 
         sqlx::query(
-            "INSERT INTO rpc_events (id, ts_ms, session_id, method, server_name, server_version, server_protocol, duration_ms, ok, error, request_json, response_json)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO rpc_events (id, ts_ms, session_id, method, server_name, server_version, server_protocol, duration_ms, ok, error, origin, request_json, response_json)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(event.id.to_string())
         .bind(event.ts_ms)
@@ -285,6 +294,7 @@ async fn flush_events(conn: &mut SqliteConnection, events: &[Event]) -> Result<(
         .bind(event.duration_ms)
         .bind(event.ok)
         .bind(event.error.as_deref())
+        .bind(event.origin.as_deref())
         .bind(request_json.as_deref())
         .bind(response_json.as_deref())
         .execute(&mut *tx)
@@ -342,17 +352,33 @@ pub fn redact_json(mut v: JsonValue, keys_lc: &[String]) -> JsonValue {
 fn migration_statements() -> impl Iterator<Item = &'static str> {
     MIGRATION_SQL
         .split(';')
+        .chain(MIGRATION_ADD_ORIGIN.split(';'))
         .map(str::trim)
         .filter(|stmt| !stmt.is_empty())
 }
 
+fn is_duplicate_column_error(err: &sqlx::Error) -> bool {
+    matches!(
+        err,
+        sqlx::Error::Database(db_err) if db_err.message().contains("duplicate column name")
+    )
+}
+
 pub fn migrations() -> Vec<Migration> {
-    vec![Migration {
-        version: 1,
-        description: "init_logging",
-        sql: MIGRATION_SQL,
-        kind: MigrationKind::Up,
-    }]
+    vec![
+        Migration {
+            version: 1,
+            description: "init_logging",
+            sql: MIGRATION_SQL,
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 2,
+            description: "add_origin_column",
+            sql: MIGRATION_ADD_ORIGIN,
+            kind: MigrationKind::Up,
+        },
+    ]
 }
 
 #[cfg(test)]
