@@ -6,8 +6,10 @@ import type {
   DebugCallToolResponse,
 } from '../tauri/bridge';
 import { MCPService } from '../tauri/bridge';
-import { ToolListPanel, RequestPanel, ResponsePanel } from '../components/debugger';
-import type { CallOutcome, DebuggerServerOption } from '../components/debugger';
+import { ToolListPanel } from '../components/debugger/ToolListPanel';
+import { RequestPanel } from '../components/debugger/RequestPanel';
+import { ResponsePanel } from '../components/debugger/ResponsePanel';
+import type { CallOutcome, DebuggerServerOption } from '../components/debugger/types';
 import {
   ArrowPathIcon,
   BugAntIcon,
