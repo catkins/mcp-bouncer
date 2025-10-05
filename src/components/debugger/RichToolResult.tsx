@@ -86,9 +86,10 @@ export function RichToolResult({ result }: RichToolResultProps) {
           <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
             Structured Content
           </h4>
-          <pre className="mt-2 overflow-auto rounded-md bg-gray-900/90 p-3 text-xs text-gray-100 dark:bg-gray-950/90">
-            {JSON.stringify(prepared.structured, null, 2)}
-          </pre>
+          <HighlightedJson
+            value={prepared.structured}
+            className="mt-2 overflow-auto rounded-md border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
+          />
         </div>
       ) : null}
     </div>
@@ -127,9 +128,10 @@ function ContentCard({ item }: { item: ToolContentItem }) {
           <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
             Unsupported Content ({item.type ?? 'unknown'})
           </h4>
-          <pre className="mt-2 overflow-auto rounded-md bg-gray-900/90 p-3 text-xs text-gray-100 dark:bg-gray-950/90">
-            {JSON.stringify(item, null, 2)}
-          </pre>
+          <HighlightedJson
+            value={item}
+            className="mt-2 overflow-auto rounded-md border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
+          />
         </div>
       );
   }
