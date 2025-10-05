@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '../test/render';
+import { render, screen } from '../../test/render';
 import userEvent from '@testing-library/user-event';
 import { ServerForm } from './ServerForm';
 import { cleanup } from '@testing-library/react';
 import { afterEach } from 'vitest';
-import { TransportType, type MCPServerConfig } from '../tauri/bridge';
+import { TransportType, type MCPServerConfig } from '../../tauri/bridge';
 
 afterEach(() => cleanup());
 

@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { ServerForm } from './ServerForm';
-import type { MCPServerConfig } from '../tauri/bridge';
-import { TransportType } from '../tauri/bridge';
+import type { MCPServerConfig } from '../../tauri/bridge';
+import { TransportType } from '../../tauri/bridge';
 
 // Mock existing servers for validation testing
 const mockExistingServers: MCPServerConfig[] = [
@@ -32,7 +32,7 @@ const mockExistingServers: MCPServerConfig[] = [
 ];
 
 const meta: Meta<typeof ServerForm> = {
-  title: 'Components/ServerForm',
+  title: 'Components/Servers/ServerForm',
   component: ServerForm,
   parameters: {
     layout: 'fullscreen',

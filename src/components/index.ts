@@ -1,10 +1,10 @@
 export { StatusIndicator } from './StatusIndicator';
-export { ServerCard } from './ServerCard';
-export { ServerList } from './ServerList';
-export { ServerForm } from './ServerForm';
+export { ServerCard } from './servers/ServerCard';
+export { ServerList } from './servers/ServerList';
+export { ServerForm } from './servers/ServerForm';
 export { Header } from './Header';
 export { ToggleSwitch } from './ToggleSwitch';
-export { ToolsModal } from './ToolsModal';
+export { ToolsModal } from './servers/ToolsModal';
 export { LoadingButton } from './LoadingButton';
 export { Toast, ToastContainer, type ToastType } from './Toast';
 export { ClientCard } from './clients/ClientCard';

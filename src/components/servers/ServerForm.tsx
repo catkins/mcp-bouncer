@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { XMarkIcon, ExclamationTriangleIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { TransportType } from '../tauri/bridge';
-import type { MCPServerConfig } from '../tauri/bridge';
-import { LoadingButton } from './LoadingButton';
-import { ToggleSwitch } from './ToggleSwitch';
-import { FormInput } from './FormInput';
-import { KeyValueList } from './KeyValueList';
-import { DropdownSelect } from './DropdownSelect';
+import { TransportType } from '../../tauri/bridge';
+import type { MCPServerConfig } from '../../tauri/bridge';
+import { LoadingButton } from '../LoadingButton';
+import { ToggleSwitch } from '../ToggleSwitch';
+import { FormInput } from '../FormInput';
+import { KeyValueList } from '../KeyValueList';
+import { DropdownSelect } from '../DropdownSelect';
 
 // FormInput moved to components/FormInput.tsx
 

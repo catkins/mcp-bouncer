@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { XMarkIcon, WrenchScrewdriverIcon, PowerIcon } from '@heroicons/react/24/outline';
-import { MCPService, type Tool } from '../tauri/bridge';
-import { ToggleSwitch } from './ToggleSwitch';
-import { LoadingButton } from './LoadingButton';
-import { useFocusTrap } from '../hooks/useFocusTrap';
+import { MCPService, type Tool } from '../../tauri/bridge';
+import { ToggleSwitch } from '../ToggleSwitch';
+import { LoadingButton } from '../LoadingButton';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 // Tool type comes from backend schema via bridge
 

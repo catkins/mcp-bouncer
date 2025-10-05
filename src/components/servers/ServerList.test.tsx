@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
-import { render, screen, waitFor } from '../test/render';
+import { render, screen, waitFor } from '../../test/render';
 import { ServerList } from './ServerList';
 
 // Mock bridge for ToolsModal to avoid real fetches
-vi.mock('../tauri/bridge', async () => {
-  const actual = await vi.importActual<Record<string, any>>('../tauri/bridge');
+vi.mock('../../tauri/bridge', async () => {
+  const actual = await vi.importActual<Record<string, any>>('../../tauri/bridge');
   return {
     ...actual,
     MCPService: {

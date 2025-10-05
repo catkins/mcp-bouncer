@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render } from '../test/render';
+import { render } from '../../test/render';
 import { cleanup } from '@testing-library/react';
 import { afterEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 
-vi.mock('../tauri/bridge', async () => {
-  const actual = await vi.importActual<Record<string, any>>('../tauri/bridge');
+vi.mock('../../tauri/bridge', async () => {
+  const actual = await vi.importActual<Record<string, any>>('../../tauri/bridge');
   return {
     ...actual,
     MCPService: {
@@ -23,7 +23,7 @@ vi.mock('../tauri/bridge', async () => {
 afterEach(() => cleanup());
 
 import { ToolsModal } from './ToolsModal';
-import { MCPService } from '../tauri/bridge';
+import { MCPService } from '../../tauri/bridge';
 
 describe('ToolsModal', () => {
   it('loads and displays tools', async () => {

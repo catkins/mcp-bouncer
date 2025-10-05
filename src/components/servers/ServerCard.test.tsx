@@ -1,9 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '../test/render';
-import { ServerCard } from './ServerCard';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { cleanup } from '@testing-library/react';
-import { afterEach } from 'vitest';
-import { TransportType, type MCPServerConfig, type ClientStatus } from '../tauri/bridge';
+import { render, screen } from '../../test/render';
+import { ServerCard } from './ServerCard';
+import { TransportType, type MCPServerConfig, type ClientStatus } from '../../tauri/bridge';
 
 afterEach(() => cleanup());
 

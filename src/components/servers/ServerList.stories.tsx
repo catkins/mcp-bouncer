@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { ServerList } from './ServerList';
-import type { MCPServerConfig, ClientStatus } from '../tauri/bridge';
-import { TransportType } from '../tauri/bridge';
+import type { MCPServerConfig, ClientStatus } from '../../tauri/bridge';
+import { TransportType } from '../../tauri/bridge';
 
 // Mock server configurations
 const mockServers: MCPServerConfig[] = [
@@ -104,7 +104,7 @@ const mockClientStatusWithErrors: Record<string, ClientStatus> = {
 
 
 const meta: Meta<typeof ServerList> = {
-  title: 'Components/ServerList',
+  title: 'Components/Servers/ServerList',
   component: ServerList,
   parameters: {
     layout: 'padded',
