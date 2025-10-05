@@ -1,5 +1,5 @@
 import { useIncomingClients, type IncomingClient } from '../hooks/useIncomingClients';
-import { ClientCard } from './ClientCard';
+import { ClientCard } from '../components/clients/ClientCard';
 
 export function ClientList({ clients: provided }: { clients?: IncomingClient[] }) {
   const { clients: liveClients } = useIncomingClients();
@@ -21,3 +21,5 @@ export function ClientList({ clients: provided }: { clients?: IncomingClient[] }
     </div>
   );
 }
+
+export default ClientList;

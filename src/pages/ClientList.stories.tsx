@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { ClientList } from './ClientList';
 
 const meta: Meta<typeof ClientList> = {
-  title: 'Components/ClientList',
+  title: 'Pages/ClientList',
   component: ClientList,
 };
 

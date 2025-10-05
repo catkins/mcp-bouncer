@@ -1,7 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '../test/render';
+import { describe, it, expect, afterEach } from 'vitest';
 import { cleanup } from '@testing-library/react';
-import { afterEach } from 'vitest';
+import { render, screen } from '../test/render';
 import { ClientList } from './ClientList';
 
 afterEach(() => cleanup());

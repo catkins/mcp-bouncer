@@ -1,4 +1,5 @@
-import { Header, ClientList, TabSwitcher, type TabKey } from './components';
+import { Header, TabSwitcher, type TabKey } from './components';
+import ClientList from './pages/ClientList';
 import { useServersState } from './hooks/mcp/useServersState';
 import { useServiceInfo } from './hooks/mcp/useServiceInfo';
 import { useSettingsState } from './hooks/mcp/useSettingsState';

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import type { IncomingClient } from '../hooks/useIncomingClients';
+import type { IncomingClient } from '../../hooks/useIncomingClients';
 import { ClockIcon } from '@heroicons/react/24/outline';
-import { timeAgo } from '../utils/date';
+import { timeAgo } from '../../utils/date';
 
 export function ClientCard({ client }: { client: IncomingClient }) {
   const [tick, setTick] = useState(0);
