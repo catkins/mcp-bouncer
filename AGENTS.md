@@ -39,13 +39,13 @@ Tip: From the repository root, prefer passing `--manifest-path` for Rust backend
 This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the official **rmcp** SDK for MCP.
 
 **Main Components:**
-- `src-tauri/src/main.rs`: Tauri entry, rmcp Streamable HTTP server, Tauri commands, events
+- `src-tauri/src/main.rs`: Tauri entry, rmcp Streamable HTTP server bootstrap, plugin setup
+- `src-tauri/src/commands.rs`: Tauri command handlers and thin adapters (e.g., settings update)
 - `src-tauri/src/lib.rs`: Library crate exporting backend modules for testing/commands
 - `src-tauri/src/config.rs`: Settings, client-state, tools toggle persistence + shared types
 - `src-tauri/src/client.rs`: RMCP client lifecycle and registry
 - `src-tauri/src/status.rs`: Client status aggregation logic
 - `src-tauri/src/events.rs`: Event emission abstraction and helpers
-- `src-tauri/src/app_logic.rs`: Thin adapters (e.g., settings update) using config + events
 - `src-tauri/src/incoming.rs`: In-memory registry of incoming clients recorded on rmcp Initialize
 - `src-tauri/tauri.conf.json`: Tauri config (build hooks and frontendDist)
 - `src-tauri/capabilities/events.json`: grants `event.listen` to the main window/webview

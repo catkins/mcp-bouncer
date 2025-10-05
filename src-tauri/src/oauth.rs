@@ -284,7 +284,9 @@ where
             .as_deref()
             .ok_or_else(|| anyhow!("oauth callback missing state parameter"))?;
 
-        match tokio::time::timeout(REQUEST_TIMEOUT, state.handle_callback(&q.code, csrf_token)).await {
+        match tokio::time::timeout(REQUEST_TIMEOUT, state.handle_callback(&q.code, csrf_token))
+            .await
+        {
             Ok(res) => res.context("oauth exchange")?,
             Err(_) => {
                 return Err(anyhow!(
