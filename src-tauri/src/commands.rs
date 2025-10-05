@@ -11,10 +11,9 @@ use mcp_bouncer::events::{
 };
 use mcp_bouncer::incoming::list_incoming;
 use mcp_bouncer::logging::{Event, RpcEventPublisher, SqlitePublisher, with_request_origin};
-use mcp_bouncer::oauth::start_oauth_for_server;
+use mcp_bouncer::oauth::{self, start_oauth_for_server};
 use mcp_bouncer::server::get_runtime_listen_addr;
 use mcp_bouncer::types::ToolInfo;
-use mcp_bouncer::unauthorized;
 use rmcp::{ServiceError, model as mcp};
 use serde_json::{Value as JsonValue, json};
 use specta::Type;
@@ -485,7 +484,7 @@ where
                     cfg.transport,
                     mcp_bouncer::config::TransportType::StreamableHttp
                 ) {
-                    unauthorized::on_possible_unauthorized(name, Some(&cfg.endpoint)).await;
+                    oauth::on_possible_unauthorized(name, Some(&cfg.endpoint)).await;
                 }
                 let snap = mcp_bouncer::overlay::snapshot().await;
                 if let Some(ent) = snap.get(name)

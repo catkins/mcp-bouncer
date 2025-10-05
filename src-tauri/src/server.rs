@@ -12,8 +12,8 @@ use crate::config::{ConfigProvider, MCPServerConfig, load_settings_with};
 use crate::events::EventEmitter;
 use crate::events::client_status_changed;
 use crate::logging::RpcEventPublisher;
+use crate::oauth;
 use crate::transport::intercepting::{InterceptingSessionManager, RequestLogContext};
-use crate::unauthorized;
 
 // Runtime-bound listen address storage
 static RUNTIME_ADDR: std::sync::OnceLock<std::net::SocketAddr> = std::sync::OnceLock::new();
@@ -212,11 +212,8 @@ where
                         Err(e) => {
                             if matches!(cfg.transport, crate::config::TransportType::StreamableHttp)
                             {
-                                unauthorized::on_possible_unauthorized(
-                                    &cfg.name,
-                                    Some(&cfg.endpoint),
-                                )
-                                .await;
+                                oauth::on_possible_unauthorized(&cfg.name, Some(&cfg.endpoint))
+                                    .await;
                                 client_status_changed(
                                     &self.emitter,
                                     &cfg.name,
