@@ -3,8 +3,8 @@ import { PlusIcon } from '@heroicons/react/24/outline';
 import { ServerCard } from './ServerCard';
 import { ServerForm } from './ServerForm';
 import { ToolsModal } from './ToolsModal';
-import type { MCPServerConfig, ClientStatus } from '../tauri/bridge';
-import { LoadingButton } from './LoadingButton';
+import type { MCPServerConfig, ClientStatus } from '../../tauri/bridge';
+import { LoadingButton } from '../LoadingButton';
 
 interface ServerListProps {
   servers: MCPServerConfig[];

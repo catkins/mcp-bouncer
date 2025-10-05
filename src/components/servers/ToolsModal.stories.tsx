@@ -150,7 +150,7 @@ if (typeof window !== 'undefined') {
 }
 
 const meta: Meta<typeof ToolsModal> = {
-  title: 'Components/ToolsModal',
+  title: 'Components/Servers/ToolsModal',
   component: ToolsModal,
   parameters: {
     layout: 'fullscreen',

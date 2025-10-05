@@ -13,9 +13,9 @@ import {
   ShieldCheckIcon,
   BugAntIcon,
 } from '@heroicons/react/24/outline';
-import type { MCPServerConfig, ClientStatus } from '../tauri/bridge';
-import { LoadingButton } from './LoadingButton';
-import { ToggleSwitch } from './ToggleSwitch';
+import type { MCPServerConfig, ClientStatus } from '../../tauri/bridge';
+import { LoadingButton } from '../LoadingButton';
+import { ToggleSwitch } from '../ToggleSwitch';
 
 interface ServerCardProps {
   server: MCPServerConfig;
@@ -60,8 +60,7 @@ function ToolsButton({ clientStatus, toggleLoading, onClick, serverName }: { cli
   return (
     <button
       onClick={onClick}
-      className={`inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-400 rounded-full text-xs font-medium transition-all duration-200 hover:bg-blue-200 dark:hover:bg-blue-800/70 hover:scale-105 active:scale-95 cursor-pointer ${toggleLoading ? 'animate-pulse' : ''
-        }`}
+      className={`inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-400 rounded-full text-xs font-medium transition-all duration-200 hover:bg-blue-200 dark:hover:bg-blue-800/70 hover:scale-105 active:scale-95 cursor-pointer ${toggleLoading ? 'animate-pulse' : ''}`}
       title="Click to manage tools"
       aria-label={`Open tools for ${serverName}`}
     >
@@ -183,7 +182,7 @@ function StdioTransportFields({ command, args, env }: { command: string; args?: 
             Environment:
           </span>
           <div className="mt-1 space-y-1">
-            {Object.entries((env ?? {}) as Record<string, string>).map(([key, value]: [string, string]) => (
+            {Object.entries((env ?? {}) as Record<string, string>).map(([key, value]) => (
               <div key={key} className="flex items-center gap-2">
                 <code className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
                   {key}={value}
@@ -217,7 +216,7 @@ function HttpTransportFields({ endpoint, headers }: { endpoint?: string | undefi
             Headers:
           </span>
           <div className="mt-1 space-y-1">
-            {Object.entries((headers ?? {}) as Record<string, string>).map(([key, value]: [string, string]) => (
+            {Object.entries((headers ?? {}) as Record<string, string>).map(([key, value]) => (
               <div key={key} className="flex items-center gap-2">
                 <code className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
                   {key}: {value}
@@ -275,16 +274,26 @@ export function ServerCard({
       <div className="flex items-start justify-between mb-1.5 relative">
         <div className="flex items-center gap-2">
           <h3
-            className={`text-base font-semibold text-gray-900 dark:text-white transition-colors duration-200 ${toggleLoading ? 'text-gray-400 dark:text-gray-500' : ''
-              }`}
+            className={`text-base font-semibold text-gray-900 dark:text-white transition-colors duration-200 ${toggleLoading ? 'text-gray-400 dark:text-gray-500' : ''}`}
           >
             {server.name}
           </h3>
           {clientStatus && (
             <div className="flex items-center gap-2">
-              <ClientStatusBadge clientStatus={clientStatus} toggleLoading={toggleLoading} transport={server.transport} onAuthorize={onAuthorize} serverName={server.name} />
+              <ClientStatusBadge
+                clientStatus={clientStatus}
+                toggleLoading={toggleLoading}
+                transport={server.transport}
+                onAuthorize={onAuthorize}
+                serverName={server.name}
+              />
               <TransportBadge transport={server.transport} />
-              <ToolsButton clientStatus={clientStatus} toggleLoading={toggleLoading} onClick={handleToolsClick} serverName={server.name} />
+              <ToolsButton
+                clientStatus={clientStatus}
+                toggleLoading={toggleLoading}
+                onClick={handleToolsClick}
+                serverName={server.name}
+              />
               {clientStatus?.state === 'connected' && onOpenDebugger && (
                 <button
                   onClick={handleDebuggerClick}
@@ -355,8 +364,7 @@ export function ServerCard({
 
       {server.description && (
         <p
-          className={`text-sm text-gray-600 dark:text-gray-400 mb-2 transition-colors duration-200 ${toggleLoading ? 'text-gray-400 dark:text-gray-500' : ''
-            }`}
+          className={`text-sm text-gray-600 dark:text-gray-400 mb-2 transition-colors duration-200 ${toggleLoading ? 'text-gray-400 dark:text-gray-500' : ''}`}
         >
           {server.description}
         </p>
@@ -387,9 +395,7 @@ export function ServerCard({
           </div>
         )}
 
-      <div
-        className={`space-y-1.5 transition-all duration-200 ${toggleLoading ? 'opacity-75' : ''}`}
-      >
+      <div className={`space-y-1.5 transition-all duration-200 ${toggleLoading ? 'opacity-75' : ''}`}>
         {/* stdio transport fields */}
         {server.transport === 'stdio' && (
           <StdioTransportFields command={server.command} args={server.args} env={server.env} />

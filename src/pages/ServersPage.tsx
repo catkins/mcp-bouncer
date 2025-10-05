@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { ServerList } from '../components';
+import { ServerList } from '../components/servers/ServerList';
 import { useServersState } from '../hooks/mcp/useServersState';
 import { useMCPActions } from '../hooks/mcp/useMCPActions';
 import { useMCPSubscriptions } from '../hooks/mcp/useMCPSubscriptions';
