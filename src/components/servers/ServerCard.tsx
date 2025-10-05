@@ -74,7 +74,7 @@ function ClientStatusBadge({ clientStatus, toggleLoading, transport, onAuthorize
   clientStatus?: ClientStatus;
   toggleLoading: boolean;
   transport: MCPServerConfig['transport'];
-  onAuthorize?: (serverName: string) => Promise<void>;
+  onAuthorize?: ((serverName: string) => Promise<void>) | undefined;
   serverName: string;
 }) {
   if (!clientStatus) return null;
@@ -148,7 +148,7 @@ function ClientStatusBadge({ clientStatus, toggleLoading, transport, onAuthorize
 }
 
 // Transport detail sections
-function StdioTransportFields({ command, args, env }: { command: string; args?: string[]; env?: Partial<Record<string, string>> }) {
+function StdioTransportFields({ command, args, env }: { command: string; args?: string[] | undefined; env?: Partial<Record<string, string>> | undefined }) {
   return (
     <>
       <div>
@@ -196,7 +196,7 @@ function StdioTransportFields({ command, args, env }: { command: string; args?: 
   );
 }
 
-function HttpTransportFields({ endpoint, headers }: { endpoint?: string; headers?: Partial<Record<string, string>> }) {
+function HttpTransportFields({ endpoint, headers }: { endpoint?: string | undefined; headers?: Partial<Record<string, string>> | undefined }) {
   return (
     <>
       {endpoint && (
