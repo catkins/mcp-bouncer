@@ -10,8 +10,7 @@ use mcp_bouncer::events::{
     settings_updated,
 };
 use mcp_bouncer::incoming::list_incoming;
-use mcp_bouncer::logging::{Event, RpcEventPublisher, SqlitePublisher};
-use mcp_bouncer::logging_origin;
+use mcp_bouncer::logging::{Event, RpcEventPublisher, SqlitePublisher, with_request_origin};
 use mcp_bouncer::oauth::start_oauth_for_server;
 use mcp_bouncer::server::get_runtime_listen_addr;
 use mcp_bouncer::types::ToolInfo;
@@ -302,7 +301,7 @@ pub async fn mcp_debug_call_tool(
     let args_for_call = args_map.clone();
     let tool_for_call = tool_name.clone();
     let start = std::time::Instant::now();
-    let result = logging_origin::with_request_origin("debugger", move || {
+    let result = with_request_origin("debugger", move || {
         let call_client = call_client.clone();
         let args_for_call = args_for_call.clone();
         let tool_for_call = tool_for_call.clone();
