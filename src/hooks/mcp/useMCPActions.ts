@@ -64,6 +64,7 @@ export function useMCPActions(
         setError('addServer');
         await MCPService.AddMCPServer(serverConfig);
         await deps.loadServers();
+        await deps.loadClientStatus();
       } catch (error) {
         console.error('Failed to add server:', error);
         setError('addServer', 'Failed to add server');

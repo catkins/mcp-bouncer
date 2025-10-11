@@ -68,9 +68,34 @@ pub async fn mcp_add_server(app: tauri::AppHandle, config: MCPServerConfig) -> R
     if s.mcp_servers.iter().any(|c| c.name == config.name) {
         return Err("server with that name already exists".into());
     }
+    let server_name = config.name.clone();
+    let should_connect = config.enabled;
     s.mcp_servers.push(config);
     save_settings(&s)?;
     notify_servers_changed(&TauriEventEmitter(app.clone()), "add");
+    if should_connect {
+        if let Some(cfg) = get_server_by_name(&server_name) {
+            if matches!(
+                cfg.transport,
+                mcp_bouncer::config::TransportType::StreamableHttp
+            ) && cfg.requires_auth
+                && mcp_bouncer::oauth::load_credentials_for(
+                    &mcp_bouncer::config::OsConfigProvider,
+                    &server_name,
+                )
+                .is_none()
+            {
+                mcp_bouncer::overlay::mark_unauthorized(&server_name).await;
+                client_status_changed(
+                    &TauriEventEmitter(app.clone()),
+                    &server_name,
+                    "requires_authorization",
+                );
+            } else {
+                connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg).await;
+            }
+        }
+    }
     Ok(())
 }
 
