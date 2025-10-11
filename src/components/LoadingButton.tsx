@@ -24,15 +24,15 @@ export function LoadingButton({
   ariaLabel,
 }: LoadingButtonProps) {
   const baseClasses =
-    'inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden';
+    'inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface-50 dark:focus:ring-offset-surface-900 disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden';
 
   const variantClasses = {
     primary:
-      'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 hover:from-blue-600 hover:via-purple-600 hover:to-pink-600 focus:ring-purple-500 text-white shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95 bg-[length:200%_100%]',
+      'bg-brand-500 hover:bg-brand-400 focus:ring-brand-300 text-white shadow-sm hover:shadow-md',
     secondary:
-      'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 focus:ring-gray-500 hover:shadow-md transform hover:scale-105 active:scale-95',
+      'bg-surface-200 dark:bg-surface-700 text-surface-800 dark:text-surface-100 hover:bg-surface-300 dark:hover:bg-surface-600 focus:ring-surface-300 dark:focus:ring-surface-500 shadow-sm',
     danger:
-      'bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 focus:ring-red-500 text-white shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95',
+      'bg-red-500 hover:bg-red-600 focus:ring-red-400 text-white shadow-sm hover:shadow-md',
   };
 
   const sizeClasses = {
@@ -60,7 +60,7 @@ export function LoadingButton({
       aria-label={ariaLabel}
       className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className} ${
         loading ? 'animate-pulse' : ''
-      } ${variant === 'primary' && !loading ? 'animate-gradient' : ''}`}
+      }`}
     >
       <span className={`transition-all duration-200 inline-flex items-center gap-1.5 ${loading ? 'opacity-75' : ''}`}>
         {loading && (
@@ -68,9 +68,6 @@ export function LoadingButton({
         )}
         {children}
       </span>
-      {variant === 'primary' && !loading && (
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-shimmer" />
-      )}
       {/* Loading overlay */}
       {loading && <div className="absolute inset-0 bg-black/10 rounded-lg animate-pulse" />}
     </button>

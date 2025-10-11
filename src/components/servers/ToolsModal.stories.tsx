@@ -257,7 +257,7 @@ export const Interactive = () => {
         </div>
         <button
           onClick={() => setIsOpen(true)}
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          className="px-4 py-2 bg-brand-500 text-white rounded hover:bg-brand-600"
         >
           Open Tools Modal
         </button>
@@ -296,7 +296,7 @@ export const LoadingState = () => {
     <div className="p-8">
       <button
         onClick={() => setIsOpen(true)}
-        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 mb-4"
+        className="px-4 py-2 bg-brand-500 text-white rounded hover:bg-brand-600 mb-4"
       >
         Open Slow Loading Modal
       </button>
@@ -356,7 +356,7 @@ export const ManyTools = () => {
     <div className="p-8">
       <button
         onClick={() => setIsOpen(true)}
-        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 mb-4"
+        className="px-4 py-2 bg-brand-500 text-white rounded hover:bg-brand-600 mb-4"
       >
         Open Modal with Many Tools
       </button>

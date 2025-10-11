@@ -7,11 +7,11 @@ import { sqlLoggingService } from '../../lib/sqlLogging';
 import { EVENT_LOGS_RPC_EVENT, on, safeUnlisten } from '../../tauri/events';
 
 const METHOD_COLORS: Record<MethodCategory, string> = {
-  initialize: '#3B82F6',
-  'tools/list': '#A855F7',
-  'tools/call': '#F59E0B',
-  notification: '#14B8A6',
-  other: '#9CA3AF',
+  initialize: '#3a9a94',
+  'tools/list': '#7c5fb7',
+  'tools/call': '#f5a524',
+  notification: '#4cbfa6',
+  other: '#8b99a8',
 };
 
 const METHOD_LABELS: Record<MethodCategory, string> = {
@@ -148,6 +148,8 @@ export function LogsHistogram({ server, method, ok, range, onRangeChange }: Logs
     }
 
     const seriesOrder: MethodCategory[] = ['initialize', 'tools/list', 'tools/call', 'notification', 'other'];
+    const isDarkMode =
+      typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
     const bucketPoints: Record<MethodCategory, ChartPoint[]> = {
       initialize: [],
       'tools/list': [],
@@ -178,6 +180,7 @@ export function LogsHistogram({ server, method, ok, range, onRangeChange }: Logs
     }
 
     const option: EChartsOption = {
+      backgroundColor: isDarkMode ? '#181c1f' : '#f6f7f9',
       animation: true,
       animationDuration: 220,
       animationDurationUpdate: 180,
@@ -187,8 +190,8 @@ export function LogsHistogram({ server, method, ok, range, onRangeChange }: Logs
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
-        backgroundColor: '#0f172a',
-        borderColor: '#1e293b',
+        backgroundColor: 'rgba(24, 28, 31, 0.92)',
+        borderColor: '#2d3339',
         formatter: (params: any) => {
           if (!Array.isArray(params)) return '';
           const first = params[0];
@@ -208,28 +211,32 @@ export function LogsHistogram({ server, method, ok, range, onRangeChange }: Logs
       legend: {
         data: seriesOrder.map((key) => METHOD_LABELS[key]),
         top: 4,
-        textStyle: { color: '#CBD5F5', fontSize: 11 },
+        textStyle: { color: isDarkMode ? '#9ca4ad' : '#5f6670', fontSize: 11 },
         icon: 'rect',
         itemHeight: 6,
         itemWidth: 10,
       },
-      grid: { left: 40, right: 12, top: 40, bottom: 60 },
+      grid: { left: 40, right: 12, top: 40, bottom: 60, containLabel: true },
       xAxis: {
         type: 'time',
         min: data.start_ts_ms,
         max: data.end_ts_ms,
         axisLabel: {
-          color: '#94A3B8',
+          color: isDarkMode ? '#8b99a8' : '#6b737d',
           formatter: (value: number) => format(new Date(value), 'MMM d HH:mm'),
         },
-        axisLine: { lineStyle: { color: '#1E293B' } },
+        axisLine: { lineStyle: { color: isDarkMode ? '#2d3339' : '#d4d8dd' } },
         axisTick: { show: false },
       },
       yAxis: {
         type: 'value',
         min: 0,
-        axisLabel: { color: '#94A3B8' },
-        splitLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.15)' } },
+        axisLabel: { color: isDarkMode ? '#8b99a8' : '#6b737d' },
+        splitLine: {
+          lineStyle: {
+            color: isDarkMode ? 'rgba(139, 153, 168, 0.12)' : 'rgba(90, 99, 109, 0.1)',
+          },
+        },
       },
       dataZoom: [
         {
@@ -244,6 +251,18 @@ export function LogsHistogram({ server, method, ok, range, onRangeChange }: Logs
           bottom: 16,
           height: 24,
           brushSelect: false,
+          backgroundColor: isDarkMode ? 'rgba(139, 153, 168, 0.12)' : 'rgba(90, 99, 109, 0.08)',
+          fillerColor: isDarkMode ? 'rgba(58, 154, 148, 0.25)' : 'rgba(58, 154, 148, 0.35)',
+          borderColor: isDarkMode ? 'rgba(139, 153, 168, 0.4)' : 'rgba(90, 99, 109, 0.2)',
+          handleStyle: {
+            color: '#3a9a94',
+            borderColor: '#3a9a94',
+          },
+          moveHandleStyle: {
+            color: '#3a9a94',
+            borderColor: '#3a9a94',
+          },
+          textStyle: { color: isDarkMode ? '#8b99a8' : '#6b737d' },
         },
       ],
       series: seriesOrder.map((category) => ({
@@ -368,26 +387,26 @@ export function LogsHistogram({ server, method, ok, range, onRangeChange }: Logs
   }, []);
 
   return (
-    <div className="mb-3">
-      <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-slate-900/70 p-3">
+    <div className="mb-4">
+      <div className="rounded-xl border border-surface-200/80 bg-white/90 p-4 shadow-sm transition-colors dark:border-surface-800/60 dark:bg-surface-900/70">
         <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="text-sm font-semibold text-gray-800 dark:text-gray-100">Log Activity</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">Stacked by RPC method; drag horizontally to zoom.</div>
+            <div className="text-sm font-semibold text-surface-800 dark:text-white">Log Activity</div>
+            <div className="text-xs text-surface-600 dark:text-surface-300">Stacked by RPC method; drag horizontally to zoom.</div>
           </div>
           <button
             type="button"
             onClick={handleResetZoom}
-            className="self-start rounded-md border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-600 shadow-sm transition hover:bg-gray-100 dark:border-gray-700 dark:bg-slate-800 dark:text-gray-200 dark:hover:bg-slate-700"
+            className="self-start rounded-md border border-surface-300 bg-white px-2 py-1 text-xs font-medium text-surface-700 shadow-sm transition hover:bg-surface-200 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100 dark:hover:bg-surface-700"
           >
             Reset view
           </button>
         </div>
         {loading && (
-          <div className="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400">Loading histogram…</div>
+          <div className="flex h-48 items-center justify-center text-sm text-surface-500 dark:text-surface-400">Loading histogram…</div>
         )}
         {!loading && !hasData && (
-          <div className="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400">No log activity for the selected filters.</div>
+          <div className="flex h-48 items-center justify-center text-sm text-surface-500 dark:text-surface-400">No log activity for the selected filters.</div>
         )}
         {!loading && hasData && option && (
           <ReactECharts

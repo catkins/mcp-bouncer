@@ -39,8 +39,8 @@ export function ToolListPanel({
   serverEligible,
 }: ToolListPanelProps) {
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col rounded-lg border border-gray-200 bg-white/90 shadow-sm dark:border-gray-700 dark:bg-gray-900/60">
-      <div className="border-b border-gray-200 px-3 py-3 dark:border-gray-700">
+    <div className="flex h-full min-h-0 min-w-0 flex-col rounded-lg border border-surface-200 bg-surface-50/90 shadow-sm dark:border-surface-700 dark:bg-surface-900/60">
+      <div className="border-b border-surface-200 px-3 py-3 dark:border-surface-700">
         <div className="flex flex-col gap-2">
           <DropdownSelect
             label="Server"
@@ -64,11 +64,11 @@ export function ToolListPanel({
           ) : null}
         </div>
       </div>
-      <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2 dark:border-gray-700">
-        <div className="flex items-center gap-1 text-sm font-semibold text-gray-700 dark:text-gray-200">
+      <div className="flex items-center justify-between border-b border-surface-200 px-3 py-2 dark:border-surface-700">
+        <div className="flex items-center gap-1 text-sm font-semibold text-surface-700 dark:text-surface-200">
           <WrenchScrewdriverIcon className="h-4 w-4" />
           Tools
-          <span className="text-xs font-normal text-gray-500 dark:text-gray-400">({tools.length})</span>
+          <span className="text-xs font-normal text-surface-500 dark:text-surface-400">({tools.length})</span>
         </div>
         <LoadingButton
           onClick={onRefresh}
@@ -81,27 +81,27 @@ export function ToolListPanel({
           Refresh
         </LoadingButton>
       </div>
-      <div className="border-b border-gray-200 px-3 py-2 dark:border-gray-700">
+      <div className="border-b border-surface-200 px-3 py-2 dark:border-surface-700">
         <div className="relative">
-          <MagnifyingGlassIcon className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+          <MagnifyingGlassIcon className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-surface-400 dark:text-surface-500" />
           <input
             type="search"
             value={search}
             onChange={event => onSearchChange(event.target.value)}
             placeholder="Filter tools"
-            className="w-full rounded-md border border-gray-300 bg-white py-2 pl-7 pr-2 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+            className="w-full rounded-md border border-surface-300 bg-white py-2 pl-7 pr-2 text-sm text-surface-800 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-300/50 dark:border-surface-600 dark:bg-surface-800 dark:text-surface-100 dark:focus:border-brand-500 dark:focus:ring-brand-500/40"
           />
         </div>
       </div>
       <div className="flex-1 overflow-y-auto">
         {loading ? (
-          <div className="flex items-center justify-center py-6 text-sm text-gray-500 dark:text-gray-400">
+          <div className="flex items-center justify-center py-6 text-sm text-surface-500 dark:text-surface-400">
             <ArrowPathIcon className="h-4 w-4 animate-spin" />
           </div>
         ) : error ? (
           <div className="px-3 py-4 text-sm text-red-500 dark:text-red-400">{error}</div>
         ) : filteredTools.length === 0 ? (
-          <div className="px-3 py-6 text-sm text-gray-500 dark:text-gray-400">No tools match your filter.</div>
+          <div className="px-3 py-6 text-sm text-surface-500 dark:text-surface-400">No tools match your filter.</div>
         ) : (
           <ul className="flex flex-col">
             {filteredTools.map(tool => {
@@ -111,15 +111,15 @@ export function ToolListPanel({
                   <button
                     type="button"
                     onClick={() => onSelectTool(tool.name)}
-                    className={`flex w-full flex-col gap-1 border-b border-gray-100 px-3 py-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 dark:border-gray-800 ${
+                    className={`flex w-full flex-col gap-1 border-b border-surface-100 px-3 py-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-400 dark:border-surface-700 ${
                       active
-                        ? 'bg-blue-50/80 text-blue-700 dark:bg-blue-900/20 dark:text-blue-200'
-                        : 'text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800/50'
+                        ? 'bg-brand-50/80 text-brand-700 dark:bg-brand-900/20 dark:text-brand-200'
+                        : 'text-surface-700 hover:bg-surface-100 dark:text-surface-200 dark:hover:bg-surface-800/50'
                     }`}
                   >
                     <code className="font-mono text-sm">{tool.name}</code>
                     {tool.description ? (
-                      <span className="text-xs text-gray-500 dark:text-gray-400">{tool.description}</span>
+                      <span className="text-xs text-surface-500 dark:text-surface-400">{tool.description}</span>
                     ) : null}
                   </button>
                 </li>

@@ -104,7 +104,7 @@ function AppContent() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-radial dark:from-gray-800 dark:via-gray-800 dark:to-gray-900">
+    <div className="min-h-screen bg-surface-100 text-surface-900 transition-colors dark:bg-surface-950 dark:text-surface-100">
       <Header
         isActive={isActive}
         toggleTheme={toggleTheme}
@@ -113,7 +113,7 @@ function AppContent() {
         mcpUrl={mcpUrl}
       />
       <ToastContainer toasts={toasts} onClose={removeToast} />
-      <main className="pt-16 px-6 pb-6 max-w-5xl mx-auto">
+      <main className="mx-auto max-w-5xl px-6 pb-10 pt-16">
         <TabSwitcher
           value={tab}
           onChange={setTab}
@@ -123,28 +123,29 @@ function AppContent() {
           debuggerCount={debuggerCount}
         />
 
-
-        {tab === 'servers' ? (
-          <ServersPage
-            clientStatus={clientStatus}
-            loadClientStatus={loadClientStatus}
-            statusLoaded={statusLoaded}
-            onOpenDebugger={handleOpenDebugger}
-          />
-        ) : tab === 'clients' ? (
-          <ClientList />
-        ) : tab === 'logs' ? (
-          <LogsPage />
-        ) : (
-          <DebuggerPage
-            servers={servers}
-            clientStatus={clientStatus}
-            eligibleServers={debuggerCandidates.map(server => server.name)}
-            selectedServer={debugServer}
-            onSelectServer={setDebugServer}
-            statusLoaded={statusLoaded}
-          />
-        )}
+        <div className="space-y-6">
+          {tab === 'servers' ? (
+            <ServersPage
+              clientStatus={clientStatus}
+              loadClientStatus={loadClientStatus}
+              statusLoaded={statusLoaded}
+              onOpenDebugger={handleOpenDebugger}
+            />
+          ) : tab === 'clients' ? (
+            <ClientList />
+          ) : tab === 'logs' ? (
+            <LogsPage />
+          ) : (
+            <DebuggerPage
+              servers={servers}
+              clientStatus={clientStatus}
+              eligibleServers={debuggerCandidates.map(server => server.name)}
+              selectedServer={debugServer}
+              onSelectServer={setDebugServer}
+              statusLoaded={statusLoaded}
+            />
+          )}
+        </div>
       </main>
     </div>
   );

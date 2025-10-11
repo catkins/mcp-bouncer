@@ -341,7 +341,7 @@ export function ServerForm({
                       type="text"
                       value={arg}
                       onChange={e => updateArg(index, e.target.value)}
-                      className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
+                      className="flex-1 px-2 py-1.5 border border-surface-300 dark:border-surface-600 rounded-md bg-surface-100 dark:bg-surface-800 text-surface-900 dark:text-white focus:ring-2 focus:ring-brand-400 dark:focus:ring-brand-500 focus:border-transparent text-sm"
                       placeholder="Argument"
                       aria-label={`Argument ${index + 1}`}
                     />

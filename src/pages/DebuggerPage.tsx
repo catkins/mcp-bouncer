@@ -193,9 +193,9 @@ export default function DebuggerPage({
           {...(selectedStatus ? { serverStatus: selectedStatus } : {})}
         />
         {!selectedServer || !serverEligible ? (
-          <div className="flex min-h-[240px] flex-1 items-center justify-center rounded-lg border border-gray-200 bg-white/70 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800/40 dark:text-gray-300">
+          <div className="flex min-h-[240px] flex-1 items-center justify-center rounded-lg border border-surface-200 bg-surface-50/70 text-sm text-surface-600 dark:border-surface-700 dark:bg-surface-900/40 dark:text-surface-300">
             <div className="flex max-w-md flex-col items-center gap-2 text-center">
-              <DocumentTextIcon className="h-8 w-8 text-blue-500" />
+              <DocumentTextIcon className="h-8 w-8 text-brand-500" />
               <p className="font-medium">
                 {selectedServer
                   ? 'Debugger is available only for connected servers with tools.'

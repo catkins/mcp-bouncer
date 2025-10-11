@@ -41,10 +41,10 @@ export const DropdownSelect = forwardRef<HTMLSelectElement, DropdownSelectProps>
     const controlId = id ?? generatedId;
 
     const baseSelectClasses = clsx(
-      'appearance-none w-full rounded-lg border bg-white/95 dark:bg-gray-900/70 text-gray-900 dark:text-gray-100 shadow-sm transition-all duration-200',
-      'focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 dark:focus:ring-purple-400/60 dark:focus:border-purple-400/60',
-      'hover:border-gray-400 dark:hover:border-gray-500',
-      'border-gray-300/90 dark:border-gray-700/80',
+      'appearance-none w-full rounded-lg border bg-surface-50/95 dark:bg-surface-800/80 text-surface-900 dark:text-surface-100 shadow-sm transition-colors duration-200',
+      'focus:outline-none focus:ring-2 focus:ring-brand-300/60 focus:border-brand-400/40 dark:focus:ring-brand-500/60 dark:focus:border-brand-500/50',
+      'hover:border-surface-400 dark:hover:border-surface-500',
+      'border-surface-300/90 dark:border-surface-600/80',
       disabled && 'cursor-not-allowed opacity-60',
       size === 'sm' ? 'h-9 px-3 pr-9 text-sm' : 'h-10 px-3 pr-9 text-sm',
       error && 'border-red-400 focus:border-red-500 focus:ring-red-400/40',
@@ -57,7 +57,7 @@ export const DropdownSelect = forwardRef<HTMLSelectElement, DropdownSelectProps>
           <label
             htmlFor={controlId}
             className={clsx(
-              'text-xs font-medium uppercase tracking-wide text-gray-600 dark:text-gray-300',
+              'text-xs font-medium uppercase tracking-wide text-surface-600 dark:text-surface-300',
               disabled && 'opacity-70',
             )}
           >
@@ -78,12 +78,12 @@ export const DropdownSelect = forwardRef<HTMLSelectElement, DropdownSelectProps>
               </option>
             ))}
           </select>
-          <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+          <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-400 dark:text-surface-500" />
         </div>
         {error ? (
           <p className="text-xs font-medium text-red-500">{error}</p>
         ) : helperText ? (
-          <p className="text-xs text-gray-500 dark:text-gray-400">{helperText}</p>
+          <p className="text-xs text-surface-500 dark:text-surface-400">{helperText}</p>
         ) : null}
       </div>
     );
@@ -91,4 +91,3 @@ export const DropdownSelect = forwardRef<HTMLSelectElement, DropdownSelectProps>
 );
 
 DropdownSelect.displayName = 'DropdownSelect';
-

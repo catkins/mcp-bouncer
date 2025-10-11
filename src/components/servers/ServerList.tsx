@@ -146,9 +146,9 @@ export function ServerList({
   }, [showAddServer, editingServer, toolsModalServer]);
 
   return (
-    <div className="mb-4">
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-base font-semibold text-gray-900 dark:text-white">Servers</h2>
+    <div className="mb-4 space-y-4">
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="text-base font-semibold text-surface-900 dark:text-white">Servers</h2>
         <LoadingButton
           onClick={handleAddServer}
           size="sm"
@@ -162,21 +162,21 @@ export function ServerList({
       {isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-800/60 animate-pulse">
-              <div className="h-4 w-40 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
-              <div className="h-3 w-64 bg-gray-200 dark:bg-gray-700 rounded" />
+            <div key={i} className="animate-pulse rounded-lg border border-surface-200 bg-white/60 p-3 dark:border-surface-700 dark:bg-surface-900/60">
+              <div className="mb-2 h-4 w-40 rounded bg-surface-200 dark:bg-surface-700" />
+              <div className="h-3 w-64 rounded bg-surface-200 dark:bg-surface-700" />
             </div>
           ))}
         </div>
       ) : servers.length === 0 ? (
-        <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-          <div className="w-12 h-12 mx-auto mb-3 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-            <PlusIcon className="h-6 w-6 text-gray-400 dark:text-gray-500" />
+        <div className="rounded-lg border border-surface-200 bg-surface-50 py-8 text-center dark:border-surface-700 dark:bg-surface-900">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-lg bg-surface-200 dark:bg-surface-700">
+            <PlusIcon className="h-6 w-6 text-surface-500 dark:text-surface-200" />
           </div>
-          <h3 className="text-base font-medium text-gray-900 dark:text-white mb-1">
+          <h3 className="mb-1 text-base font-medium text-surface-900 dark:text-white">
             No servers configured
           </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+          <p className="mb-4 text-sm text-surface-600 dark:text-surface-300">
             Add your first MCP server to get started
           </p>
           <LoadingButton onClick={handleAddServer} size="sm" className="text-xs px-2 py-1 h-6">

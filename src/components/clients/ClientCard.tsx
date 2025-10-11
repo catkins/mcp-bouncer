@@ -13,21 +13,21 @@ export function ClientCard({ client }: { client: IncomingClient }) {
   const tooltip = client.connected_at ? new Date(client.connected_at).toLocaleString() : '';
 
   return (
-    <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all duration-300">
+    <div className="p-4 rounded-xl border border-surface-200 bg-white/95 shadow-sm transition-all duration-300 hover:shadow-md dark:border-surface-700 dark:bg-surface-900">
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white">{client.name}</h3>
-            <span className="px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 rounded-full">
+            <h3 className="text-base font-semibold text-surface-900 dark:text-white">{client.name}</h3>
+            <span className="px-2 py-0.5 text-xs bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-200 rounded-full">
               v{client.version}
             </span>
           </div>
           {client.title && (
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{client.title}</p>
+            <p className="text-sm text-surface-600 dark:text-surface-400 mt-1">{client.title}</p>
           )}
         </div>
         <span
-          className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-full text-xs font-medium"
+          className="inline-flex items-center gap-1 px-2 py-0.5 bg-surface-100 dark:bg-surface-700 text-surface-800 dark:text-surface-200 rounded-full text-xs font-medium"
           title={tooltip}
           data-tick={tick}
         >

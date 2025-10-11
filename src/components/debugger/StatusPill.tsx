@@ -16,14 +16,14 @@ export function StatusPill({ status }: StatusPillProps) {
       );
     case 'connecting':
       return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+        <span className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-medium text-brand-700 dark:bg-brand-900/40 dark:text-brand-200">
           <ArrowPathIcon className="h-3 w-3 animate-spin" />
           Connecting
         </span>
       );
     default:
       return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-gray-200 px-2 py-0.5 text-[11px] font-medium text-gray-700 dark:bg-gray-700/40 dark:text-gray-200">
+        <span className="inline-flex items-center gap-1 rounded-full bg-surface-200 px-2 py-0.5 text-[11px] font-medium text-surface-700 dark:bg-surface-700/40 dark:text-surface-200">
           <XCircleIcon className="h-3 w-3" />
           {status.state.replace('_', ' ')}
         </span>
