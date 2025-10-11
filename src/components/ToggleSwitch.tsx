@@ -44,17 +44,17 @@ export function ToggleSwitch({
         onClick={handleToggle}
         disabled={disabled}
         className={`
-          relative inline-flex items-center rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
+          relative inline-flex items-center rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-400 focus:ring-offset-2 focus:ring-offset-surface-50 dark:focus:ring-offset-surface-900
           ${sizeClasses[size]}
           ${
             checked
-              ? 'bg-gradient-to-r from-blue-400 via-blue-500 to-purple-500 shadow-lg'
-              : 'bg-gray-300 dark:bg-gray-600'
+              ? 'bg-brand-500 shadow-md dark:bg-brand-600'
+              : 'bg-surface-200 dark:bg-surface-600'
           }
           ${
             disabled
               ? 'opacity-50 cursor-not-allowed'
-              : 'cursor-pointer hover:shadow-md transform hover:scale-105 active:scale-95'
+              : 'cursor-pointer hover:shadow-md'
           }
           ${disabled && checked ? 'animate-pulse' : ''}
         `}
@@ -79,8 +79,8 @@ export function ToggleSwitch({
         <div className="flex flex-col">
           {label && (
             <span
-              className={`font-medium ${size === 'sm' ? 'text-xs' : size === 'md' ? 'text-sm' : 'text-base'} text-gray-900 dark:text-white transition-colors duration-200 ${
-                disabled ? 'text-gray-400 dark:text-gray-500' : ''
+              className={`font-medium ${size === 'sm' ? 'text-xs' : size === 'md' ? 'text-sm' : 'text-base'} text-surface-800 dark:text-white transition-colors duration-200 ${
+                disabled ? 'text-surface-400 dark:text-surface-500' : ''
               }`}
             >
               {label}
@@ -88,8 +88,8 @@ export function ToggleSwitch({
           )}
           {description && (
             <span
-              className={`${size === 'sm' ? 'text-xs' : 'text-sm'} text-gray-500 dark:text-gray-400 transition-colors duration-200 ${
-                disabled ? 'text-gray-300 dark:text-gray-600' : ''
+              className={`${size === 'sm' ? 'text-xs' : 'text-sm'} text-surface-600 dark:text-surface-400 transition-colors duration-200 ${
+                disabled ? 'text-surface-400 dark:text-surface-600' : ''
               }`}
             >
               {description}

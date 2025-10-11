@@ -18,13 +18,12 @@ export function HighlightedJson({ value, collapsedByDefault, className }: {
   const theme = typeof document !== 'undefined' && document.documentElement.classList.contains('dark') ? themes.vsDark : themes.vsLight;
   return (
     <div className={clsx('flex flex-col gap-1', className)}>
-  <div
-    className={clsx(
-      'relative flex-1 rounded border border-gray-200 bg-gray-50 text-xs dark:border-gray-700 dark:bg-gray-900',
-      showFull ? 'overflow-auto' : 'overflow-hidden',
-      'overflow-x-auto w-full max-w-full min-w-0'
-    )}
-  >
+      <div
+        className={clsx(
+          'relative flex-1 overflow-x-auto overflow-y-auto rounded-lg border border-surface-200/80 bg-white/95 text-xs shadow-sm dark:border-surface-800/60 dark:bg-surface-900/70',
+          showFull ? 'max-h-96' : 'max-h-60 overflow-hidden'
+        )}
+      >
         <Highlight
           theme={theme}
           code={showFull ? json : preview}
@@ -43,12 +42,12 @@ export function HighlightedJson({ value, collapsedByDefault, className }: {
           )}
         </Highlight>
         {!showFull && previewClipped && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-b from-transparent to-gray-50 dark:to-gray-900" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-b from-transparent to-white dark:to-surface-900" />
         )}
       </div>
       {tooLarge && (
         <button
-          className="self-start rounded bg-gray-100 px-1.5 py-[1px] text-[11px] text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+          className="self-start rounded-md bg-surface-200 px-1.5 py-[2px] text-[11px] text-surface-700 transition hover:bg-surface-300 dark:bg-surface-800 dark:text-surface-100 dark:hover:bg-surface-700"
           onClick={() => setExpanded(v => !v)}
         >
           {expanded ? 'Collapse large payload' : `Expand large payload (${Math.round(json.length / 1024)}KB)`}

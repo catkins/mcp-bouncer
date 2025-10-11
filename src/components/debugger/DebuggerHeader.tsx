@@ -19,11 +19,11 @@ export function DebuggerHeader({
   serverEligible,
 }: DebuggerHeaderProps) {
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white/90 p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/60 lg:flex-row lg:items-center lg:justify-between">
+    <div className="flex flex-col gap-4 rounded-xl border border-surface-200/80 bg-white/90 p-4 shadow-sm transition-colors dark:border-surface-800/60 dark:bg-surface-900/70 lg:flex-row lg:items-center lg:justify-between">
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Tool Debugger</h2>
+        <h2 className="text-lg font-semibold text-surface-900 dark:text-white">Tool Debugger</h2>
         {selectedServer ? (
-          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-surface-600 dark:text-surface-300">
             <span>{selectedServer}</span>
             {status ? <StatusPill status={status} /> : null}
             {!serverEligible && (
@@ -34,7 +34,9 @@ export function DebuggerHeader({
             )}
           </div>
         ) : (
-          <p className="text-sm text-gray-500 dark:text-gray-400">Select a connected server to inspect its tools.</p>
+          <p className="mt-1 text-sm text-surface-500 dark:text-surface-400">
+            Select a connected server to inspect its tools.
+          </p>
         )}
       </div>
       <DropdownSelect

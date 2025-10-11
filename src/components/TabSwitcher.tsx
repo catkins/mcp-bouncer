@@ -16,21 +16,20 @@ export function TabSwitcher({
   debuggerCount?: number;
 }) {
   const base =
-    'inline-flex items-center px-3 py-1.5 rounded-md text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/40 shadow-sm transform hover:scale-105 active:scale-95';
+    'inline-flex items-center px-3.5 py-1.5 rounded-full text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-300 dark:focus:ring-brand-500 focus:ring-offset-1 focus:ring-offset-surface-100 dark:focus:ring-offset-surface-900 shadow-sm';
 
-  const active =
-    'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700';
+  const active = 'bg-brand-500 text-white hover:bg-brand-400';
 
   const inactive =
-    'bg-gradient-to-r from-purple-600/15 to-purple-500/15 text-gray-700 dark:text-gray-200 hover:from-purple-600/25 hover:to-purple-500/25';
+    'bg-surface-200 text-surface-700 hover:bg-surface-300 dark:bg-surface-800 dark:text-surface-100 dark:hover:bg-surface-700';
 
   const badge = 'ml-2 px-2 py-0.5 rounded-full text-xs font-semibold';
   const activeBadge = 'bg-white/20 text-white';
-  const inactiveBadge = 'bg-purple-500/20 text-purple-700 dark:text-purple-200';
+  const inactiveBadge = 'bg-surface-300 text-surface-700 dark:bg-surface-700 dark:text-surface-200';
 
   return (
     <>
-      <div className="fixed top-14 left-0 right-0 z-30 bg-gray-50/90 dark:bg-gray-800/60 backdrop-blur-md border-b border-gray-200/70 dark:border-gray-700/50">
+      <div className="fixed top-14 left-0 right-0 z-30 border-b border-surface-200/70 bg-surface-100/95 backdrop-blur-md transition-colors dark:border-surface-800/60 dark:bg-surface-900/70">
         <div className="mx-auto flex max-w-5xl flex-wrap gap-2 px-6 py-2.5">
           <button
             className={`${base} ${value === 'servers' ? active : inactive}`}
@@ -70,7 +69,7 @@ export function TabSwitcher({
           </button>
         </div>
       </div>
-      <div className="h-[60px]" aria-hidden />
+      <div className="h-12" aria-hidden />
     </>
   );
 }

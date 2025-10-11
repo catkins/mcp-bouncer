@@ -150,16 +150,16 @@ export function ToolsModal({ serverName, isOpen, onClose }: ToolsModalProps) {
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descId}
-        className="relative w-full max-w-4xl mx-4 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-hidden"
+        className="relative w-full max-w-4xl mx-4 bg-surface-50 dark:bg-surface-900 rounded-lg shadow-xl border border-surface-200 dark:border-surface-700 max-h-[90vh] overflow-hidden"
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between p-4 border-b border-surface-200 dark:border-surface-700">
           <div className="flex items-center gap-2">
-            <WrenchScrewdriverIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            <h2 id={titleId} className="text-lg font-semibold text-gray-900 dark:text-white">
+            <WrenchScrewdriverIcon className="w-5 h-5 text-brand-600 dark:text-brand-300" />
+            <h2 id={titleId} className="text-lg font-semibold text-surface-900 dark:text-white">
               Tools - {serverName}
             </h2>
-            <span className="text-sm text-gray-500 dark:text-gray-400">({tools.length} tools)</span>
+            <span className="text-sm text-surface-500 dark:text-surface-400">({tools.length} tools)</span>
           </div>
           <div className="flex items-center gap-2">
             <LoadingButton data-initial-focus onClick={onClose} variant="secondary" size="sm" className="p-1.5" ariaLabel="Close tools modal">
@@ -175,7 +175,7 @@ export function ToolsModal({ serverName, isOpen, onClose }: ToolsModalProps) {
         <div id={descId} className="p-4 overflow-y-auto max-h-[calc(90vh-120px)]">
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-500"></div>
             </div>
           ) : error ? (
             <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
@@ -189,7 +189,7 @@ export function ToolsModal({ serverName, isOpen, onClose }: ToolsModalProps) {
           ) : (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <p className="text-xs text-gray-600 dark:text-gray-400">
+                <p className="text-xs text-surface-600 dark:text-surface-400">
                   Toggle individual tools on or off. Disabled tools will not be available to MCP
                   clients.
                 </p>
@@ -215,36 +215,36 @@ export function ToolsModal({ serverName, isOpen, onClose }: ToolsModalProps) {
               </div>
 
               {/* Table */}
-              <div className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
+              <div className="border border-surface-200 dark:border-surface-600 rounded-lg overflow-hidden">
                 <table className="w-full">
-                  <thead className="bg-gray-50 dark:bg-gray-700/50">
+                  <thead className="bg-surface-100 dark:bg-surface-800/50">
                     <tr>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      <th className="px-3 py-2 text-left text-xs font-medium text-surface-500 dark:text-surface-400 uppercase tracking-wider">
                         Tool
                       </th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      <th className="px-3 py-2 text-left text-xs font-medium text-surface-500 dark:text-surface-400 uppercase tracking-wider">
                         Description
                       </th>
-                      <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-20">
+                      <th className="px-3 py-2 text-center text-xs font-medium text-surface-500 dark:text-surface-400 uppercase tracking-wider w-20">
                         Status
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+                  <tbody className="divide-y divide-surface-200 dark:divide-surface-600">
                     {tools.map((tool, _index) => (
                       <tr
                         key={tool.name}
-                        className={`hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors duration-150 ${
+                        className={`hover:bg-surface-100 dark:hover:bg-surface-800/30 transition-colors duration-150 ${
                           toggleLoading[tool.name] ? 'opacity-75' : ''
                         }`}
                       >
                         <td className="px-3 py-2">
-                          <code className="text-sm font-mono text-gray-900 dark:text-gray-100 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
+                          <code className="text-sm font-mono text-surface-900 dark:text-white bg-surface-100 dark:bg-surface-700 px-1.5 py-0.5 rounded">
                             {tool.name}
                           </code>
                         </td>
                         <td className="px-3 py-2">
-                          <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2">
+                          <p className="text-sm text-surface-700 dark:text-surface-300 line-clamp-2">
                             {tool.description}
                           </p>
                         </td>
@@ -268,13 +268,13 @@ export function ToolsModal({ serverName, isOpen, onClose }: ToolsModalProps) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-4 border-t border-gray-200 dark:border-gray-700">
-          <div className="text-xs text-gray-500 dark:text-gray-400">
+        <div className="flex items-center justify-between p-4 border-t border-surface-200 dark:border-surface-700">
+          <div className="text-xs text-surface-500 dark:text-surface-400">
             {tools.length > 0 && (
               <span>
                 {enabledCount} of {totalCount} tools enabled
                 {bulkLoading && (
-                  <span className="ml-2 text-blue-600 dark:text-blue-400">
+                  <span className="ml-2 text-brand-600 dark:text-brand-300">
                     • {bulkActionDescription}
                   </span>
                 )}

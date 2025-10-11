@@ -5,16 +5,16 @@ interface StatusIndicatorProps {
 export function StatusIndicator({ isActive }: StatusIndicatorProps) {
   if (isActive === null) {
     return (
-      <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-50 dark:bg-gray-800 rounded-full border border-gray-200 dark:border-gray-700">
-        <div className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-gray-300 dark:border-gray-600 border-t-gray-600 dark:border-t-gray-400"></div>
-        <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Checking…</span>
+      <div className="flex items-center gap-1.5 rounded-full border border-surface-200 bg-surface-100 px-2 py-1 dark:border-surface-700 dark:bg-surface-800">
+        <div className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-surface-300 border-t-surface-600 dark:border-surface-600 dark:border-t-surface-400"></div>
+        <span className="text-xs font-medium text-surface-600 dark:text-surface-300">Checking…</span>
       </div>
     );
   } else if (isActive) {
     return (
-      <div className="flex items-center gap-1.5 px-2 py-1 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30 rounded-full border border-blue-200 dark:border-blue-800">
-        <div className="h-1.5 w-1.5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-pulse"></div>
-        <span className="text-xs font-medium text-blue-700 dark:text-blue-400">Active</span>
+      <div className="flex items-center gap-1.5 px-2 py-1 bg-brand-50 dark:bg-brand-900/30 rounded-full border border-brand-200 dark:border-brand-800">
+        <div className="h-1.5 w-1.5 bg-brand-500 rounded-full animate-pulse"></div>
+        <span className="text-xs font-medium text-brand-700 dark:text-brand-300">Active</span>
       </div>
     );
   } else {

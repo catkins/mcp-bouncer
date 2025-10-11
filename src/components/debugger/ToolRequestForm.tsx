@@ -370,7 +370,7 @@ function JsonOnlyForm({
       <textarea
         value={jsonInput}
         onChange={event => onJsonChange(event.target.value)}
-        className="min-h-[160px] flex-1 rounded-md border border-gray-300 bg-white p-3 font-mono text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+        className="min-h-[160px] flex-1 rounded-md border border-surface-300 bg-white p-3 font-mono text-sm text-surface-800 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-300/50 dark:border-surface-600 dark:bg-surface-800 dark:text-surface-100 dark:focus:border-brand-500 dark:focus:ring-brand-500/40"
         spellCheck={false}
         disabled={disabled || loading}
       />
@@ -596,7 +596,7 @@ function PrimitiveInput({ type, value, onChange, disabled, id }: PrimitiveInputP
       onChange={event => onChange(event.target.value)}
       step={type === 'integer' ? '1' : undefined}
       id={id}
-      className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+      className="rounded-md border border-surface-300 bg-white px-3 py-1.5 text-sm text-surface-800 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-300/50 dark:border-surface-600 dark:bg-surface-800 dark:text-surface-200 dark:focus:border-brand-500 dark:focus:ring-brand-500/40"
       disabled={disabled}
     />
   );

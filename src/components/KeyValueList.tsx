@@ -47,7 +47,7 @@ export function KeyValueList({
               type="text"
               value={key}
               onChange={e => onUpdate(index, key, e.target.value, value)}
-              className="w-1/3 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
+              className="w-1/3 px-2 py-1.5 border border-surface-300 dark:border-surface-600 rounded-md bg-surface-100 dark:bg-surface-800 text-surface-900 dark:text-white focus:ring-2 focus:ring-brand-400 dark:focus:ring-brand-500 focus:border-transparent text-sm"
               placeholder={keyPlaceholder}
               aria-label={`${ariaLabelBase} key ${index + 1}`}
             />
@@ -55,7 +55,7 @@ export function KeyValueList({
               type="text"
               value={value}
               onChange={e => onUpdate(index, key, key, e.target.value)}
-              className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 focus:border-transparent text-sm"
+              className="flex-1 px-2 py-1.5 border border-surface-300 dark:border-surface-600 rounded-md bg-surface-100 dark:bg-surface-800 text-surface-900 dark:text-white focus:ring-2 focus:ring-brand-400 dark:focus:ring-brand-500 focus:border-transparent text-sm"
               placeholder={valuePlaceholder}
               aria-label={`${ariaLabelBase} value ${index + 1}`}
             />

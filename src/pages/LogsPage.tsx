@@ -44,7 +44,7 @@ export function LogsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
+      <div className="mb-2 flex items-center justify-between">
         <LogsFilterBar
           {...(server !== undefined ? { server } : {})}
           {...(method !== undefined ? { method } : {})}
@@ -53,7 +53,7 @@ export function LogsPage() {
           onMethodChange={m => reset({ method: m as string | undefined })}
           onOkChange={v => reset({ ok: v as boolean | undefined })}
         />
-        <div className="text-xs text-gray-500">{count === null ? '—' : `${count} events`}</div>
+        <div className="text-xs text-surface-500 dark:text-surface-400">{count === null ? '—' : `${count} events`}</div>
       </div>
       <LogsHistogram
         {...(server !== undefined ? { server } : {})}

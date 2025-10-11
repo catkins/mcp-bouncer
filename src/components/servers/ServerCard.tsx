@@ -48,7 +48,7 @@ function getTransportIcon(transport: MCPServerConfig['transport']) {
 
 function TransportBadge({ transport }: { transport: MCPServerConfig['transport'] }) {
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-400 rounded-full text-xs font-medium">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-brand-400/15 text-brand-700 dark:bg-brand-900/30 dark:text-brand-200">
       {getTransportIcon(transport)}
       {transport || 'stdio'}
     </span>
@@ -60,7 +60,7 @@ function ToolsButton({ clientStatus, toggleLoading, onClick, serverName }: { cli
   return (
     <button
       onClick={onClick}
-      className={`inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-400 rounded-full text-xs font-medium transition-all duration-200 hover:bg-blue-200 dark:hover:bg-blue-800/70 hover:scale-105 active:scale-95 cursor-pointer ${toggleLoading ? 'animate-pulse' : ''}`}
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-all duration-200 bg-brand-400/15 text-brand-700 dark:bg-brand-900/30 dark:text-brand-100 hover:bg-brand-400/25 dark:hover:bg-brand-800/50 cursor-pointer ${toggleLoading ? 'animate-pulse' : ''}`}
       title="Click to manage tools"
       aria-label={`Open tools for ${serverName}`}
     >
@@ -91,7 +91,7 @@ function ClientStatusBadge({ clientStatus, toggleLoading, transport, onAuthorize
 
   if (clientStatus.state === 'connecting')
     return (
-      <span className={`${base} bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-400${pulse}`}>
+      <span className={`${base} bg-brand-400/15 text-brand-700 dark:bg-brand-900/30 dark:text-brand-200${pulse}`}>
         <ArrowPathIcon className="w-3 h-3 animate-spin" />
         Connecting
       </span>
@@ -140,7 +140,7 @@ function ClientStatusBadge({ clientStatus, toggleLoading, transport, onAuthorize
     );
 
   return (
-    <span className={`${base} bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-300${pulse}`}>
+    <span className={`${base} bg-surface-200 dark:bg-surface-700 text-surface-800 dark:text-surface-200${pulse}`}>
       <NoSymbolIcon className="w-3 h-3" />
       Disconnected
     </span>
@@ -152,22 +152,22 @@ function StdioTransportFields({ command, args, env }: { command: string; args?: 
   return (
     <>
       <div>
-        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Command:</span>
-        <code className="ml-2 px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
+        <span className="text-xs font-medium text-surface-500 dark:text-surface-400">Command:</span>
+        <code className="ml-2 px-1.5 py-0.5 rounded text-xs font-mono bg-surface-100 text-surface-800 dark:bg-surface-800 dark:text-surface-200">
           {command}
         </code>
       </div>
 
       {(args ?? []).length > 0 && (
         <div className="flex items-start gap-2">
-          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">
+          <span className="text-xs font-medium text-surface-500 dark:text-surface-400 flex-shrink-0">
             Arguments:
           </span>
           <div className="flex flex-wrap gap-1">
             {(args ?? []).map((arg: string, index: number) => (
               <code
                 key={index}
-                className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono"
+                className="px-1.5 py-0.5 rounded text-xs font-mono bg-surface-100 text-surface-800 dark:bg-surface-800 dark:text-surface-200"
               >
                 {arg}
               </code>
@@ -178,13 +178,13 @@ function StdioTransportFields({ command, args, env }: { command: string; args?: 
 
       {env && Object.keys(env as Record<string, string>).length > 0 && (
         <div>
-          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+          <span className="text-xs font-medium text-surface-500 dark:text-surface-400">
             Environment:
           </span>
           <div className="mt-1 space-y-1">
             {Object.entries((env ?? {}) as Record<string, string>).map(([key, value]) => (
               <div key={key} className="flex items-center gap-2">
-                <code className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
+                <code className="px-1.5 py-0.5 rounded text-xs font-mono bg-surface-100 text-surface-800 dark:bg-surface-800 dark:text-surface-200">
                   {key}={value}
                 </code>
               </div>
@@ -201,10 +201,10 @@ function HttpTransportFields({ endpoint, headers }: { endpoint?: string | undefi
     <>
       {endpoint && (
         <div>
-          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+          <span className="text-xs font-medium text-surface-500 dark:text-surface-400">
             Endpoint:
           </span>
-          <code className="ml-2 px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
+          <code className="ml-2 px-1.5 py-0.5 rounded text-xs font-mono bg-surface-100 text-surface-800 dark:bg-surface-800 dark:text-surface-200">
             {endpoint}
           </code>
         </div>
@@ -212,13 +212,13 @@ function HttpTransportFields({ endpoint, headers }: { endpoint?: string | undefi
 
       {headers && Object.keys(headers as Record<string, string>).length > 0 && (
         <div>
-          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+          <span className="text-xs font-medium text-surface-500 dark:text-surface-400">
             Headers:
           </span>
           <div className="mt-1 space-y-1">
             {Object.entries((headers ?? {}) as Record<string, string>).map(([key, value]) => (
               <div key={key} className="flex items-center gap-2">
-                <code className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">
+                <code className="px-1.5 py-0.5 rounded text-xs font-mono bg-surface-100 text-surface-800 dark:bg-surface-800 dark:text-surface-200">
                   {key}: {value}
                 </code>
               </div>
@@ -260,7 +260,7 @@ export function ServerCard({
   return (
     <div
       className={`
-      relative p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm
+      relative p-4 bg-white/95 dark:bg-surface-900 border border-surface-200 dark:border-surface-800 rounded-xl shadow-sm
       hover:shadow-md transition-all duration-300 ease-in-out
       ${toggleLoading ? 'animate-pulse' : ''}
       ${loading ? 'opacity-75' : 'opacity-100'}
@@ -274,7 +274,7 @@ export function ServerCard({
       <div className="flex items-start justify-between mb-1.5 relative">
         <div className="flex items-center gap-2">
           <h3
-            className={`text-base font-semibold text-gray-900 dark:text-white transition-colors duration-200 ${toggleLoading ? 'text-gray-400 dark:text-gray-500' : ''}`}
+            className={`text-base font-semibold text-surface-900 dark:text-white transition-colors duration-200 ${toggleLoading ? 'text-surface-500 dark:text-surface-500' : ''}`}
           >
             {server.name}
           </h3>
@@ -364,7 +364,7 @@ export function ServerCard({
 
       {server.description && (
         <p
-          className={`text-sm text-gray-600 dark:text-gray-400 mb-2 transition-colors duration-200 ${toggleLoading ? 'text-gray-400 dark:text-gray-500' : ''}`}
+          className={`mb-2 text-sm text-surface-600 dark:text-surface-300 transition-colors duration-200 ${toggleLoading ? 'text-surface-400 dark:text-surface-500' : ''}`}
         >
           {server.description}
         </p>

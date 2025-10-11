@@ -1,7 +1,69 @@
 @import 'tailwindcss';
 
+@source '../index.html';
+@source './**/*.{ts,tsx,js,jsx}';
+
 /* Custom dark mode variant for Tailwind CSS v4 */
 @custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-brand-50: #f0f7f6;
+  --color-brand-100: #d8ebe9;
+  --color-brand-200: #b5dad6;
+  --color-brand-300: #8ac6c1;
+  --color-brand-400: #62b1ab;
+  --color-brand-500: #3a9a94;
+  --color-brand-600: #2e7f7a;
+  --color-brand-700: #246560;
+  --color-brand-800: #1c4d49;
+  --color-brand-900: #153937;
+  --color-brand-950: #0f2a29;
+
+  --color-surface-50: #f8f9fa;
+  --color-surface-100: #f1f2f4;
+  --color-surface-200: #e5e7ea;
+  --color-surface-300: #d3d7db;
+  --color-surface-400: #bfc4c9;
+  --color-surface-500: #a4abb1;
+  --color-surface-600: #7f858c;
+  --color-surface-700: #5a5f66;
+  --color-surface-800: #3c4146;
+  --color-surface-900: #25292e;
+  --color-surface-950: #181c1f;
+
+  --background-image-gradient-brand-soft: linear-gradient(
+    135deg,
+    rgba(58, 154, 148, 0.15) 0%,
+    rgba(21, 57, 55, 0.35) 100%
+  );
+  --background-image-gradient-brand-bold: linear-gradient(135deg, #3a9a94 0%, #246560 100%);
+  --background-image-gradient-brand-muted: linear-gradient(
+    135deg,
+    rgba(248, 249, 250, 0.9) 0%,
+    rgba(60, 65, 70, 0.35) 100%
+  );
+  --background-image-gradient-radial: radial-gradient(
+    ellipse at center,
+    rgba(58, 154, 148, 0.4) 0%,
+    rgba(21, 57, 55, 0.85) 100%
+  );
+  --background-image-gradient-conic: conic-gradient(
+    from 180deg at 50% 50%,
+    rgba(58, 154, 148, 0.4) 0deg,
+    rgba(21, 57, 55, 0.85) 360deg
+  );
+}
+
+@layer base {
+  body {
+    @apply bg-surface-50 text-surface-900;
+  }
+
+  .dark body,
+  body[data-mode='dark'] {
+    @apply bg-surface-950 text-surface-100;
+  }
+}
 
 /* Custom utilities for Tailwind CSS v4 */
 .line-clamp-2 {

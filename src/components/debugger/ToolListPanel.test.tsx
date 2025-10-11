@@ -47,7 +47,7 @@ describe('ToolListPanel', () => {
     expect(screen.getByText('Tools')).toBeInTheDocument();
     expect(screen.getByText('server::alpha')).toBeInTheDocument();
     const selected = screen.getByText('server::beta');
-    expect(selected.closest('button')).toHaveClass('bg-blue-50/80');
+    expect(selected.closest('button')).toHaveClass('bg-brand-50/80');
   });
 
   it('filters tools based on search input', async () => {

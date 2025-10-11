@@ -26,7 +26,7 @@ export function LogsFilterBar({ server, method, ok, onServerChange, onMethodChan
   ];
 
   return (
-    <div className="mb-3 flex flex-wrap items-end gap-4 text-sm text-gray-600 dark:text-gray-300">
+    <div className="mb-3 flex flex-wrap items-end gap-4 text-sm text-surface-600 dark:text-surface-300">
       <DropdownSelect
         label="Server"
         size="sm"

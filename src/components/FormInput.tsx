@@ -21,10 +21,10 @@ export function FormInput({
 }: FormInputProps) {
   const getInputClassName = () => {
     const baseClasses =
-      'w-full px-2 py-1.5 border rounded-md bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:border-transparent text-sm';
+      'w-full px-2 py-1.5 border rounded-md bg-surface-100 dark:bg-surface-800 text-surface-900 dark:text-white focus:ring-2 focus:border-transparent text-sm';
     const errorClasses = 'border-red-500 focus:ring-red-500';
     const normalClasses =
-      'border-gray-300 dark:border-gray-700 focus:ring-purple-500 dark:focus:ring-purple-400';
+      'border-surface-300 dark:border-surface-600 focus:ring-brand-400 dark:focus:ring-brand-500';
 
     return `${baseClasses} ${error ? errorClasses : normalClasses}`;
   };
@@ -33,7 +33,7 @@ export function FormInput({
     <div>
       <label
         htmlFor={id}
-        className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1"
+        className="block text-xs font-medium text-surface-700 dark:text-surface-200 mb-1"
       >
         {label} {required && '*'}
       </label>
@@ -50,4 +50,3 @@ export function FormInput({
     </div>
   );
 }
-

@@ -30,9 +30,9 @@ export function LogList({ items, loadMore, hasMore, loading }: {
         <LogListItem key={item.id} item={item} />
       ))}
       <div ref={sentinelRef} />
-      {loading && <div className="text-sm text-gray-500 py-1">Loading…</div>}
+      {loading && <div className="py-1 text-sm text-surface-500 dark:text-surface-400">Loading…</div>}
       {!hasMore && items.length > 0 && (
-        <div className="text-xs text-gray-400 text-center py-2">End of results</div>
+        <div className="py-2 text-center text-xs text-surface-400 dark:text-surface-500">End of results</div>
       )}
     </div>
   );

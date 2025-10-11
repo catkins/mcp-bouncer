@@ -34,14 +34,14 @@ export function Toast({ id, type, title, message, duration = 5000, onClose }: To
     success: 'text-green-500',
     error: 'text-red-500',
     warning: 'text-yellow-500',
-    info: 'text-blue-500',
+    info: 'text-brand-500',
   };
 
   const bgClasses = {
     success: 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800',
     error: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800',
     warning: 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800',
-    info: 'bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border-blue-200 dark:border-blue-800',
+    info: 'bg-brand-50 dark:bg-brand-900/20 border-brand-200 dark:border-brand-800',
   };
 
   const icons = {
