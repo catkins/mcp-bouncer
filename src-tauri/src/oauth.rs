@@ -51,6 +51,12 @@ struct OAuthFileV2(HashMap<String, PersistedCreds>);
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct PersistedCreds {
+    #[serde(default)]
+    client_id: Option<String>,
+    #[serde(default)]
+    client_secret: Option<String>,
+    #[serde(default)]
+    redirect_uri: Option<String>,
     // Raw OAuth token response as JSON (keeps compatibility with upstream crate fields)
     data: serde_json::Value,
     // Absolute Unix timestamp (seconds) when access token expires
@@ -61,16 +67,28 @@ fn oauth_path(cp: &dyn ConfigProvider) -> PathBuf {
     cp.base_dir().join("oauth.json")
 }
 
-pub fn load_credentials_for(cp: &dyn ConfigProvider, name: &str) -> Option<OAuthTokenResponse> {
+#[derive(Debug, Clone)]
+pub struct LoadedOAuthCredentials {
+    pub client_id: String,
+    pub client_secret: Option<String>,
+    pub redirect_uri: Option<String>,
+    pub token: OAuthTokenResponse,
+    pub expires_at: Option<std::time::SystemTime>,
+}
+
+pub fn load_credentials_entry(
+    cp: &dyn ConfigProvider,
+    name: &str,
+) -> Option<LoadedOAuthCredentials> {
     let p = oauth_path(cp);
     if !p.exists() {
         return None;
     }
     let bytes = std::fs::read(&p).ok()?;
 
-    // Parse new mandatory format
     if let Ok(map) = serde_json::from_slice::<OAuthFileV2>(&bytes) {
         if let Some(pc) = map.0.get(name) {
+            let client_id = pc.client_id.clone()?;
             let mut data = pc.data.clone();
             // Compute current relative expires_in from absolute expires_at
             if let Some(expires_at) = pc.expires_at {
@@ -89,7 +107,21 @@ pub fn load_credentials_for(cp: &dyn ConfigProvider, name: &str) -> Option<OAuth
                     );
                 }
             }
-            return serde_json::from_value::<OAuthTokenResponse>(data).ok();
+            let token = serde_json::from_value::<OAuthTokenResponse>(data).ok()?;
+            let expires_at = pc.expires_at.and_then(|ts| {
+                if ts >= 0 {
+                    std::time::UNIX_EPOCH.checked_add(std::time::Duration::from_secs(ts as u64))
+                } else {
+                    None
+                }
+            });
+            return Some(LoadedOAuthCredentials {
+                client_id,
+                client_secret: pc.client_secret.clone(),
+                redirect_uri: pc.redirect_uri.clone(),
+                token,
+                expires_at,
+            });
         }
         None
     } else {
@@ -97,9 +129,16 @@ pub fn load_credentials_for(cp: &dyn ConfigProvider, name: &str) -> Option<OAuth
     }
 }
 
+pub fn load_credentials_for(cp: &dyn ConfigProvider, name: &str) -> Option<OAuthTokenResponse> {
+    load_credentials_entry(cp, name).map(|c| c.token)
+}
+
 pub fn save_credentials_for(
     cp: &dyn ConfigProvider,
     name: &str,
+    client_id: &str,
+    client_secret: Option<&str>,
+    redirect_uri: Option<&str>,
     creds: OAuthTokenResponse,
 ) -> Result<(), String> {
     let p = oauth_path(cp);
@@ -127,8 +166,16 @@ pub fn save_credentials_for(
         OAuthFileV2::default()
     };
 
-    map.0
-        .insert(name.to_string(), PersistedCreds { data, expires_at });
+    map.0.insert(
+        name.to_string(),
+        PersistedCreds {
+            client_id: Some(client_id.to_string()),
+            client_secret: client_secret.map(|s| s.to_string()),
+            redirect_uri: redirect_uri.map(|s| s.to_string()),
+            data,
+            expires_at,
+        },
+    );
 
     if let Some(dir) = p.parent() {
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
@@ -138,6 +185,27 @@ pub fn save_credentials_for(
         serde_json::to_vec_pretty(&map).map_err(|e| e.to_string())?,
     )
     .map_err(|e| e.to_string())
+}
+
+/// Probe the given HTTP endpoint and return true if it responds with 401.
+pub async fn probe_unauthorized(endpoint: &str) -> bool {
+    if endpoint.is_empty() {
+        return false;
+    }
+    if let Ok(resp) = reqwest::Client::default().get(endpoint).send().await {
+        return resp.status().as_u16() == 401;
+    }
+    false
+}
+
+/// If an endpoint is provided and probing returns 401, mark overlay as unauthorized.
+pub async fn on_possible_unauthorized(name: &str, endpoint: Option<&str>) {
+    if let Some(ep) = endpoint
+        && probe_unauthorized(ep).await
+    {
+        tracing::debug!(target = "auth", server=%name, endpoint=%ep, "401_probe_hit");
+        overlay::mark_unauthorized(name).await;
+    }
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -284,7 +352,9 @@ where
             .as_deref()
             .ok_or_else(|| anyhow!("oauth callback missing state parameter"))?;
 
-        match tokio::time::timeout(REQUEST_TIMEOUT, state.handle_callback(&q.code, csrf_token)).await {
+        match tokio::time::timeout(REQUEST_TIMEOUT, state.handle_callback(&q.code, csrf_token))
+            .await
+        {
             Ok(res) => res.context("oauth exchange")?,
             Err(_) => {
                 return Err(anyhow!(
@@ -295,8 +365,15 @@ where
         }
 
         // Try to export credentials for persistence if supported
-        if let Ok((_, Some(creds))) = state.get_credentials().await
-            && let Err(err) = save_credentials_for(&OsConfigProvider, name, creds)
+        if let Ok((client_id, Some(creds))) = state.get_credentials().await
+            && let Err(err) = save_credentials_for(
+                &OsConfigProvider,
+                name,
+                &client_id,
+                None,
+                Some(&redirect_uri),
+                creds,
+            )
         {
             tracing::warn!(
                 target = "oauth",
@@ -442,12 +519,26 @@ mod tests {
         });
         let creds: OAuthTokenResponse = serde_json::from_value(creds_value.clone()).unwrap();
 
-        save_credentials_for(&cp, "srv", creds).unwrap();
+        save_credentials_for(
+            &cp,
+            "srv",
+            "test-client",
+            None,
+            Some("http://127.0.0.1/callback"),
+            creds,
+        )
+        .unwrap();
 
         let raw = fs::read(oauth_path(&cp)).unwrap();
         let parsed: OAuthFileV2 = serde_json::from_slice(&raw).unwrap();
         let stored = parsed.0.get("srv").expect("persisted creds entry");
         assert!(stored.expires_at.is_some());
+        assert_eq!(stored.client_id.as_deref(), Some("test-client"));
+        assert!(stored.client_secret.is_none());
+        assert_eq!(
+            stored.redirect_uri.as_deref(),
+            Some("http://127.0.0.1/callback")
+        );
 
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -457,7 +548,15 @@ mod tests {
         assert!(expires_at >= now);
         assert!(expires_at <= now + 3600 + 2); // allow small clock skew
 
-        let loaded = load_credentials_for(&cp, "srv").expect("loaded creds");
+        let loaded = load_credentials_entry(&cp, "srv").expect("loaded creds");
+        assert_eq!(loaded.client_id, "test-client");
+        assert!(loaded.client_secret.is_none());
+        assert_eq!(
+            loaded.redirect_uri.as_deref(),
+            Some("http://127.0.0.1/callback")
+        );
+        assert!(loaded.expires_at.is_some());
+        let loaded = loaded.token;
         let loaded_json = serde_json::to_value(&loaded).unwrap();
         assert_eq!(loaded_json["access_token"], creds_value["access_token"]);
         assert_eq!(loaded_json["refresh_token"], creds_value["refresh_token"]);
@@ -474,6 +573,9 @@ mod tests {
         let expires_in = loaded_json["expires_in"].as_u64().unwrap();
         assert!(expires_in <= 3600);
         assert!(expires_in > 0);
+
+        let plain_loaded = load_credentials_for(&cp, "srv").expect("plain loaded creds");
+        assert_eq!(serde_json::to_value(plain_loaded).unwrap(), loaded_json);
     }
 
     #[test]
@@ -485,14 +587,35 @@ mod tests {
         }))
         .unwrap();
 
-        save_credentials_for(&cp, "srv", creds).unwrap();
+        save_credentials_for(
+            &cp,
+            "srv",
+            "test-client",
+            Some("secret"),
+            Some("http://127.0.0.1/callback"),
+            creds,
+        )
+        .unwrap();
 
         let raw = fs::read(oauth_path(&cp)).unwrap();
         let parsed: OAuthFileV2 = serde_json::from_slice(&raw).unwrap();
         let stored = parsed.0.get("srv").expect("persisted creds entry");
         assert!(stored.expires_at.is_none());
+        assert_eq!(stored.client_id.as_deref(), Some("test-client"));
+        assert_eq!(stored.client_secret.as_deref(), Some("secret"));
+        assert_eq!(
+            stored.redirect_uri.as_deref(),
+            Some("http://127.0.0.1/callback")
+        );
 
-        let loaded = load_credentials_for(&cp, "srv").expect("loaded creds");
+        let loaded = load_credentials_entry(&cp, "srv").expect("loaded creds");
+        assert_eq!(loaded.client_id, "test-client");
+        assert_eq!(loaded.client_secret.as_deref(), Some("secret"));
+        assert_eq!(
+            loaded.redirect_uri.as_deref(),
+            Some("http://127.0.0.1/callback")
+        );
+        let loaded = loaded.token;
         let loaded_json = serde_json::to_value(&loaded).unwrap();
         assert!(loaded_json.get("expires_in").is_none());
     }

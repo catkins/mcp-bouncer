@@ -29,6 +29,7 @@ rmcp = { version = "0.8.0", features = [
 ] }
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.133"
+sse-stream = "0.2"
 specta = { version = "2.0.0-rc.22", features = ["derive", "serde", "serde_json", "chrono"] }
 specta-typescript = "0.0.9"
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"] }

@@ -188,9 +188,9 @@ mcp-bouncer/
 │       ├── client.rs         # RMCP client lifecycle and registry helpers
 │       ├── status.rs         # Client status aggregation logic
 │       ├── events.rs         # Event emission abstraction + helpers
-│       ├── app_logic.rs      # Thin orchestration adapters (e.g., settings update)
+│       ├── commands.rs       # Tauri command handlers + thin orchestration adapters (settings, server events)
 │       ├── incoming.rs       # In‑memory registry for incoming clients (Initialize)
-│       └── main.rs           # App entry; thin Tauri commands wiring (auto-exports TS bindings in debug)
+│       └── main.rs           # App entry; bootstrap + plugin setup (generates TS bindings in debug)
 ├── src/tauri/bindings.ts     # Generated TS bindings (debug builds)
 └── src/tauri/bridge.ts       # Thin wrapper over generated bindings for the UI
 └── settings.example.json     # Example configuration

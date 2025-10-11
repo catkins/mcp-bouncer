@@ -18,8 +18,7 @@ use tokio::sync::{Mutex, RwLock};
 use crate::{
     events::{self, EventEmitter},
     incoming::record_connect,
-    logging::{Event, RpcEventPublisher},
-    logging_origin::current_request_origin,
+    logging::{Event, RpcEventPublisher, current_request_origin},
 };
 
 #[derive(Clone)]
@@ -931,7 +930,7 @@ mod tests {
     use super::*;
     use crate::events::{BufferingEventEmitter, EVENT_INCOMING_CLIENTS_UPDATED};
     use crate::incoming;
-    use crate::logging_origin;
+    use crate::logging::with_request_origin;
     use tokio::sync::mpsc;
 
     #[derive(Clone, Default)]
@@ -1242,7 +1241,7 @@ mod tests {
                 arguments: None,
             },
         ));
-        let pending = logging_origin::with_request_origin("debugger", || async {
+        let pending = with_request_origin("debugger", || async {
             state.build_pending(&request, &request_id).await
         })
         .await
