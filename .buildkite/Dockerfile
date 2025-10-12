@@ -6,6 +6,8 @@ RUN apt-get update && apt-get install -y \
   ca-certificates \
   gnupg \
   build-essential \
+  libkeyutils-dev \
+  keyutils \
   pkg-config \
   && rm -rf /var/lib/apt/lists/* \
   && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
