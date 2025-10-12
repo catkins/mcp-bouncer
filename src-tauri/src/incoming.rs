@@ -1,62 +1,64 @@
-use std::sync::{
-    OnceLock,
-    atomic::{AtomicU64, Ordering},
-};
-
 use crate::config::IncomingClient;
-
-// In-memory registry of incoming clients (Initialize’d connections)
-pub type IncomingRegistry = tokio::sync::Mutex<Vec<IncomingClient>>;
-
-static INCOMING_REGISTRY: OnceLock<IncomingRegistry> = OnceLock::new();
-static NEXT_ID: AtomicU64 = AtomicU64::new(1);
-
-pub fn incoming_registry() -> &'static IncomingRegistry {
-    INCOMING_REGISTRY.get_or_init(|| tokio::sync::Mutex::new(Vec::new()))
-}
+use crate::runtime;
 
 pub async fn record_connect(name: String, version: String, title: Option<String>) -> String {
-    let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
-    let id_str = format!("{}-{}", std::process::id(), id);
-    let client = IncomingClient {
-        id: id_str.clone(),
-        name,
-        version,
-        title,
-        connected_at: Some(iso8601_now()),
-    };
-    let reg = incoming_registry();
-    let mut guard = reg.lock().await;
-    guard.push(client);
-    id_str
+    runtime::global()
+        .incoming()
+        .record_connect(name, version, title)
+        .await
 }
 
 pub async fn list_incoming() -> Vec<IncomingClient> {
-    let reg = incoming_registry();
-    let guard = reg.lock().await;
-    guard.clone()
+    runtime::global().incoming().list().await
 }
 
 #[cfg(test)]
 pub async fn clear_incoming() {
-    let reg = incoming_registry();
-    let mut guard = reg.lock().await;
-    guard.clear();
-}
-
-fn iso8601_now() -> String {
-    // RFC3339 / ISO8601 UTC timestamp suitable for JS Date parsing
-    chrono::Utc::now().to_rfc3339()
+    runtime::global().incoming().clear().await;
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::ConfigProvider;
+    use std::{
+        path::PathBuf,
+        sync::Arc,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    #[derive(Clone)]
+    struct TempProvider(PathBuf);
+
+    impl TempProvider {
+        fn new() -> Self {
+            let dir = std::env::temp_dir().join(format!(
+                "mcp-bouncer-incoming-{}-{}",
+                std::process::id(),
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
+            ));
+            std::fs::create_dir_all(&dir).unwrap();
+            Self(dir)
+        }
+    }
+
+    impl ConfigProvider for TempProvider {
+        fn base_dir(&self) -> PathBuf {
+            self.0.clone()
+        }
+    }
 
     #[tokio::test]
     #[serial_test::serial]
     async fn records_and_lists_clients() {
         // Avoid relying on global count; other tests may record concurrently.
+        let original = crate::runtime::global();
+        let provider = Arc::new(TempProvider::new());
+        let state = Arc::new(crate::runtime::RuntimeState::new(provider));
+        crate::runtime::set_global(state);
         let id1 = record_connect("client-a".into(), "1.0".into(), None).await;
         let id2 = record_connect("client-b".into(), "2.0".into(), Some("Title".into())).await;
         assert_ne!(id1, id2);
@@ -68,5 +70,6 @@ mod tests {
                 && c.name == "client-b"
                 && c.title.as_deref() == Some("Title"))
         );
+        crate::runtime::set_global(original);
     }
 }

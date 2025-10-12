@@ -6,6 +6,7 @@ mod logging_core;
 mod logging_sqlite;
 pub mod oauth;
 pub mod overlay;
+pub mod runtime;
 pub mod secrets;
 pub mod server;
 pub mod status;

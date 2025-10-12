@@ -1,12 +1,14 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 mod commands;
 
-use std::{fs, sync::OnceLock};
+use std::{fs, sync::Arc, sync::OnceLock};
 use tauri::Manager;
 
 use mcp_bouncer::events::TauriEventEmitter;
 use mcp_bouncer::logging::SqlitePublisher;
+use mcp_bouncer::runtime::RuntimeState;
 use mcp_bouncer::server::start_http_server;
+use mcp_bouncer::{config::ConfigProvider, runtime};
 #[cfg(debug_assertions)]
 use specta_typescript::Typescript;
 #[cfg(debug_assertions)]
@@ -111,6 +113,10 @@ fn main() {
         .add_migrations("sqlite:logs.sqlite", mcp_bouncer::logging::migrations())
         .build();
 
+    let provider: Arc<dyn ConfigProvider> = Arc::new(mcp_bouncer::config::OsConfigProvider);
+    let runtime_state = Arc::new(RuntimeState::new(provider.clone()));
+    runtime::set_global(runtime_state.clone());
+
     let res = tauri::Builder::default()
         // Shell plugin is commonly needed to open links, etc.
         .plugin(tauri_plugin_shell::init())
@@ -159,6 +165,7 @@ fn main() {
             commands::settings_open_config_directory,
             commands::settings_update_settings
         ])
+        .manage(runtime_state)
         .run(tauri::generate_context!());
     // Final best-effort flush after event loop exits
     tauri::async_runtime::block_on(mcp_bouncer::logging::force_flush_and_checkpoint());
