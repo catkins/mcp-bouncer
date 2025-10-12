@@ -47,6 +47,11 @@ MCP Bouncer acts as a centralized hub for managing Model Context Protocol server
 - Easy access to configuration directory
 - Environment variable management per server
 
+### 🔒 Secure Secret Storage
+- OAuth access and refresh tokens are encrypted/stored via the operating system keyring using the cross-platform `keyring` crate—no sensitive token payloads remain in `oauth.json`.
+- On first run after upgrading, legacy plaintext credentials are migrated into the keyring and scrubbed from the JSON file automatically.
+- The same abstraction will power upcoming named secrets for injecting headers, environment variables, or CLI parameters.
+
 ### 🔌 MCP Client Integration
 - Built-in MCP client for testing server connections
 - Real-time connection status updates
@@ -80,6 +85,7 @@ MCP Bouncer acts as a centralized hub for managing Model Context Protocol server
 - Node.js 18+
 - Rust toolchain (stable, recent enough for `edition = 2024`)
 - Tauri CLI (optional): `npm i -g @tauri-apps/cli` or use `npx tauri`
+- Linux only: install `keyutils`/`libkeyutils` so the system keyring backend is available for OAuth secret storage.
 
 ### Development
 1. Clone the repository:
@@ -116,6 +122,11 @@ The application automatically manages settings in platform-specific locations:
 - **macOS**: `~/Library/Application Support/app.mcp.bouncer/settings.json`
 - **Linux**: `~/.config/app.mcp.bouncer/settings.json`
 - **Windows**: `%APPDATA%\app.mcp.bouncer\settings.json`
+
+### OAuth Credentials & Secrets
+- OAuth access/refresh tokens are stored in the operating system keyring (Keychain on macOS, Credential Manager on Windows, keyutils/secret-service on Linux) via the `keyring` crate.
+- The on-disk `oauth.json` file now holds only metadata (client id, redirect URI, expiry). During the upgrade path legacy plaintext tokens are migrated into the keyring and removed from the file automatically.
+- Future named secrets (for HTTP headers, env vars, or CLI params) will reuse the same abstraction; when testing locally, the backend automatically swaps in an in-memory secret store to avoid touching your real keychain.
 
 ### Configuration Format
 
@@ -155,17 +166,17 @@ The application automatically manages settings in platform-specific locations:
 | `name` | string | Yes | Unique identifier for the server |
 | `description` | string | No | Human-readable description |
 | `transport` | string | Yes | Transport type: `stdio`, `sse`, or `streamable_http` |
-
-### SSE Transport
-- Endpoint: set `endpoint` to your server's SSE base (e.g., `http://127.0.0.1:8080/sse`).
-- Headers: optional `headers` object attaches static HTTP headers to SSE requests (useful for API keys).
-- Behavior: the app lists tools and forwards headers on tool calls; see `src-tauri/tests/sse_integration.rs` for an example.
 | `command` | string | For `stdio` | Command to execute |
 | `args` | array | For `stdio` | Command-line arguments |
 | `env` | object | No | Environment variables |
 | `endpoint` | string | For HTTP | HTTP endpoint URL |
 | `headers` | object | For HTTP | HTTP headers |
 | `enabled` | boolean | No | Auto-start on application launch |
+
+### SSE Transport
+- Endpoint: set `endpoint` to your server's SSE base (e.g., `http://127.0.0.1:8080/sse`).
+- Headers: optional `headers` object attaches static HTTP headers to SSE requests (useful for API keys).
+- Behavior: the app lists tools and forwards headers on tool calls; see `src-tauri/tests/sse_integration.rs` for an example.
 
 ## Project Structure
 

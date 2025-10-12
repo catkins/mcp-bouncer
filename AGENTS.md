@@ -47,6 +47,7 @@ This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the of
 - `src-tauri/src/status.rs`: Client status aggregation logic
 - `src-tauri/src/events.rs`: Event emission abstraction and helpers
 - `src-tauri/src/incoming.rs`: In-memory registry of incoming clients recorded on rmcp Initialize
+- `src-tauri/src/secrets.rs`: Secret store abstraction (keyring-backed in production, in-memory in tests)
 - `src-tauri/tauri.conf.json`: Tauri config (build hooks and frontendDist)
 - `src-tauri/capabilities/events.json`: grants `event.listen` to the main window/webview
 - `src/tauri/bindings.ts`: generated TypeScript bindings for commands/types (debug builds)
@@ -68,6 +69,12 @@ This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the of
 - **Inbound (proxy server ➝ downstream client)**: The rmcp HTTP server composes `InterceptingSessionManager`, which wraps every session transport with `InterceptingTransport`. The wrapper injects a `RequestLogContext` into each inbound request, tracks elapsed time, enriches initialize/list/callTool events, records notifications, and hands events to the shared `RpcEventPublisher`/UI emitter.
 - **Outbound (proxy client ➝ upstream server)**: `ensure_rmcp_client` wraps every constructed transport (HTTP, SSE, stdio) in `InterceptingClientTransport`. The outbound interceptor mirrors the same logging pipeline, ensuring listTools/callTool/etc. invocations and their responses (or errors) are logged even when they originate from the proxy itself (tool refresh, OAuth reconnects, etc.).
 - The interceptors store per-request state (start time, serialized payloads, inferred server metadata) so logs have consistent structure regardless of direction. When introducing a new transport, make sure it is wrapped before calling `.serve(...)`, and that the caller passes an emitter + logger through to `ensure_rmcp_client`.
+
+#### Secret Storage & OAuth Credentials
+- OAuth access/refresh token payloads are persisted via the cross-platform `keyring` crate so they live in the OS keychain rather than on disk. The legacy `oauth.json` file now stores only non-sensitive metadata (client id, redirect URI, expiry).
+- On first read, any existing plaintext tokens in `oauth.json` are migrated into the keyring and scrubbed from the file. If migration fails, a warning is logged and the on-disk payload is still used; fix the environment and retry so secrets do not linger on disk.
+- When introducing new secret material (e.g., named headers/env secrets), depend on the `SecretStore` trait and inject it so tests can use the in-memory `MemorySecretStore` without touching the real keychain.
+- Linux development/CI requires `keyutils`/`libkeyutils` packages for the system keyring backend; macOS and Windows rely on their native keychain APIs.
 
 #### JSON-RPC Logging (SQLite)
 - Always-on: the backend persistently logs JSON-RPC requests/responses to a SQLite database at `$XDG_CONFIG_HOME/app.mcp.bouncer/logs.sqlite`.
@@ -135,6 +142,7 @@ This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the of
 - MCP server routing: keep tool names `server::tool` to avoid collisions across upstreams.
 - Settings shape: keep fields stable; UI relies on them. Extend carefully and emit `settings:updated` after writes.
 - Events: match existing event names; the UI hooks already listen for them.
+- Secrets: new persistence should use `SecretStore` so production stays on the OS keyring and tests can swap in the in-memory store; do not write sensitive payloads to disk.
 - Rust `format!` style: prefer inlined capture syntax (e.g., `format!("{var}")`, `format!("{base}/path")`) over placeholder form (`format!("{}", var)`). This satisfies clippy (`uninlined_format_args`) and keeps code concise.
 
 ### Code Hygiene (for agents)
