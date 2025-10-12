@@ -51,6 +51,8 @@ fn spawn_mcp_proxy(app: &tauri::AppHandle) {
 }
 
 fn main() {
+    // Ensure PATH matches interactive shell when launched outside the terminal (macOS/Linux).
+    let _ = fix_path_env::fix();
     // Initialize structured logging via tracing with env filter.
     // Configure via RUST_LOG, e.g., RUST_LOG=info,mcp_bouncer=debug
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
