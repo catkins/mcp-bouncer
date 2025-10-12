@@ -123,7 +123,7 @@ function AppContent() {
           debuggerCount={debuggerCount}
         />
 
-        <div className="space-y-6">
+        <div className="space-y-6 mt-1">
           {tab === 'servers' ? (
             <ServersPage
               clientStatus={clientStatus}
