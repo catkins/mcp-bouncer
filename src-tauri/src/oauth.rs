@@ -165,10 +165,7 @@ pub fn load_credentials_entry_with_store(
             }
         }
 
-        let data = match token_data {
-            Some(value) => value,
-            None => return None,
-        };
+        let data = token_data?;
 
         (
             client_id,

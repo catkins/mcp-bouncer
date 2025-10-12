@@ -60,7 +60,7 @@ pub trait SecretStore: Send + Sync {
 }
 
 /// Production secret store backed by the operating system keyring.
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct KeyringSecretStore {
     service: String,
 }
@@ -74,10 +74,6 @@ impl KeyringSecretStore {
         }
     }
 
-    pub fn default() -> Self {
-        Self::new(Self::DEFAULT_SERVICE)
-    }
-
     fn entry(&self, username: &str) -> Result<Entry, SecretStoreError> {
         Entry::new(&self.service, username).map_err(|err| {
             SecretStoreError::Backend(format!(
@@ -85,6 +81,12 @@ impl KeyringSecretStore {
                 self.service, username
             ))
         })
+    }
+}
+
+impl Default for KeyringSecretStore {
+    fn default() -> Self {
+        Self::new(Self::DEFAULT_SERVICE)
     }
 }
 
