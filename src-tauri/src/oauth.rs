@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 use axum::response::Html;
@@ -12,7 +12,9 @@ use crate::config::{ClientConnectionState, ConfigProvider, OsConfigProvider, loa
 use crate::events::{EventEmitter, client_error, client_status_changed};
 use crate::logging::RpcEventPublisher;
 use crate::overlay;
+use crate::secrets::{KeyringSecretStore, SecretKey, SecretNamespace, SecretStore};
 use anyhow::{Context, Result, anyhow};
+use tracing::warn;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const CALLBACK_TIMEOUT: Duration = Duration::from_secs(180);
@@ -58,13 +60,27 @@ struct PersistedCreds {
     #[serde(default)]
     redirect_uri: Option<String>,
     // Raw OAuth token response as JSON (keeps compatibility with upstream crate fields)
-    data: serde_json::Value,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    data: Option<serde_json::Value>,
     // Absolute Unix timestamp (seconds) when access token expires
     expires_at: Option<i64>,
 }
 
 fn oauth_path(cp: &dyn ConfigProvider) -> PathBuf {
     cp.base_dir().join("oauth.json")
+}
+
+fn oauth_secret_key(name: &str) -> SecretKey<'_> {
+    SecretKey {
+        namespace: SecretNamespace::OAuthToken,
+        identifier: name,
+    }
+}
+
+fn os_secret_store() -> &'static KeyringSecretStore {
+    static STORE: OnceLock<KeyringSecretStore> = OnceLock::new();
+    STORE.get_or_init(KeyringSecretStore::default)
 }
 
 #[derive(Debug, Clone)]
@@ -80,57 +96,147 @@ pub fn load_credentials_entry(
     cp: &dyn ConfigProvider,
     name: &str,
 ) -> Option<LoadedOAuthCredentials> {
+    load_credentials_entry_with_store(cp, os_secret_store(), name)
+}
+
+pub fn load_credentials_entry_with_store(
+    cp: &dyn ConfigProvider,
+    secret_store: &dyn SecretStore,
+    name: &str,
+) -> Option<LoadedOAuthCredentials> {
     let p = oauth_path(cp);
     if !p.exists() {
         return None;
     }
     let bytes = std::fs::read(&p).ok()?;
+    let mut map = serde_json::from_slice::<OAuthFileV2>(&bytes).unwrap_or_default();
+    let key = oauth_secret_key(name);
+    let mut needs_flush = false;
 
-    if let Ok(map) = serde_json::from_slice::<OAuthFileV2>(&bytes) {
-        if let Some(pc) = map.0.get(name) {
-            let client_id = pc.client_id.clone()?;
-            let mut data = pc.data.clone();
-            // Compute current relative expires_in from absolute expires_at
-            if let Some(expires_at) = pc.expires_at {
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_secs() as i64)
-                    .unwrap_or(0);
-                let mut rel = expires_at - now;
-                if rel < 0 {
-                    rel = 0;
+    let (client_id, client_secret, redirect_uri, expires_at_secs, mut data) = {
+        let pc = map.0.get_mut(name)?;
+        let client_id = pc.client_id.clone()?;
+        let client_secret = pc.client_secret.clone();
+        let redirect_uri = pc.redirect_uri.clone();
+        let expires_at_secs = pc.expires_at;
+
+        let mut token_data: Option<serde_json::Value> = None;
+
+        match secret_store.get(&key) {
+            Ok(Some(raw)) => match serde_json::from_str::<serde_json::Value>(&raw) {
+                Ok(value) => token_data = Some(value),
+                Err(err) => {
+                    warn!(target = "oauth", server = %name, "failed to parse oauth token from keyring: {err}");
+                    if let Some(existing) = pc.data.as_ref() {
+                        token_data = Some(existing.clone());
+                    }
                 }
-                if let Some(obj) = data.as_object_mut() {
-                    obj.insert(
-                        "expires_in".to_string(),
-                        serde_json::Value::Number(serde_json::Number::from(rel as u64)),
-                    );
+            },
+            Ok(None) => {
+                if let Some(existing) = pc.data.take() {
+                    let clone_for_return = existing.clone();
+                    match serde_json::to_string(&existing) {
+                        Ok(serialized) => match secret_store.set(&key, &serialized) {
+                            Ok(()) => {
+                                needs_flush = true;
+                                token_data = Some(existing);
+                            }
+                            Err(err) => {
+                                warn!(target = "oauth", server = %name, "failed to migrate oauth token into keyring: {err}");
+                                pc.data = Some(existing);
+                                token_data = Some(clone_for_return);
+                            }
+                        },
+                        Err(err) => {
+                            warn!(target = "oauth", server = %name, "failed to serialize oauth token during migration: {err}");
+                            pc.data = Some(existing);
+                            token_data = Some(clone_for_return);
+                        }
+                    }
+                } else {
+                    warn!(target = "oauth", server = %name, "oauth metadata missing token payload during migration");
                 }
             }
-            let token = serde_json::from_value::<OAuthTokenResponse>(data).ok()?;
-            let expires_at = pc.expires_at.and_then(|ts| {
-                if ts >= 0 {
-                    std::time::UNIX_EPOCH.checked_add(std::time::Duration::from_secs(ts as u64))
-                } else {
-                    None
+            Err(err) => {
+                warn!(target = "oauth", server = %name, "failed to load oauth token from keyring: {err}");
+                if let Some(existing) = pc.data.as_ref() {
+                    token_data = Some(existing.clone());
                 }
-            });
-            return Some(LoadedOAuthCredentials {
-                client_id,
-                client_secret: pc.client_secret.clone(),
-                redirect_uri: pc.redirect_uri.clone(),
-                token,
-                expires_at,
-            });
+            }
         }
-        None
-    } else {
-        None
+
+        let data = match token_data {
+            Some(value) => value,
+            None => return None,
+        };
+
+        (
+            client_id,
+            client_secret,
+            redirect_uri,
+            expires_at_secs,
+            data,
+        )
+    };
+
+    if let Some(expires_at) = expires_at_secs {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        let mut rel = expires_at - now;
+        if rel < 0 {
+            rel = 0;
+        }
+        if let Some(obj) = data.as_object_mut() {
+            obj.insert(
+                "expires_in".to_string(),
+                serde_json::Value::Number(serde_json::Number::from(rel as u64)),
+            );
+        }
     }
+
+    let token = serde_json::from_value::<OAuthTokenResponse>(data).ok()?;
+    let expires_at = expires_at_secs.and_then(|ts| {
+        if ts >= 0 {
+            std::time::UNIX_EPOCH.checked_add(std::time::Duration::from_secs(ts as u64))
+        } else {
+            None
+        }
+    });
+
+    if needs_flush {
+        match serde_json::to_vec_pretty(&map) {
+            Ok(buf) => {
+                if let Err(err) = std::fs::write(&p, buf) {
+                    warn!(target = "oauth", server = %name, "failed to rewrite oauth metadata after migration: {err}");
+                }
+            }
+            Err(err) => {
+                warn!(target = "oauth", server = %name, "failed to serialize oauth metadata after migration: {err}")
+            }
+        }
+    }
+
+    Some(LoadedOAuthCredentials {
+        client_id,
+        client_secret,
+        redirect_uri,
+        token,
+        expires_at,
+    })
 }
 
 pub fn load_credentials_for(cp: &dyn ConfigProvider, name: &str) -> Option<OAuthTokenResponse> {
     load_credentials_entry(cp, name).map(|c| c.token)
+}
+
+pub fn load_credentials_for_with_store(
+    cp: &dyn ConfigProvider,
+    secret_store: &dyn SecretStore,
+    name: &str,
+) -> Option<OAuthTokenResponse> {
+    load_credentials_entry_with_store(cp, secret_store, name).map(|c| c.token)
 }
 
 pub fn save_credentials_for(
@@ -141,12 +247,30 @@ pub fn save_credentials_for(
     redirect_uri: Option<&str>,
     creds: OAuthTokenResponse,
 ) -> Result<(), String> {
+    save_credentials_for_with_store(
+        cp,
+        os_secret_store(),
+        name,
+        client_id,
+        client_secret,
+        redirect_uri,
+        creds,
+    )
+}
+
+pub fn save_credentials_for_with_store(
+    cp: &dyn ConfigProvider,
+    secret_store: &dyn SecretStore,
+    name: &str,
+    client_id: &str,
+    client_secret: Option<&str>,
+    redirect_uri: Option<&str>,
+    creds: OAuthTokenResponse,
+) -> Result<(), String> {
     let p = oauth_path(cp);
 
-    // Serialize creds to JSON to avoid relying on private struct fields
     let data = serde_json::to_value(&creds).map_err(|e| e.to_string())?;
 
-    // Compute absolute expires_at from relative expires_in if present
     let expires_at: Option<i64> = match data.get("expires_in").and_then(|v| v.as_i64()) {
         Some(rel) if rel > 0 => {
             let now = std::time::SystemTime::now()
@@ -158,8 +282,13 @@ pub fn save_credentials_for(
         _ => None,
     };
 
+    let serialized = serde_json::to_string(&data).map_err(|e| e.to_string())?;
+    let key = oauth_secret_key(name);
+    secret_store
+        .set(&key, &serialized)
+        .map_err(|e| format!("store oauth token in keyring: {e}"))?;
+
     let mut map = if p.exists() {
-        // Read existing file or start fresh
         let bytes = std::fs::read(&p).map_err(|e| e.to_string())?;
         serde_json::from_slice::<OAuthFileV2>(&bytes).unwrap_or_default()
     } else {
@@ -172,19 +301,29 @@ pub fn save_credentials_for(
             client_id: Some(client_id.to_string()),
             client_secret: client_secret.map(|s| s.to_string()),
             redirect_uri: redirect_uri.map(|s| s.to_string()),
-            data,
+            data: None,
             expires_at,
         },
     );
 
     if let Some(dir) = p.parent() {
-        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        std::fs::create_dir_all(dir).map_err(|e| format!("create config dir: {e}"))?;
     }
-    std::fs::write(
-        &p,
-        serde_json::to_vec_pretty(&map).map_err(|e| e.to_string())?,
-    )
-    .map_err(|e| e.to_string())
+
+    match serde_json::to_vec_pretty(&map) {
+        Ok(buf) => {
+            if let Err(err) = std::fs::write(&p, buf) {
+                let _ = secret_store.delete(&key);
+                return Err(format!("write oauth credentials: {err}"));
+            }
+        }
+        Err(err) => {
+            let _ = secret_store.delete(&key);
+            return Err(format!("serialize oauth credentials: {err}"));
+        }
+    }
+
+    Ok(())
 }
 
 /// Probe the given HTTP endpoint and return true if it responds with 401.
@@ -472,6 +611,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::secrets::MemorySecretStore;
     use serde_json::json;
     use std::{
         fs,
@@ -511,6 +651,7 @@ mod tests {
     #[test]
     fn save_and_load_preserves_tokens_and_expires_in() {
         let cp = TempConfigProvider::new();
+        let store = MemorySecretStore::new();
         let creds_value = json!({
             "access_token": "abc",
             "refresh_token": "def",
@@ -519,8 +660,9 @@ mod tests {
         });
         let creds: OAuthTokenResponse = serde_json::from_value(creds_value.clone()).unwrap();
 
-        save_credentials_for(
+        save_credentials_for_with_store(
             &cp,
+            &store,
             "srv",
             "test-client",
             None,
@@ -539,6 +681,15 @@ mod tests {
             stored.redirect_uri.as_deref(),
             Some("http://127.0.0.1/callback")
         );
+        assert!(stored.data.is_none());
+
+        let secret_raw = store
+            .get(&super::oauth_secret_key("srv"))
+            .expect("secret lookup")
+            .expect("secret stored");
+        let secret_json: serde_json::Value = serde_json::from_str(&secret_raw).unwrap();
+        assert_eq!(secret_json["access_token"], creds_value["access_token"]);
+        assert_eq!(secret_json["refresh_token"], creds_value["refresh_token"]);
 
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -548,7 +699,7 @@ mod tests {
         assert!(expires_at >= now);
         assert!(expires_at <= now + 3600 + 2); // allow small clock skew
 
-        let loaded = load_credentials_entry(&cp, "srv").expect("loaded creds");
+        let loaded = load_credentials_entry_with_store(&cp, &store, "srv").expect("loaded creds");
         assert_eq!(loaded.client_id, "test-client");
         assert!(loaded.client_secret.is_none());
         assert_eq!(
@@ -574,21 +725,24 @@ mod tests {
         assert!(expires_in <= 3600);
         assert!(expires_in > 0);
 
-        let plain_loaded = load_credentials_for(&cp, "srv").expect("plain loaded creds");
+        let plain_loaded =
+            load_credentials_for_with_store(&cp, &store, "srv").expect("plain loaded creds");
         assert_eq!(serde_json::to_value(plain_loaded).unwrap(), loaded_json);
     }
 
     #[test]
     fn save_handles_missing_expires_in() {
         let cp = TempConfigProvider::new();
+        let store = MemorySecretStore::new();
         let creds: OAuthTokenResponse = serde_json::from_value(json!({
             "access_token": "zzz",
             "token_type": "Bearer"
         }))
         .unwrap();
 
-        save_credentials_for(
+        save_credentials_for_with_store(
             &cp,
+            &store,
             "srv",
             "test-client",
             Some("secret"),
@@ -607,8 +761,16 @@ mod tests {
             stored.redirect_uri.as_deref(),
             Some("http://127.0.0.1/callback")
         );
+        assert!(stored.data.is_none());
 
-        let loaded = load_credentials_entry(&cp, "srv").expect("loaded creds");
+        let secret_raw = store
+            .get(&super::oauth_secret_key("srv"))
+            .expect("secret lookup")
+            .expect("secret stored");
+        let secret_json: serde_json::Value = serde_json::from_str(&secret_raw).unwrap();
+        assert_eq!(secret_json["access_token"].as_str(), Some("zzz"));
+
+        let loaded = load_credentials_entry_with_store(&cp, &store, "srv").expect("loaded creds");
         assert_eq!(loaded.client_id, "test-client");
         assert_eq!(loaded.client_secret.as_deref(), Some("secret"));
         assert_eq!(
