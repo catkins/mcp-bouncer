@@ -161,7 +161,7 @@ async fn e2e_list_and_echo_hermetic_http() {
     let client = ().serve(transport).await.expect("serve client");
 
     // List tools; expect everything::echo present (retry while upstream boots)
-    let echo_name = "up::echo";
+    let echo_name = "up__echo";
     let start = std::time::Instant::now();
     let _names = loop {
         let tools = client.list_all_tools().await.expect("list tools");
@@ -178,7 +178,7 @@ async fn e2e_list_and_echo_hermetic_http() {
     // Call echo tool
     let res = client
         .call_tool(mcp::CallToolRequestParam {
-            name: "echo".into(),
+            name: echo_name.into(),
             arguments: Some(
                 serde_json::json!({ "message": "hello" })
                     .as_object()

@@ -5,7 +5,9 @@ use rmcp::transport::streamable_http_server::{
     StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
 };
 use rmcp::{RoleServer, Service as McpService};
+use std::collections::HashMap;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 
 use crate::client::{apply_log_context_from_client, ensure_rmcp_client, fetch_tools_for_cfg};
 use crate::config::{ConfigProvider, MCPServerConfig, load_settings_with};
@@ -36,6 +38,7 @@ where
     pub emitter: E,
     pub cp: CP,
     logger: L,
+    tool_aliases: Arc<RwLock<HashMap<String, (String, String)>>>,
 }
 
 impl<E, CP, L> McpService<RoleServer> for BouncerService<E, CP, L>
@@ -131,26 +134,56 @@ where
             .filter(|c| c.enabled)
             .collect();
         const TOOL_LIST_TIMEOUT_SECS: u64 = 6;
-        let mut tools = aggregate_tools(
+        let tool_records = aggregate_tools(
             servers,
             std::time::Duration::from_secs(TOOL_LIST_TIMEOUT_SECS),
             self.emitter.clone(),
             self.logger.clone(),
         )
         .await;
+
         let state = crate::config::load_tools_state_with(&self.cp);
-        tools.retain(|t| {
-            if let Some((server, tool)) = t.name.split_once("::") {
-                state
-                    .0
-                    .get(server)
-                    .and_then(|m| m.get(tool))
-                    .copied()
-                    .unwrap_or(true)
-            } else {
-                true
+        let mut alias_counts: HashMap<String, usize> = HashMap::new();
+        let mut alias_map: HashMap<String, (String, String)> = HashMap::new();
+        let mut tools: Vec<mcp::Tool> = Vec::new();
+        for record in tool_records.into_iter() {
+            let enabled = state
+                .0
+                .get(&record.server_name)
+                .and_then(|m| m.get(&record.tool_name))
+                .copied()
+                .unwrap_or(true);
+            if !enabled {
+                continue;
             }
-        });
+
+            let base = build_sanitized_tool_name(&record.server_name, &record.tool_name);
+            let entry = alias_counts.entry(base.clone()).or_insert(0);
+            *entry += 1;
+            let sanitized_name = if *entry == 1 {
+                base
+            } else {
+                format!("{base}-{}", *entry)
+            };
+
+            alias_map.insert(
+                sanitized_name.clone(),
+                (record.server_name.clone(), record.tool_name.clone()),
+            );
+
+            tools.push(mcp::Tool::new(
+                sanitized_name,
+                record.description.clone().unwrap_or_default(),
+                record.input_schema.clone(),
+            ));
+        }
+
+        {
+            let mut aliases = self.tool_aliases.write().await;
+            aliases.clear();
+            aliases.extend(alias_map.into_iter());
+        }
+
         let out = mcp::ServerResult::ListToolsResult(mcp::ListToolsResult {
             tools,
             next_cursor: None,
@@ -167,10 +200,7 @@ where
         log_ctx: Option<RequestLogContext<E, L>>,
     ) -> Result<mcp::ServerResult, mcp::ErrorData> {
         let name = req.params.name.to_string();
-        let (server_name, tool_name) = name
-            .split_once("::")
-            .map(|(a, b)| (a.to_string(), b.to_string()))
-            .unwrap_or((String::new(), name.clone()));
+        let (server_name, tool_name) = self.resolve_tool_target(&name).await;
         let args_obj = req
             .params
             .arguments
@@ -264,9 +294,31 @@ where
         }
         Ok(out)
     }
+
+    async fn resolve_tool_target(&self, alias: &str) -> (String, String) {
+        if let Some(mapped) = {
+            let guard = self.tool_aliases.read().await;
+            guard.get(alias).cloned()
+        } {
+            return mapped;
+        }
+
+        alias
+            .split_once("::")
+            .map(|(a, b)| (a.to_string(), b.to_string()))
+            .unwrap_or_else(|| (String::new(), alias.to_string()))
+    }
 }
 
-fn to_mcp_tool(server: &str, v: &serde_json::Value) -> Option<mcp::Tool> {
+#[derive(Clone, Debug)]
+struct AggregatedTool {
+    server_name: String,
+    tool_name: String,
+    description: Option<String>,
+    input_schema: serde_json::Map<String, serde_json::Value>,
+}
+
+fn to_aggregated_tool(server: &str, v: &serde_json::Value) -> Option<AggregatedTool> {
     let name = v.get("name")?.as_str()?.to_string();
     let description = v
         .get("description")
@@ -277,12 +329,47 @@ fn to_mcp_tool(server: &str, v: &serde_json::Value) -> Option<mcp::Tool> {
         .or_else(|| v.get("input_schema"))
         .and_then(|s| s.as_object().cloned())
         .unwrap_or_default();
-    let fullname = format!("{server}::{name}");
-    Some(mcp::Tool::new(
-        fullname,
-        description.unwrap_or_default(),
-        schema_obj,
-    ))
+    Some(AggregatedTool {
+        server_name: server.to_string(),
+        tool_name: name,
+        description,
+        input_schema: schema_obj,
+    })
+}
+
+fn sanitize_component(input: &str) -> Option<String> {
+    if input.is_empty() {
+        return None;
+    }
+
+    let sanitized: String = input
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '_' || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    let trimmed = sanitized.trim_matches('_');
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
+fn build_sanitized_tool_name(server: &str, tool: &str) -> String {
+    let server_part = sanitize_component(server);
+    let tool_part = sanitize_component(tool);
+
+    match (server_part, tool_part) {
+        (Some(server), Some(tool)) => format!("{server}__{tool}"),
+        (Some(server), None) => server,
+        (None, Some(tool)) => tool,
+        (None, None) => "tool".to_string(),
+    }
 }
 
 fn select_target_server<CP: ConfigProvider>(
@@ -314,7 +401,7 @@ async fn aggregate_tools<E, L>(
     timeout: std::time::Duration,
     emitter: E,
     logger: L,
-) -> Vec<mcp::Tool>
+) -> Vec<AggregatedTool>
 where
     E: EventEmitter + Clone + Send + Sync + 'static,
     L: RpcEventPublisher,
@@ -331,11 +418,11 @@ where
             }
         }
     });
-    let mut tools: Vec<mcp::Tool> = Vec::new();
+    let mut tools: Vec<AggregatedTool> = Vec::new();
     for res in join_all(tasks).await.into_iter().flatten() {
         let (server_name, list) = res;
         for item in list {
-            if let Some(t) = to_mcp_tool(&server_name, &item) {
+            if let Some(t) = to_aggregated_tool(&server_name, &item) {
                 tools.push(t);
             }
         }
@@ -429,13 +516,30 @@ mod tests {
     }
 
     #[test]
-    fn to_mcp_tool_handles_input_schema_casing() {
+    fn aggregated_tool_handles_input_schema_casing() {
         let v1 = serde_json::json!({ "name": "echo", "description": "d", "inputSchema": { "type": "object" } });
         let v2 = serde_json::json!({ "name": "ping", "input_schema": { "type": "object" } });
-        let t1 = super::to_mcp_tool("srv", &v1).unwrap();
-        let t2 = super::to_mcp_tool("srv", &v2).unwrap();
-        assert!(t1.name.contains("srv::echo"));
-        assert!(t2.name.contains("srv::ping"));
+        let t1 = super::to_aggregated_tool("srv", &v1).unwrap();
+        let t2 = super::to_aggregated_tool("srv", &v2).unwrap();
+        assert_eq!(t1.server_name, "srv");
+        assert_eq!(t1.tool_name, "echo");
+        assert!(t1.input_schema.contains_key("type"));
+        assert_eq!(t1.description.as_deref(), Some("d"));
+        assert_eq!(t2.tool_name, "ping");
+        assert!(t2.input_schema.contains_key("type"));
+    }
+
+    #[test]
+    fn build_sanitized_tool_name_respects_allowed_charset() {
+        let name = super::build_sanitized_tool_name("Test Server", "call tool! v1");
+        assert!(
+            name.chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+        );
+        assert!(name.contains("Test_Server"));
+
+        let fallback = super::build_sanitized_tool_name("", "  ");
+        assert_eq!(fallback, "tool");
     }
 
     #[tokio::test]
@@ -487,6 +591,8 @@ where
         emitter.clone(),
         logger.clone(),
     ));
+    let tool_aliases: Arc<RwLock<HashMap<String, (String, String)>>> =
+        Arc::new(RwLock::new(HashMap::new()));
     let service: StreamableHttpService<
         BouncerService<E, CP, L>,
         InterceptingSessionManager<LocalSessionManager, E, L>,
@@ -495,11 +601,13 @@ where
             let emitter = emitter.clone();
             let cp = cp.clone();
             let logger = logger.clone();
+            let tool_aliases = tool_aliases.clone();
             move || {
                 Ok(BouncerService {
                     emitter: emitter.clone(),
                     cp: cp.clone(),
                     logger: logger.clone(),
+                    tool_aliases: tool_aliases.clone(),
                 })
             }
         },
