@@ -2,7 +2,11 @@
 
 A desktop application that serves as a gateway and management interface for Model Context Protocol (MCP) servers. Now built with Tauri v2 (Rust + WebView) and the official Rust MCP SDK (rmcp). It provides a modern, cross‑platform GUI for configuring, managing, and monitoring MCP servers with support for multiple transport protocols.
 
-![App screenshot](doc/screenshot.png)
+## Screenshots
+
+![Server List](doc/serverlist.png)
+![Logs](doc/logs.png)
+![Debugger](doc/debugger.png)
 
 > **⚠️ Early Development Software**
 > This project is in early development and may have bugs, incomplete features, or breaking changes. Use at your own risk and please report any issues you encounter.
@@ -20,44 +24,52 @@ MCP Bouncer acts as a centralized hub for managing Model Context Protocol server
 ## Features
 
 ### 🚀 Server Management
+
 - Add, edit, and remove MCP server configurations
 - Enable/disable servers individually
 - Bulk start/stop operations
 - Real-time status monitoring with connection health indicators
 
 ### 🔧 Transport Protocol Support
+
 - **stdio**: Process‑based transport for local MCP servers (via rmcp TokioChildProcess)
 - **Streamable HTTP**: HTTP transport with streaming capabilities (via rmcp client/server)
 - SSE transport is supported; the UI models it and the backend includes an integration test validating header forwarding and tool listing.
 
 ### 🎨 Modern UI
+
 - Clean, responsive interface built with React and Tailwind CSS
 - Dark/light theme support
 - Toast notifications for user feedback
 - Compact, efficient layout design
 
 ### 👀 Incoming Clients
+
 - As MCP clients connect to the built‑in Streamable HTTP server, they appear in the Incoming Clients list.
 - Shows reported client `name`, `version`, and optional `title` (when provided by the client during Initialize).
 - Connection time `connected_at` is in RFC3339 (ISO 8601) format for reliable display in the UI.
 
 ### ⚙️ Configuration Management
+
 - Automatic settings persistence in platform-specific locations
 - JSON-based configuration format
 - Easy access to configuration directory
 - Environment variable management per server
 
 ### 🔒 Secure Secret Storage
+
 - OAuth access and refresh tokens are encrypted/stored via the operating system keyring using the cross-platform `keyring` crate—no sensitive token payloads remain in `oauth.json`.
 - On first run after upgrading, legacy plaintext credentials are migrated into the keyring and scrubbed from the JSON file automatically.
 - The same abstraction will power upcoming named secrets for injecting headers, environment variables, or CLI parameters.
 
 ### 🔌 MCP Client Integration
+
 - Built-in MCP client for testing server connections
 - Real-time connection status updates
 - Error reporting and debugging information
 
 ### 🪵 JSON-RPC Logging (SQLite)
+
 - Always-on logging of all JSON-RPC requests/responses handled by the proxy.
 - Location: `logs.sqlite` in the app config directory:
   - macOS: `~/Library/Application Support/app.mcp.bouncer/logs.sqlite`
@@ -75,6 +87,7 @@ MCP Bouncer acts as a centralized hub for managing Model Context Protocol server
   - `SELECT * FROM rpc_events ORDER BY ts_ms DESC LIMIT 10;`
 
 ### 🛰️ Intercepting Transport Architecture
+
 - **Inbound proxy traffic**: The embedded Streamable HTTP server wraps every session transport with an `InterceptingTransport` via `InterceptingSessionManager`. Each inbound request is annotated with a `RequestLogContext`, which captures timings, injects server/client metadata, and pushes events to the SQLite logger and live UI stream.
 - **Outbound upstream traffic**: All upstream RMCP clients created by `ensure_rmcp_client` use `InterceptingClientTransport`, wrapping HTTP/SSE/stdio transports before `.serve(...)` runs. This guarantees that tool refreshes, OAuth reconnects, and user-triggered calls record the same structured events (including errors) as downstream traffic.
 - Both interceptors share the `RpcEventPublisher` + `EventEmitter`, so extending to new transports only requires wrapping the transport and passing the emitter/logger through. Pending-request state stores start timestamps, serialized payloads, and resolves human-readable errors (e.g., callTool content) for consistent SQLite records.
@@ -82,22 +95,29 @@ MCP Bouncer acts as a centralized hub for managing Model Context Protocol server
 ## Quick Start
 
 ### Prerequisites
+
 - Node.js 18+
 - Rust toolchain (stable, recent enough for `edition = 2024`)
 - Tauri CLI (optional): `npm i -g @tauri-apps/cli` or use `npx tauri`
 - Linux only: install `keyutils`/`libkeyutils` so the system keyring backend is available for OAuth secret storage.
 
 ### Development
+
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/catkins/mcp-bouncer.git
    cd mcp-bouncer
    ```
+
 2. Install frontend deps:
+
    ```bash
    npm install
    ```
+
 3. Dev run (Vite + Tauri):
+
    ```bash
    npx tauri dev
    # or
@@ -105,6 +125,7 @@ MCP Bouncer acts as a centralized hub for managing Model Context Protocol server
    ```
 
 ### Building
+
 ```bash
 # Build the web assets and bundle the app
 cargo tauri build
@@ -117,6 +138,7 @@ cargo build --manifest-path src-tauri/Cargo.toml --release
 ## Configuration
 
 ### Settings Location
+
 The application automatically manages settings in platform-specific locations:
 
 - **macOS**: `~/Library/Application Support/app.mcp.bouncer/settings.json`
@@ -124,6 +146,7 @@ The application automatically manages settings in platform-specific locations:
 - **Windows**: `%APPDATA%\app.mcp.bouncer\settings.json`
 
 ### OAuth Credentials & Secrets
+
 - OAuth access/refresh tokens are stored in the operating system keyring (Keychain on macOS, Credential Manager on Windows, keyutils/secret-service on Linux) via the `keyring` crate.
 - The on-disk `oauth.json` file now holds only metadata (client id, redirect URI, expiry). During the upgrade path legacy plaintext tokens are migrated into the keyring and removed from the file automatically.
 - Future named secrets (for HTTP headers, env vars, or CLI params) will reuse the same abstraction; when testing locally, the backend automatically swaps in an in-memory secret store to avoid touching your real keychain.
@@ -161,19 +184,20 @@ The application automatically manages settings in platform-specific locations:
 
 ### Server Configuration Options
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | Yes | Unique identifier for the server |
-| `description` | string | No | Human-readable description |
-| `transport` | string | Yes | Transport type: `stdio`, `sse`, or `streamable_http` |
-| `command` | string | For `stdio` | Command to execute |
-| `args` | array | For `stdio` | Command-line arguments |
-| `env` | object | No | Environment variables |
-| `endpoint` | string | For HTTP | HTTP endpoint URL |
-| `headers` | object | For HTTP | HTTP headers |
-| `enabled` | boolean | No | Auto-start on application launch |
+| Field         | Type    | Required    | Description                                          |
+| ------------- | ------- | ----------- | ---------------------------------------------------- |
+| `name`        | string  | Yes         | Unique identifier for the server                     |
+| `description` | string  | No          | Human-readable description                           |
+| `transport`   | string  | Yes         | Transport type: `stdio`, `sse`, or `streamable_http` |
+| `command`     | string  | For `stdio` | Command to execute                                   |
+| `args`        | array   | For `stdio` | Command-line arguments                               |
+| `env`         | object  | No          | Environment variables                                |
+| `endpoint`    | string  | For HTTP    | HTTP endpoint URL                                    |
+| `headers`     | object  | For HTTP    | HTTP headers                                         |
+| `enabled`     | boolean | No          | Auto-start on application launch                     |
 
 ### SSE Transport
+
 - Endpoint: set `endpoint` to your server's SSE base (e.g., `http://127.0.0.1:8080/sse`).
 - Headers: optional `headers` object attaches static HTTP headers to SSE requests (useful for API keys).
 - Behavior: the app lists tools and forwards headers on tool calls; see `src-tauri/tests/sse_integration.rs` for an example.
@@ -210,6 +234,7 @@ mcp-bouncer/
 ## Usage Examples
 
 ### Adding a Filesystem MCP Server
+
 1. Click "Add Server" in the UI
 2. Configure with:
    - Name: `filesystem`
@@ -219,6 +244,7 @@ mcp-bouncer/
    - Environment: `{"MCP_FILESYSTEM_ROOT": "/path/to/root"}`
 
 ### Adding a Remote HTTP Server
+
 1. Click "Add Server" in the UI
 2. Configure with:
    - Name: `remote-api`
@@ -229,6 +255,7 @@ mcp-bouncer/
 ## Development
 
 ### Architecture
+
 - **Backend**: Rust (Tauri v2). Hosts an rmcp Streamable HTTP server at `http://127.0.0.1:8091/mcp`.
   - Aggregates and proxies to configured upstream MCP servers (Streamable HTTP, STDIO) via rmcp clients.
   - Tool names are prefixed `server::tool` to disambiguate across servers.
@@ -241,6 +268,7 @@ mcp-bouncer/
 - TypeScript bindings for Tauri commands and shared structs are generated automatically in debug builds using specta + tauri-specta. The generated file is at `src/tauri/bindings.ts`, and the frontend uses a thin adapter `src/tauri/bridge.ts` for ergonomic calls.
 
 ### Dev Commands
+
 - Dev app: `npx tauri dev`
 - Build app: `cargo tauri build`
 - Just backend: `cargo build --manifest-path src-tauri/Cargo.toml`
