@@ -1,7 +1,12 @@
 use mcp_bouncer::config::{
     ConfigProvider, MCPServerConfig, TransportType, default_settings, save_settings_with,
 };
-use mcp_bouncer::{events::EventEmitter, logging::SqlitePublisher, server::start_http_server};
+use mcp_bouncer::{
+    config::ServerTransport,
+    events::EventEmitter,
+    logging::SqlitePublisher,
+    server::{start_server, stop_server},
+};
 use rmcp::ServiceExt;
 use rmcp::model as mcp;
 use rmcp::transport::{
@@ -137,23 +142,31 @@ async fn e2e_list_and_echo_hermetic_http() {
     save_settings_with(&cp, &s).expect("save settings");
 
     // Start bouncer HTTP server on an ephemeral port
-    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 0));
+    let addr_str = "127.0.0.1:0".to_string();
     #[derive(Clone)]
     struct NoopEmitter;
     impl EventEmitter for NoopEmitter {
         fn emit(&self, _e: &str, _p: &serde_json::Value) {}
     }
-    let (_handle, bound) =
-        match start_http_server(NoopEmitter, cp.clone(), SqlitePublisher, addr).await {
-            Ok(res) => res,
-            Err(err) => {
-                if err.contains("Operation not permitted") {
-                    eprintln!("skipping e2e_list_and_echo_hermetic_http: {err}");
-                    return;
-                }
-                panic!("start_http_server failed: {err}");
+    let (handle, bound_opt) = match start_server(
+        NoopEmitter,
+        cp.clone(),
+        SqlitePublisher,
+        ServerTransport::Tcp,
+        addr_str.clone(),
+    )
+    .await
+    {
+        Ok(res) => res,
+        Err(err) => {
+            if err.contains("Operation not permitted") {
+                eprintln!("skipping e2e_list_and_echo_hermetic_http: {err}");
+                return;
             }
-        };
+            panic!("start_server failed: {err}");
+        }
+    };
+    let bound = bound_opt.expect("TCP server should return bound address");
     let url = format!("http://{}:{}/mcp", bound.ip(), bound.port());
 
     // Connect an MCP client to the bouncer
@@ -198,4 +211,7 @@ async fn e2e_list_and_echo_hermetic_http() {
         text.contains("hello"),
         "echo response should contain 'hello' but was: {text}",
     );
+
+    // Cleanup
+    stop_server(&handle);
 }

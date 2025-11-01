@@ -1,7 +1,12 @@
 use mcp_bouncer::config::{
     ConfigProvider, MCPServerConfig, TransportType, default_settings, save_settings_with,
 };
-use mcp_bouncer::{events::EventEmitter, logging::SqlitePublisher, server::start_http_server};
+use mcp_bouncer::{
+    config::ServerTransport,
+    events::EventEmitter,
+    logging::SqlitePublisher,
+    server::{start_server, stop_server},
+};
 use rmcp::ServiceExt;
 use rmcp::model as mcp;
 use rmcp::transport::{
@@ -152,18 +157,26 @@ async fn logging_persists_events_to_sqlite() {
     impl EventEmitter for NoopEmitter {
         fn emit(&self, _e: &str, _p: &serde_json::Value) {}
     }
-    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 0));
-    let (_handle, bound) =
-        match start_http_server(NoopEmitter, cp.clone(), SqlitePublisher, addr).await {
-            Ok(res) => res,
-            Err(err) => {
-                if err.contains("Operation not permitted") {
-                    eprintln!("skipping {test_name}: {err}");
-                    return;
-                }
-                panic!("start_http_server failed: {err}");
+    let addr_str = "127.0.0.1:0".to_string();
+    let (handle, bound_opt) = match start_server(
+        NoopEmitter,
+        cp.clone(),
+        SqlitePublisher,
+        ServerTransport::Tcp,
+        addr_str,
+    )
+    .await
+    {
+        Ok(res) => res,
+        Err(err) => {
+            if err.contains("Operation not permitted") {
+                eprintln!("skipping {test_name}: {err}");
+                return;
             }
-        };
+            panic!("start_server failed: {err}");
+        }
+    };
+    let bound = bound_opt.expect("TCP server should return bound address");
     let url = format!("http://{}:{}/mcp", bound.ip(), bound.port());
 
     // Client connects, lists tools, and calls echo
@@ -236,6 +249,9 @@ async fn logging_persists_events_to_sqlite() {
         .filter_map(|row| row.try_get::<Option<String>, _>(2).ok().flatten())
         .any(|origin| matches!(origin.as_str(), "external" | "internal" | "debugger"));
     assert!(origin_present, "expected at least one origin tag");
+
+    // Cleanup
+    stop_server(&handle);
 }
 
 #[tokio::test]
@@ -339,18 +355,26 @@ async fn logging_persists_error_and_redacts_sensitive_fields() {
     impl EventEmitter for NoopEmitter {
         fn emit(&self, _e: &str, _p: &serde_json::Value) {}
     }
-    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 0));
-    let (_handle, bound) =
-        match start_http_server(NoopEmitter, cp.clone(), SqlitePublisher, addr).await {
-            Ok(res) => res,
-            Err(err) => {
-                if err.contains("Operation not permitted") {
-                    eprintln!("skipping {test_name}: {err}");
-                    return;
-                }
-                panic!("start_http_server failed: {err}");
+    let addr_str = "127.0.0.1:0".to_string();
+    let (handle, bound_opt) = match start_server(
+        NoopEmitter,
+        cp.clone(),
+        SqlitePublisher,
+        ServerTransport::Tcp,
+        addr_str,
+    )
+    .await
+    {
+        Ok(res) => res,
+        Err(err) => {
+            if err.contains("Operation not permitted") {
+                eprintln!("skipping {test_name}: {err}");
+                return;
             }
-        };
+            panic!("start_server failed: {err}");
+        }
+    };
+    let bound = bound_opt.expect("TCP server should return bound address");
     let url = format!("http://{}:{}/mcp", bound.ip(), bound.port());
 
     // Client connects and calls the failing tool with sensitive fields
@@ -412,6 +436,9 @@ async fn logging_persists_error_and_redacts_sensitive_fields() {
             );
         }
     }
+
+    // Cleanup
+    stop_server(&handle);
 }
 
 #[tokio::test]
@@ -521,18 +548,26 @@ async fn logging_persists_many_calltool_events_in_batches() {
     impl EventEmitter for NoopEmitter {
         fn emit(&self, _e: &str, _p: &serde_json::Value) {}
     }
-    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 0));
-    let (_handle, bound) =
-        match start_http_server(NoopEmitter, cp.clone(), SqlitePublisher, addr).await {
-            Ok(res) => res,
-            Err(err) => {
-                if err.contains("Operation not permitted") {
-                    eprintln!("skipping {test_name}: {err}");
-                    return;
-                }
-                panic!("start_http_server failed: {err}");
+    let addr_str = "127.0.0.1:0".to_string();
+    let (handle, bound_opt) = match start_server(
+        NoopEmitter,
+        cp.clone(),
+        SqlitePublisher,
+        ServerTransport::Tcp,
+        addr_str,
+    )
+    .await
+    {
+        Ok(res) => res,
+        Err(err) => {
+            if err.contains("Operation not permitted") {
+                eprintln!("skipping {test_name}: {err}");
+                return;
             }
-        };
+            panic!("start_server failed: {err}");
+        }
+    };
+    let bound = bound_opt.expect("TCP server should return bound address");
     let url = format!("http://{}:{}/mcp", bound.ip(), bound.port());
 
     // Client connects and sends many tools/call requests
@@ -602,4 +637,7 @@ async fn logging_persists_many_calltool_events_in_batches() {
             assert!(ts <= last_ts);
         }
     }
+
+    // Cleanup
+    stop_server(&handle);
 }
