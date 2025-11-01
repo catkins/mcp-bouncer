@@ -39,10 +39,19 @@ fn default_transport() -> TransportType {
     TransportType::Stdio
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum ServerTransport {
+    Tcp,
+    Unix,
+    Stdio,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct Settings {
     pub mcp_servers: Vec<MCPServerConfig>,
     pub listen_addr: String,
+    pub transport: ServerTransport,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Type)]
@@ -101,6 +110,7 @@ pub fn default_settings() -> Settings {
     Settings {
         mcp_servers: Vec::new(),
         listen_addr: "http://localhost:8091/mcp".to_string(),
+        transport: ServerTransport::Tcp,
     }
 }
 
@@ -239,6 +249,26 @@ mod tests {
         let loaded = load_settings_with(&cp);
         assert_eq!(loaded.mcp_servers.len(), 1);
         assert_eq!(loaded.listen_addr, s.listen_addr);
+        assert_eq!(loaded.transport, s.transport);
+    }
+
+    #[test]
+    fn server_transport_serialization() {
+        let transport = ServerTransport::Tcp;
+        let json = serde_json::to_string(&transport).unwrap();
+        assert_eq!(json, "\"tcp\"");
+
+        let transport = ServerTransport::Unix;
+        let json = serde_json::to_string(&transport).unwrap();
+        assert_eq!(json, "\"unix\"");
+
+        let transport = ServerTransport::Stdio;
+        let json = serde_json::to_string(&transport).unwrap();
+        assert_eq!(json, "\"stdio\"");
+
+        // Test deserialization
+        let parsed: ServerTransport = serde_json::from_str("\"tcp\"").unwrap();
+        assert!(matches!(parsed, ServerTransport::Tcp));
     }
 
     #[test]

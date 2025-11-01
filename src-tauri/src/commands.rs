@@ -2,8 +2,9 @@ use std::collections::HashMap;
 
 use mcp_bouncer::client::{ensure_rmcp_client, fetch_tools_for_cfg, remove_rmcp_client};
 use mcp_bouncer::config::{
-    ClientConnectionState, ClientStatus, ConfigProvider, IncomingClient, MCPServerConfig, Settings,
-    config_dir, default_settings, load_settings, save_settings, save_settings_with,
+    ClientConnectionState, ClientStatus, ConfigProvider, IncomingClient, MCPServerConfig,
+    ServerTransport, Settings, config_dir, default_settings, load_settings, save_settings,
+    save_settings_with,
 };
 use mcp_bouncer::events::{
     EventEmitter, TauriEventEmitter, client_error, client_status_changed, servers_updated,
@@ -36,10 +37,18 @@ pub async fn mcp_list() -> Result<Vec<MCPServerConfig>, String> {
 #[specta::specta]
 #[tauri::command]
 pub async fn mcp_listen_addr() -> Result<String, String> {
-    if let Some(addr) = get_runtime_listen_addr() {
-        return Ok(format!("http://{}:{}/mcp", addr.ip(), addr.port()));
+    let settings = load_settings();
+    match settings.transport {
+        ServerTransport::Tcp => {
+            if let Some(addr) = get_runtime_listen_addr() {
+                Ok(format!("http://{}:{}/mcp", addr.ip(), addr.port()))
+            } else {
+                Ok(settings.listen_addr)
+            }
+        }
+        ServerTransport::Unix => Ok("/tmp/mcp-bouncer.sock".to_string()),
+        ServerTransport::Stdio => Ok("stdio".to_string()),
     }
-    Ok(load_settings().listen_addr)
 }
 
 #[specta::specta]
@@ -130,7 +139,8 @@ pub async fn mcp_update_server(
                         "requires_authorization",
                     );
                 } else {
-                    connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg).await;
+                    connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg)
+                        .await;
                 }
             }
         } else {
