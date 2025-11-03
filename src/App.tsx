@@ -27,7 +27,7 @@ function AppContent() {
 
   // Keep service info in sync on settings updates
   useMCPSubscriptions({
-    loadServers: async () => { },
+    loadServers,
     loadActive,
     loadSettings,
     loadMcpUrl,
