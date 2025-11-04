@@ -203,10 +203,35 @@ The application automatically manages settings in platform-specific locations:
 Configure how external MCP clients reach the built-in proxy via the top-level `transport` field in `settings.json`:
 
 - `tcp` (default): Binds to `127.0.0.1:8091`. If that port is unavailable, MCP Bouncer falls back to an ephemeral port; the header badge updates using the runtime address returned by `mcp_listen_addr`.
-- `unix` (macOS/Linux): Listens on `/tmp/mcp-bouncer.sock`. Any pre-existing socket file at that path is removed on startup before binding.
+- `unix` (macOS/Linux): Listens on `/tmp/mcp-bouncer.sock`. Any pre-existing socket file at that path is removed on startup before binding. Use the helper CLI `mcp-bouncer-socket-proxy` (see below) when a client expects a stdio bridge.
 - `stdio`: Serves the proxy over standard input/output without creating a socket. Use this when embedding MCP Bouncer inside another supervisor and wiring pipes manually; the UI surfaces the listen address as `stdio`.
 
 The persisted `listen_addr` remains for backward compatibility, but the live value displayed in the UI is derived from the active transport. Selecting `unix` on non-Unix platforms surfaces an explicit startup error.
+
+#### Unix Socket Helper CLI
+
+Expose a Unix-socket Bouncer over stdio for tools that only speak the MCP stdio transport:
+
+```bash
+cargo run --manifest-path src-tauri/Cargo.toml --bin mcp-bouncer-socket-proxy -- \
+  --socket /tmp/mcp-bouncer.sock
+```
+
+- `--socket` points at the MCP Bouncer socket path (defaults to `/tmp/mcp-bouncer.sock`).
+- `--endpoint` lets you override the HTTP path inside the unix socket (defaults to `/mcp`).
+- The command reads requests from `stdin` and forwards them to the running Unix-socket proxy, writing responses back to `stdout`. This makes it safe to wrap with any stdio-compatible MCP client.
+
+Running the bridge typically looks like:
+
+1. In `settings.json`, set the top-level `"transport": "unix"` and restart MCP Bouncer so it binds the socket.  
+2. In a terminal, launch the proxy CLI (as above) to connect stdio ↔ unix.  
+3. Point your stdio client at the bridge. Example with [`mcp-remote`](https://www.npmjs.com/package/mcp-remote):
+
+   ```bash
+   npx mcp-remote --transport stdio --command mcp-bouncer-socket-proxy -- --socket /tmp/mcp-bouncer.sock
+   ```
+
+When you bundle the desktop app (`cargo tauri build`), the helper binary is produced alongside the main application; ship both if Unix socket support is required.
 
 ### SSE Transport
 

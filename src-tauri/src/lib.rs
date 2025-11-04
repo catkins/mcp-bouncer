@@ -9,6 +9,7 @@ pub mod overlay;
 pub mod runtime;
 pub mod secrets;
 pub mod server;
+pub mod socket_proxy;
 pub mod status;
 pub mod tools_cache;
 pub mod transport;

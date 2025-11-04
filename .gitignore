@@ -1,4 +1,5 @@
 bin
+!src-tauri/src/bin/
 dist
 node_modules
 *storybook.log

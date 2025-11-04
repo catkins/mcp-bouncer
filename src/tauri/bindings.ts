@@ -167,7 +167,8 @@ export type DebugCallToolResponse = { duration_ms: number; ok: boolean; result: 
 export type IncomingClient = { id: string; name: string; version: string; title?: string | null; connected_at?: string | null }
 export type JsonValue = null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>
 export type MCPServerConfig = { name: string; description: string; transport?: TransportType; command: string; args?: string[]; env?: Partial<{ [key in string]: string }>; endpoint?: string; headers?: Partial<{ [key in string]: string }>; requires_auth?: boolean; enabled: boolean }
-export type Settings = { mcp_servers: MCPServerConfig[]; listen_addr: string }
+export type ServerTransport = "tcp" | "unix" | "stdio"
+export type Settings = { mcp_servers: MCPServerConfig[]; listen_addr: string; transport: ServerTransport }
 export type ToolInfo = { name: string; description?: string | null; input_schema?: JsonValue | null }
 export type TransportType = "stdio" | "sse" | "streamable_http"
 
