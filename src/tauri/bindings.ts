@@ -21,6 +21,14 @@ async mcpListenAddr() : Promise<Result<string, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async mcpSocketBridgePath() : Promise<Result<SocketBridgeInfo | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mcp_socket_bridge_path") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async mcpIsActive() : Promise<Result<boolean, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("mcp_is_active") };
@@ -169,6 +177,7 @@ export type JsonValue = null | boolean | number | string | JsonValue[] | Partial
 export type MCPServerConfig = { name: string; description: string; transport?: TransportType; command: string; args?: string[]; env?: Partial<{ [key in string]: string }>; endpoint?: string; headers?: Partial<{ [key in string]: string }>; requires_auth?: boolean; enabled: boolean }
 export type ServerTransport = "tcp" | "unix" | "stdio"
 export type Settings = { mcp_servers: MCPServerConfig[]; listen_addr: string; transport: ServerTransport }
+export type SocketBridgeInfo = { path: string; exists: boolean }
 export type ToolInfo = { name: string; description?: string | null; input_schema?: JsonValue | null }
 export type TransportType = "stdio" | "sse" | "streamable_http"
 

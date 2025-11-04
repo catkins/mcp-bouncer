@@ -5,6 +5,7 @@ import {
   GlobeAltIcon,
   ClipboardDocumentIcon,
 } from '@heroicons/react/24/outline';
+import type { SocketBridgeInfo } from '../tauri/bridge';
 
 interface HeaderProps {
   isActive: boolean | null;
@@ -12,14 +13,31 @@ interface HeaderProps {
   theme: 'light' | 'dark';
   onOpenConfig: () => void;
   mcpUrl: string;
+  socketBridgePath: SocketBridgeInfo | null;
 }
 
-export function Header({ isActive, toggleTheme, theme, onOpenConfig, mcpUrl }: HeaderProps) {
+export function Header({
+  isActive,
+  toggleTheme,
+  theme,
+  onOpenConfig,
+  mcpUrl,
+  socketBridgePath,
+}: HeaderProps) {
   const handleCopyUrl = async () => {
     try {
       await navigator.clipboard.writeText(mcpUrl);
     } catch (error) {
       console.error('Failed to copy URL:', error);
+    }
+  };
+
+  const handleCopyBridge = async () => {
+    if (!socketBridgePath) return;
+    try {
+      await navigator.clipboard.writeText(socketBridgePath.path);
+    } catch (error) {
+      console.error('Failed to copy bridge path:', error);
     }
   };
   return (
@@ -44,6 +62,29 @@ export function Header({ isActive, toggleTheme, theme, onOpenConfig, mcpUrl }: H
               <ClipboardDocumentIcon className="h-3.5 w-3.5" />
             </button>
           </div>
+          {socketBridgePath ? (
+            <div className="flex items-center gap-2 rounded-lg bg-surface-100 px-3 py-1.5 dark:bg-surface-800">
+              <span className="text-xs font-semibold uppercase text-surface-500 dark:text-surface-400">
+                Bridge
+              </span>
+              <span className="max-w-xs truncate text-sm font-mono text-surface-700 dark:text-surface-200">
+                {socketBridgePath.path}
+              </span>
+              <button
+                onClick={handleCopyBridge}
+                disabled={!socketBridgePath.exists}
+                className={`rounded p-1 transition-colors ${socketBridgePath.exists ? 'text-surface-500 hover:bg-surface-200 hover:text-surface-800 dark:text-surface-400 dark:hover:bg-surface-700 dark:hover:text-white' : 'cursor-not-allowed text-surface-400 dark:text-surface-600'}`}
+                aria-label="Copy bridge path"
+              >
+                <ClipboardDocumentIcon className="h-3.5 w-3.5" />
+              </button>
+              {!socketBridgePath.exists ? (
+                <span className="text-xs text-amber-500 dark:text-amber-400">
+                  build helper to enable
+                </span>
+              ) : null}
+            </div>
+          ) : null}
           <button
             onClick={onOpenConfig}
             className="rounded-lg p-1.5 text-surface-600 transition-colors hover:bg-surface-200 hover:text-surface-900 dark:text-surface-400 dark:hover:bg-surface-700 dark:hover:text-white"

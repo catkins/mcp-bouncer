@@ -1,8 +1,9 @@
 use std::{future::Future, path::PathBuf, str::FromStr, sync::Arc};
 
 use anyhow::{Context, Result};
-use futures::StreamExt;
 use bytes::Bytes;
+use futures::StreamExt;
+use http_body_util::{BodyExt, Full};
 use hyper::{
     Method, Request, StatusCode,
     body::Incoming,
@@ -14,6 +15,7 @@ use hyper::{
 use hyper_util::{client::legacy::Client, rt::TokioExecutor};
 use hyperlocal::UnixConnector;
 use rmcp::{
+    ErrorData,
     model::{
         ClientCapabilities, ClientInfo, ClientNotification, ClientRequest, Implementation,
         ProtocolVersion, ServerCapabilities, ServerInfo, ServerNotification, ServerRequest,
@@ -21,8 +23,8 @@ use rmcp::{
     },
     serve_client, serve_server,
     service::{
-        NotificationContext, Peer, RequestContext, RoleClient, RoleServer, RunningService,
-        Service, ServiceError,
+        NotificationContext, Peer, RequestContext, RoleClient, RoleServer, RunningService, Service,
+        ServiceError,
     },
     transport::{
         StreamableHttpClientTransport,
@@ -34,11 +36,9 @@ use rmcp::{
             StreamableHttpError, StreamableHttpPostResponse,
         },
     },
-    ErrorData,
 };
 use serde_json;
 use sse_stream::SseStream;
-use http_body_util::{BodyExt, Full};
 use tokio::sync::RwLock;
 
 struct ProxyState {
@@ -203,8 +203,7 @@ where
 {
     let state = Arc::new(ProxyState::new());
 
-    let http_client = Client::builder(TokioExecutor::new())
-        .build::<_, Full<Bytes>>(UnixConnector);
+    let http_client = Client::builder(TokioExecutor::new()).build::<_, Full<Bytes>>(UnixConnector);
     let unix_client = UnixStreamClient::new(socket_path.clone(), endpoint.to_owned(), http_client);
 
     let transport_config =
@@ -285,7 +284,11 @@ struct UnixStreamClient {
 }
 
 impl UnixStreamClient {
-    fn new(socket_path: PathBuf, endpoint: String, http: Client<UnixConnector, Full<Bytes>>) -> Self {
+    fn new(
+        socket_path: PathBuf,
+        endpoint: String,
+        http: Client<UnixConnector, Full<Bytes>>,
+    ) -> Self {
         Self {
             socket_path: Arc::new(socket_path),
             endpoint: Arc::from(endpoint),
@@ -405,8 +408,8 @@ impl StreamableHttpClient for UnixStreamClient {
                 builder = builder.header(header::AUTHORIZATION, value);
             }
 
-            let body_bytes = serde_json::to_vec(&message)
-                .map_err(|e| StreamableHttpError::Client(e.into()))?;
+            let body_bytes =
+                serde_json::to_vec(&message).map_err(|e| StreamableHttpError::Client(e.into()))?;
             let request = builder
                 .body(Full::from(Bytes::from(body_bytes)))
                 .map_err(|e| StreamableHttpError::Client(e.into()))?;

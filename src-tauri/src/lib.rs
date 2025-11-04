@@ -15,6 +15,12 @@ pub mod tools_cache;
 pub mod transport;
 pub mod types;
 
+pub const BIN_NAME_SOCKET_PROXY: &str = if cfg!(windows) {
+    "mcp-bouncer-socket-proxy.exe"
+} else {
+    "mcp-bouncer-socket-proxy"
+};
+
 pub mod logging {
     pub use crate::logging_core::{
         Event, RpcEventPublisher, current_request_origin, with_optional_request_origin,

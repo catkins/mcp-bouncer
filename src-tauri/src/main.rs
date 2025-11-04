@@ -98,6 +98,7 @@ fn main() {
         let builder = SpectaBuilder::<tauri::Wry>::new().commands(collect_commands![
             commands::mcp_list,
             commands::mcp_listen_addr,
+            commands::mcp_socket_bridge_path,
             commands::mcp_is_active,
             commands::mcp_get_client_status,
             commands::mcp_get_incoming_clients,
@@ -176,6 +177,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::mcp_list,
             commands::mcp_listen_addr,
+            commands::mcp_socket_bridge_path,
             commands::mcp_is_active,
             commands::mcp_get_client_status,
             commands::mcp_get_incoming_clients,

@@ -11,6 +11,9 @@ vi.mock('../../tauri/bridge', async () => {
       ListenAddr: vi.fn(async () => 'http://127.0.0.1:8091/mcp'),
       IsActive: vi.fn(async () => true),
     },
+    MiscService: {
+      GetSocketBridgePath: vi.fn(async () => ({ path: '/tmp/proxy', exists: false })),
+    },
   };
 });
 
@@ -21,15 +24,16 @@ function Harness({ onState }: { onState: (s: any) => void }) {
 }
 
 describe('useServiceInfo', () => {
-  it('loads listen addr and active state', async () => {
+  it('loads listen addr, active state, and bridge path', async () => {
     let st: any;
     render(<Harness onState={s => (st = s)} />);
     await st.loadMcpUrl();
     await st.loadActive();
+    await st.loadSocketBridgePath();
     await waitFor(() => {
       expect(st.mcpUrl).toMatch(/8091\/mcp/);
       expect(st.isActive).toBe(true);
+      expect(st.socketBridgePath).toEqual({ path: '/tmp/proxy', exists: false });
     });
   });
 });
-

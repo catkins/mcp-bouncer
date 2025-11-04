@@ -17,6 +17,7 @@ function Harness({ fns }: { fns: Record<string, any> }) {
     loadSettings: fns.loadSettings,
     loadMcpUrl: fns.loadMcpUrl,
     loadClientStatus: fns.loadClientStatus,
+    loadSocketBridgePath: fns.loadSocketBridgePath,
   });
   return null;
 }
@@ -31,6 +32,7 @@ describe('useMCPSubscriptions', () => {
       loadSettings: vi.fn(async () => {}),
       loadMcpUrl: vi.fn(async () => {}),
       loadClientStatus: vi.fn(async () => {}),
+      loadSocketBridgePath: vi.fn(async () => {}),
     };
 
     const { unmount } = render(<Harness fns={fns} />);
@@ -44,6 +46,7 @@ describe('useMCPSubscriptions', () => {
       expect(fns.loadServers).toHaveBeenCalledTimes(1);
       expect(fns.loadActive).toHaveBeenCalledTimes(1);
       expect(fns.loadClientStatus).toHaveBeenCalledTimes(1);
+      expect(fns.loadSocketBridgePath).toHaveBeenCalledTimes(1);
     });
 
     vi.clearAllMocks();
@@ -54,6 +57,7 @@ describe('useMCPSubscriptions', () => {
       expect(fns.loadMcpUrl).toHaveBeenCalledTimes(1);
       expect(fns.loadServers).toHaveBeenCalledTimes(1);
       expect(fns.loadClientStatus).toHaveBeenCalledTimes(1);
+      expect(fns.loadSocketBridgePath).toHaveBeenCalledTimes(1);
     });
 
     vi.clearAllMocks();
