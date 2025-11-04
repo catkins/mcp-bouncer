@@ -220,6 +220,7 @@ cargo run --manifest-path src-tauri/Cargo.toml --bin mcp-bouncer-socket-proxy --
 - `--socket` points at the MCP Bouncer socket path (defaults to `/tmp/mcp-bouncer.sock`).
 - `--endpoint` lets you override the HTTP path inside the unix socket (defaults to `/mcp`).
 - The command reads requests from `stdin` and forwards them to the running Unix-socket proxy, writing responses back to `stdout`. This makes it safe to wrap with any stdio-compatible MCP client.
+- Build a standalone binary with `cargo build --manifest-path src-tauri/Cargo.toml --bin mcp-bouncer-socket-proxy --release` (output lives at `src-tauri/target/release/mcp-bouncer-socket-proxy`).
 
 Running the bridge typically looks like:
 
@@ -230,6 +231,14 @@ Running the bridge typically looks like:
    ```bash
    npx mcp-remote --transport stdio --command mcp-bouncer-socket-proxy -- --socket /tmp/mcp-bouncer.sock
    ```
+
+For a richer inspection experience, try the official MCP Inspector:
+
+```bash
+npx -y @modelcontextprotocol/inspector -- ./src-tauri/target/release/mcp-bouncer-socket-proxy --socket /tmp/mcp-bouncer.sock
+```
+
+Start the CLI in one terminal (it will wait for connections), then launch the Inspector command in another to browse the advertised tools and send requests interactively.
 
 When you bundle the desktop app (`cargo tauri build`), the helper binary is produced alongside the main application; ship both if Unix socket support is required.
 
