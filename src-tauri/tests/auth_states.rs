@@ -18,7 +18,6 @@ async fn mark_unauthorized_sets_state_and_clears_error() {
         env: Default::default(),
         endpoint: "http://127.0.0.1".into(),
         headers: Default::default(),
-        requires_auth: false,
         enabled: true,
     });
     save_settings_with(&cp, &s).unwrap();
@@ -50,7 +49,6 @@ async fn authorizing_state_is_exposed() {
         env: Default::default(),
         endpoint: "http://127.0.0.1".into(),
         headers: Default::default(),
-        requires_auth: false,
         enabled: true,
     });
     save_settings_with(&cp, &s).unwrap();

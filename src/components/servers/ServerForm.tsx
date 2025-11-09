@@ -34,7 +34,6 @@ export function ServerForm({
     env: {},
     endpoint: '',
     headers: {},
-    requires_auth: false,
     enabled: true,
   });
   const idSeq = React.useRef(0);

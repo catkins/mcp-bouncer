@@ -17,7 +17,6 @@ const mockServers: MCPServerConfig[] = [
     },
     endpoint: '',
     headers: {},
-    requires_auth: false,
   },
   {
     name: 'buildkite',
@@ -31,7 +30,6 @@ const mockServers: MCPServerConfig[] = [
     headers: {
       Authorization: 'Bearer token123',
     },
-    requires_auth: false,
   },
   {
     name: 'disabled-server',
@@ -43,7 +41,6 @@ const mockServers: MCPServerConfig[] = [
     env: {},
     endpoint: '',
     headers: {},
-    requires_auth: false,
   },
 ];
 
@@ -182,7 +179,6 @@ export const MixedTransports: Story = {
         args: [],
         env: {},
         headers: {},
-        requires_auth: false,
       },
     ],
     clientStatus: {
@@ -235,7 +231,6 @@ export const LargeList: Story = {
         env: {},
         endpoint: '',
         headers: {},
-        requires_auth: false,
       },
       {
         name: 'server-5',
@@ -247,7 +242,6 @@ export const LargeList: Story = {
         args: [],
         env: {},
         headers: {},
-        requires_auth: false,
       },
       {
         name: 'server-6',
@@ -256,7 +250,6 @@ export const LargeList: Story = {
         endpoint: 'https://secure.example.com/mcp',
         enabled: true,
         command: '',
-        requires_auth: true,
         args: [],
         env: {},
         headers: {},

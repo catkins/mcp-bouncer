@@ -19,7 +19,7 @@ describe('ServerList', () => {
   const servers = [
     {
       name: 'svc', description: '', transport: 'stdio', command: 'cmd', args: [], env: {},
-      endpoint: '', headers: {}, requires_auth: false, enabled: true,
+      endpoint: '', headers: {}, enabled: true,
     },
   ];
 
@@ -95,7 +95,7 @@ describe('ServerList', () => {
     const authServers = [
       {
         name: 'svc', description: '', transport: 'streamable_http', command: 'cmd', args: [], env: {},
-        endpoint: 'http://localhost', headers: {}, requires_auth: true, enabled: true,
+        endpoint: 'http://localhost', headers: {}, enabled: true,
       },
     ];
     const authStatus = {

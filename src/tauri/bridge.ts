@@ -11,7 +11,6 @@ export type MCPServerConfig = {
   env?: Partial<Record<string, string>>;
   endpoint?: string;
   headers?: Partial<Record<string, string>>;
-  requires_auth?: boolean;
   enabled: boolean;
 };
 export type ServerTransport = 'tcp' | 'unix' | 'stdio';

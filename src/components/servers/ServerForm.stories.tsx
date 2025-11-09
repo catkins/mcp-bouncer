@@ -15,7 +15,6 @@ const mockExistingServers: MCPServerConfig[] = [
     env: {},
     endpoint: '',
     headers: {},
-    requires_auth: false,
   },
   {
     name: 'another-server',
@@ -27,7 +26,6 @@ const mockExistingServers: MCPServerConfig[] = [
     env: { DEBUG: 'true' },
     endpoint: '',
     headers: {},
-    requires_auth: false,
   },
 ];
 
@@ -94,7 +92,6 @@ export const EditStdioServer: Story = {
       },
       endpoint: '',
       headers: {},
-      requires_auth: false,
     },
     existingServers: mockExistingServers,
   },
@@ -115,7 +112,6 @@ export const EditHttpServer: Story = {
         Authorization: 'Bearer token123',
         'Content-Type': 'application/json',
       },
-      requires_auth: false,
     },
     existingServers: mockExistingServers,
   },
@@ -135,7 +131,6 @@ export const EditSseServer: Story = {
       headers: {
         'X-API-Key': 'secret-key',
       },
-      requires_auth: false,
     },
     existingServers: mockExistingServers,
   },
@@ -150,7 +145,6 @@ export const EditServerWithAuth: Story = {
       endpoint: 'https://api.example.com/mcp',
       enabled: true,
       command: '',
-      requires_auth: true,
       headers: {
         'Content-Type': 'application/json',
       },
@@ -179,7 +173,6 @@ export const EditComplexStdioServer: Story = {
       },
       endpoint: '',
       headers: {},
-      requires_auth: false,
     },
     existingServers: mockExistingServers,
   },
@@ -197,7 +190,6 @@ export const EditDisabledServer: Story = {
       env: {},
       endpoint: '',
       headers: {},
-      requires_auth: false,
     },
     existingServers: mockExistingServers,
   },
@@ -215,7 +207,6 @@ export const LoadingState: Story = {
       env: {},
       endpoint: '',
       headers: {},
-      requires_auth: false,
     },
     loading: true,
     existingServers: mockExistingServers,
@@ -234,7 +225,6 @@ export const MinimalStdioServer: Story = {
       env: {},
       endpoint: '',
       headers: {},
-      requires_auth: false,
     },
   },
 };
@@ -251,7 +241,6 @@ export const MinimalHttpServer: Story = {
       headers: {},
       args: [],
       env: {},
-      requires_auth: false,
     },
   },
 };

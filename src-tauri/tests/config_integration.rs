@@ -21,7 +21,6 @@ fn settings_and_tools_persist() {
         env: Default::default(),
         endpoint: "http://127.0.0.1".into(),
         headers: Default::default(),
-        requires_auth: false,
         enabled: true,
     });
     save_settings_with(&cp, &s).unwrap();

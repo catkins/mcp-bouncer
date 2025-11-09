@@ -130,7 +130,6 @@ async fn http_client_can_connect_list_tools_and_send_headers() {
         env: Default::default(),
         endpoint: format!("http://{}:{}/mcp", addr.ip(), addr.port()),
         headers,
-        requires_auth: false,
         enabled: true,
     };
 

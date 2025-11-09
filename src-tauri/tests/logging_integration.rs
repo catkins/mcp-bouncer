@@ -146,7 +146,6 @@ async fn logging_persists_events_to_sqlite() {
         env: Default::default(),
         endpoint: format!("http://{}:{}/mcp", upstream_addr.ip(), upstream_addr.port()),
         headers: Default::default(),
-        requires_auth: false,
         enabled: true,
     });
     save_settings_with(&cp, &s).expect("save settings");
@@ -344,7 +343,6 @@ async fn logging_persists_error_and_redacts_sensitive_fields() {
         env: Default::default(),
         endpoint: format!("http://{}:{}/mcp", upstream_addr.ip(), upstream_addr.port()),
         headers: Default::default(),
-        requires_auth: false,
         enabled: true,
     });
     save_settings_with(&cp, &s).expect("save settings");
@@ -537,7 +535,6 @@ async fn logging_persists_many_calltool_events_in_batches() {
         env: Default::default(),
         endpoint: format!("http://{}:{}/mcp", upstream_addr.ip(), upstream_addr.port()),
         headers: Default::default(),
-        requires_auth: false,
         enabled: true,
     });
     save_settings_with(&cp, &s).expect("save settings");

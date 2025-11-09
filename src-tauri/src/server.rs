@@ -501,7 +501,6 @@ mod tests {
             env: Default::default(),
             endpoint: String::new(),
             headers: Default::default(),
-            requires_auth: false,
             enabled: true,
         });
         s.mcp_servers.push(MCPServerConfig {
@@ -513,7 +512,6 @@ mod tests {
             env: Default::default(),
             endpoint: String::new(),
             headers: Default::default(),
-            requires_auth: false,
             enabled: true,
         });
         save_settings_with(&cp, &s).unwrap();

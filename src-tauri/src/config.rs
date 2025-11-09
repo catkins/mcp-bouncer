@@ -30,8 +30,6 @@ pub struct MCPServerConfig {
     pub endpoint: String,
     #[serde(default)]
     pub headers: HashMap<String, String>,
-    #[serde(default)]
-    pub requires_auth: bool,
     pub enabled: bool,
 }
 
@@ -242,7 +240,6 @@ mod tests {
             env: Default::default(),
             endpoint: "http://127.0.0.1".into(),
             headers: Default::default(),
-            requires_auth: false,
             enabled: true,
         });
         save_settings_with(&cp, &s).unwrap();

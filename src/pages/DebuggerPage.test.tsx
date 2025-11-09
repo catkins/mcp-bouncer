@@ -21,7 +21,6 @@ const serverConfig: MCPServerConfig = {
   env: {},
   endpoint: '',
   headers: {},
-  requires_auth: false,
   enabled: true,
 };
 

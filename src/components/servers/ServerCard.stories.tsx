@@ -20,7 +20,6 @@ const baseServer = {
   enabled: true,
   endpoint: '',
   headers: {},
-  requires_auth: false,
 };
 
 export const ConnectedWithTools: Story = {

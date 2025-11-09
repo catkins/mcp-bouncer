@@ -136,7 +136,6 @@ async fn e2e_list_and_echo_hermetic_http() {
         env: Default::default(),
         endpoint: format!("http://{}:{}/mcp", upstream_addr.ip(), upstream_addr.port()),
         headers: Default::default(),
-        requires_auth: false,
         enabled: true,
     });
     save_settings_with(&cp, &s).expect("save settings");

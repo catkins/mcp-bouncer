@@ -144,25 +144,7 @@ pub async fn mcp_add_server(app: tauri::AppHandle, config: MCPServerConfig) -> R
     save_settings(&s)?;
     notify_servers_changed(&TauriEventEmitter(app.clone()), "add");
     if should_connect && let Some(cfg) = get_server_by_name(&server_name) {
-        if matches!(
-            cfg.transport,
-            mcp_bouncer::config::TransportType::StreamableHttp
-        ) && cfg.requires_auth
-            && mcp_bouncer::oauth::load_credentials_for(
-                &mcp_bouncer::config::OsConfigProvider,
-                &server_name,
-            )
-            .is_none()
-        {
-            mcp_bouncer::overlay::mark_unauthorized(&server_name).await;
-            client_status_changed(
-                &TauriEventEmitter(app.clone()),
-                &server_name,
-                "requires_authorization",
-            );
-        } else {
-            connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg).await;
-        }
+        connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg).await;
     }
     Ok(())
 }
@@ -183,26 +165,8 @@ pub async fn mcp_update_server(
         notify_servers_changed(&TauriEventEmitter(app.clone()), "update");
         if enabling {
             if let Some(cfg) = get_server_by_name(&server_name) {
-                if matches!(
-                    cfg.transport,
-                    mcp_bouncer::config::TransportType::StreamableHttp
-                ) && cfg.requires_auth
-                    && mcp_bouncer::oauth::load_credentials_for(
-                        &mcp_bouncer::config::OsConfigProvider,
-                        &server_name,
-                    )
-                    .is_none()
-                {
-                    mcp_bouncer::overlay::mark_unauthorized(&server_name).await;
-                    client_status_changed(
-                        &TauriEventEmitter(app.clone()),
-                        &server_name,
-                        "requires_authorization",
-                    );
-                } else {
-                    connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg)
-                        .await;
-                }
+                connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg)
+                    .await;
             }
         } else {
             let _ = remove_rmcp_client(&server_name).await;
@@ -247,26 +211,8 @@ pub async fn mcp_toggle_server_enabled(
         save_settings(&s)?;
         if enabled {
             if let Some(cfg) = get_server_by_name(&server_name) {
-                if matches!(
-                    cfg.transport,
-                    mcp_bouncer::config::TransportType::StreamableHttp
-                ) && cfg.requires_auth
-                    && mcp_bouncer::oauth::load_credentials_for(
-                        &mcp_bouncer::config::OsConfigProvider,
-                        &server_name,
-                    )
-                    .is_none()
-                {
-                    mcp_bouncer::overlay::mark_unauthorized(&server_name).await;
-                    client_status_changed(
-                        &TauriEventEmitter(app.clone()),
-                        &server_name,
-                        "requires_authorization",
-                    );
-                } else {
-                    connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg)
-                        .await;
-                }
+                connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg)
+                    .await;
             }
         } else {
             let _ = remove_rmcp_client(&server_name).await;

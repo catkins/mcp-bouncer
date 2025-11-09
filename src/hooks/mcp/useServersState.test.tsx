@@ -10,7 +10,7 @@ vi.mock('../../tauri/bridge', async () => {
       ...actual.MCPService,
       List: vi.fn(async () => [{
         name: 'svc', description: '', transport: 'stdio', command: 'cmd', args: [], env: {},
-        endpoint: '', headers: {}, requires_auth: false, enabled: true,
+        endpoint: '', headers: {}, enabled: true,
       }]),
     },
   };
@@ -33,4 +33,3 @@ describe('useServersState', () => {
     });
   });
 });
-
