@@ -1,7 +1,7 @@
 use std::{env, path::PathBuf, process};
 
 use anyhow::Result;
-use mcp_bouncer::socket_proxy;
+use mcp_bouncer::socket_bridge;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -11,7 +11,7 @@ async fn main() -> Result<()> {
     });
 
     println!(
-        "mcp-bouncer-socket-proxy piping stdio ↔ {}{}",
+        "mcp-bouncer-socket-bridge piping stdio ↔ {}{}",
         cfg.socket_path.display(),
         cfg.endpoint
     );
@@ -24,7 +24,7 @@ async fn main() -> Result<()> {
         }
     };
 
-    socket_proxy::serve_stdio(stdio, cfg.socket_path, &cfg.endpoint, shutdown).await?;
+    socket_bridge::serve_stdio(stdio, cfg.socket_path, &cfg.endpoint, shutdown).await?;
     Ok(())
 }
 
@@ -64,7 +64,7 @@ fn parse_args() -> Result<Config, String> {
 
 fn print_usage_and_exit(code: i32) -> ! {
     eprintln!(
-        "Usage: mcp-bouncer-socket-proxy [--socket <path>] [--endpoint <path>]\n\
+        "Usage: mcp-bouncer-socket-bridge [--socket <path>] [--endpoint <path>]\n\
          Defaults: socket=/tmp/mcp-bouncer.sock endpoint=/mcp"
     );
     process::exit(code);

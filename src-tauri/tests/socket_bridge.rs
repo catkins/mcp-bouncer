@@ -7,7 +7,7 @@ use mcp_bouncer::{
     events::BufferingEventEmitter,
     logging::{Event, RpcEventPublisher},
     server::{self, stop_server},
-    socket_proxy,
+    socket_bridge,
 };
 use rmcp::ServiceExt;
 
@@ -68,10 +68,10 @@ async fn unix_proxy_bridges_requests() {
 
     let (client_stream, proxy_stream) = tokio::io::duplex(8192);
 
-    let proxy_task = tokio::spawn({
+    let bridge_task = tokio::spawn({
         let socket_path = socket_path.clone();
         async move {
-            socket_proxy::serve_stdio(proxy_stream, socket_path, "/mcp", async {
+            socket_bridge::serve_stdio(proxy_stream, socket_path, "/mcp", async {
                 let _ = shutdown_rx.await;
             })
             .await
@@ -90,10 +90,10 @@ async fn unix_proxy_bridges_requests() {
         .expect("list tools over proxy");
 
     let _ = shutdown_tx.send(());
-    proxy_task
+    bridge_task
         .await
-        .expect("proxy task join")
-        .expect("proxy serve");
+        .expect("bridge task join")
+        .expect("bridge serve");
 
     stop_server(&server_handle);
     tokio::time::sleep(Duration::from_millis(50)).await;

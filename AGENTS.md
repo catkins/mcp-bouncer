@@ -5,9 +5,11 @@ This file provides guidance to coding agents when working with code in this repo
 ## Development Commands (Tauri v2)
 
 ### App (dev/build)
-- Dev (Vite + Tauri): `npx tauri dev`
+- Dev (Vite + Tauri): `npx tauri dev` (runs `npm run dev:tauri`, which rebuilds the Unix socket bridge helper before launching Vite)
 - Build app: `cargo tauri build`
 - Backend only: `cargo build --manifest-path src-tauri/Cargo.toml`
+- Socket bridge helper (debug): `npm run build:bridge`
+- Socket bridge helper (release): `npm run build:bridge:release`
 
 Tip: From the repository root, prefer passing `--manifest-path` for Rust backend tasks:
 
@@ -64,6 +66,7 @@ This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the of
   - `mcp:servers_updated`, `settings:updated`, `mcp:client_status_changed`, `mcp:client_error`, `mcp:incoming_clients_updated`
 - Settings JSON: `$XDG_CONFIG_HOME/app.mcp.bouncer/settings.json`
 - Incoming clients: recorded when rmcp Initialize is received; `connected_at` uses RFC3339 (ISO 8601) strings for robust JS parsing.
+- Unix socket transport: on macOS/Linux the proxy can bind to `/tmp/mcp-bouncer.sock` instead of `127.0.0.1`. We ship a helper CLI `mcp-bouncer-socket-bridge` (see README) that splices that socket into stdio only when you explicitly run it. This keeps the HTTP endpoint off localhost ports so untrusted webpages/electron shells cannot probe the MCP server and prevents accidental exposure on your LAN; only processes with filesystem access to the socket can reach it.
 
 #### Intercepting transport architecture
 - **Inbound (proxy server ➝ downstream client)**: The rmcp HTTP server composes `InterceptingSessionManager`, which wraps every session transport with `InterceptingTransport`. The wrapper injects a `RequestLogContext` into each inbound request, tracks elapsed time, enriches initialize/list/callTool events, records notifications, and hands events to the shared `RpcEventPublisher`/UI emitter.

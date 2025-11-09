@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use mcp_bouncer::BIN_NAME_SOCKET_PROXY;
+use mcp_bouncer::BIN_NAME_SOCKET_BRIDGE;
 use mcp_bouncer::client::{ensure_rmcp_client, fetch_tools_for_cfg, remove_rmcp_client};
 use mcp_bouncer::config::{
     ClientConnectionState, ClientStatus, ConfigProvider, IncomingClient, MCPServerConfig,
@@ -83,11 +83,11 @@ pub async fn mcp_socket_bridge_path(
     if let Ok(exe_path) = std::env::current_exe()
         && let Some(dir) = exe_path.parent()
     {
-        candidates.push(dir.join(BIN_NAME_SOCKET_PROXY));
+        candidates.push(dir.join(BIN_NAME_SOCKET_BRIDGE));
     }
 
     if cfg!(debug_assertions)
-        && let Some(dev_path) = dev_socket_proxy_path()
+        && let Some(dev_path) = dev_socket_bridge_path()
     {
         candidates.push(dev_path);
     }
@@ -639,13 +639,13 @@ fn notify_servers_changed<E: EventEmitter>(emitter: &E, reason: &str) {
     servers_updated(emitter, reason);
 }
 
-fn dev_socket_proxy_path() -> Option<std::path::PathBuf> {
+fn dev_socket_bridge_path() -> Option<std::path::PathBuf> {
     let mut base = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     base.pop();
     base.push("target");
 
     ["debug", "release"].into_iter().map(|profile| {
-        let mut candidate = base.join(profile).join(BIN_NAME_SOCKET_PROXY);
+        let mut candidate = base.join(profile).join(BIN_NAME_SOCKET_BRIDGE);
         if cfg!(target_os = "windows") && !candidate.as_os_str().to_string_lossy().ends_with(".exe")
         {
             candidate.set_extension("exe");

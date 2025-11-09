@@ -10,8 +10,8 @@ name = "mcp_bouncer"
 path = "src/lib.rs"
 
 [[bin]]
-name = "mcp-bouncer-socket-proxy"
-path = "src/bin/socket_proxy.rs"
+name = "mcp-bouncer-socket-bridge"
+path = "src/bin/socket_bridge.rs"
 
 [dependencies]
 anyhow = "1.0.100"
