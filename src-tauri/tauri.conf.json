@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "identifier": "app.mcp.bouncer",
   "build": {
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build",
+    "beforeDevCommand": "npm run dev:tauri",
+    "beforeBuildCommand": "npm run build:bridge:release && npm run build",
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173"
   },

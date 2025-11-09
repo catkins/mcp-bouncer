@@ -9,10 +9,17 @@ pub mod overlay;
 pub mod runtime;
 pub mod secrets;
 pub mod server;
+pub mod socket_bridge;
 pub mod status;
 pub mod tools_cache;
 pub mod transport;
 pub mod types;
+
+pub const BIN_NAME_SOCKET_BRIDGE: &str = if cfg!(windows) {
+    "mcp-bouncer-socket-bridge.exe"
+} else {
+    "mcp-bouncer-socket-bridge"
+};
 
 pub mod logging {
     pub use crate::logging_core::{

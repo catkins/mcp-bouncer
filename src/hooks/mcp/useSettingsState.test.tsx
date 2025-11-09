@@ -8,7 +8,7 @@ vi.mock('../../tauri/bridge', async () => {
     ...actual,
     SettingsService: {
       ...actual.SettingsService,
-      GetSettings: vi.fn(async () => ({ listen_addr: 'http://x', mcp_servers: [] })),
+      GetSettings: vi.fn(async () => ({ listen_addr: 'http://x', mcp_servers: [], transport: 'unix' })),
       OpenConfigDirectory: vi.fn(async () => {}),
     },
   };
@@ -36,4 +36,3 @@ describe('useSettingsState', () => {
     expect(SettingsService.OpenConfigDirectory).toHaveBeenCalled();
   });
 });
-

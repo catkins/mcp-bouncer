@@ -21,23 +21,37 @@ import DebuggerPage from './pages/DebuggerPage';
 
 function AppContent() {
   const { servers, loadServers } = useServersState();
-  const { mcpUrl, isActive, loadMcpUrl, loadActive } = useServiceInfo();
+  const {
+    mcpUrl,
+    isActive,
+    socketBridgePath,
+    loadMcpUrl,
+    loadActive,
+    loadSocketBridgePath,
+  } = useServiceInfo();
   const { loadSettings, openConfigDirectory } = useSettingsState();
   const { clientStatus, loadClientStatus, loaded: statusLoaded } = useClientStatusState();
 
   // Keep service info in sync on settings updates
   useMCPSubscriptions({
-    loadServers: async () => { },
+    loadServers,
     loadActive,
     loadSettings,
     loadMcpUrl,
     loadClientStatus,
+    loadSocketBridgePath,
   });
 
   // Initial bootstrap for global settings + URL/active
   useEffect(() => {
-    Promise.allSettled([loadSettings(), loadMcpUrl(), loadActive(), loadClientStatus()]);
-  }, [loadSettings, loadMcpUrl, loadActive, loadClientStatus]);
+    Promise.allSettled([
+      loadSettings(),
+      loadMcpUrl(),
+      loadActive(),
+      loadClientStatus(),
+      loadSocketBridgePath(),
+    ]);
+  }, [loadSettings, loadMcpUrl, loadActive, loadClientStatus, loadSocketBridgePath]);
 
   useEffect(() => {
     loadServers();
@@ -111,6 +125,7 @@ function AppContent() {
         theme={theme}
         onOpenConfig={openConfigDirectory}
         mcpUrl={mcpUrl}
+        socketBridgePath={socketBridgePath}
       />
       <ToastContainer toasts={toasts} onClose={removeToast} />
       <main className="mx-auto max-w-5xl px-6 pb-10 pt-16">

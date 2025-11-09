@@ -1,11 +1,12 @@
 import { useCallback, useState } from 'react';
-import { MCPService } from '../../tauri/bridge';
+import { MCPService, MiscService, type SocketBridgeInfo } from '../../tauri/bridge';
 
 export function useServiceInfo() {
   const [mcpUrl, setMcpUrl] = useState('');
   const [isActive, setIsActive] = useState<boolean | null>(null);
   const [loadingUrl, setLoadingUrl] = useState(false);
   const [loadingActive, setLoadingActive] = useState(false);
+  const [socketBridgePath, setSocketBridgePath] = useState<SocketBridgeInfo | null>(null);
 
   const loadMcpUrl = useCallback(async () => {
     try {
@@ -31,5 +32,23 @@ export function useServiceInfo() {
     }
   }, []);
 
-  return { mcpUrl, isActive, loadMcpUrl, loadActive, loadingUrl, loadingActive } as const;
+  const loadSocketBridgePath = useCallback(async () => {
+    try {
+      const info = await MiscService.GetSocketBridgePath();
+      setSocketBridgePath(info ?? null);
+    } catch (error) {
+      console.error('Failed to load socket bridge path:', error);
+    }
+  }, []);
+
+  return {
+    mcpUrl,
+    isActive,
+    socketBridgePath,
+    loadMcpUrl,
+    loadActive,
+    loadSocketBridgePath,
+    loadingUrl,
+    loadingActive,
+  } as const;
 }

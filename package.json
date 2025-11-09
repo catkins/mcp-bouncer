@@ -5,8 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:tauri": "npm run build:bridge && vite",
     "build:dev": "vite build --minify false --mode development",
     "build": "tsc && vite build --mode production",
+    "build:bridge": "cargo build --manifest-path src-tauri/Cargo.toml --bin mcp-bouncer-socket-bridge",
+    "build:bridge:release": "cargo build --manifest-path src-tauri/Cargo.toml --bin mcp-bouncer-socket-bridge --release",
     "preview": "vite preview",
     "lint": "eslint . --ext .ts,.tsx --max-warnings=0",
     "lint:fix": "eslint . --ext .ts,.tsx --fix --max-warnings=0",
@@ -23,7 +26,7 @@
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "@tailwindcss/vite": "^4.1.14",
-    "@tauri-apps/api": "^2.8.0",
+    "@tauri-apps/api": "^2.9.0",
     "@tauri-apps/plugin-log": "^2.7.0",
     "@tauri-apps/plugin-sql": "^2.3.0",
     "date-fns": "^4.1.0",

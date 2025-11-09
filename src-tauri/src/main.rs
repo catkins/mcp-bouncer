@@ -7,8 +7,11 @@ use tauri::Manager;
 use mcp_bouncer::events::TauriEventEmitter;
 use mcp_bouncer::logging::SqlitePublisher;
 use mcp_bouncer::runtime::RuntimeState;
-use mcp_bouncer::server::start_http_server;
-use mcp_bouncer::{config::ConfigProvider, runtime};
+use mcp_bouncer::server::start_server;
+use mcp_bouncer::{
+    config::{ConfigProvider, ServerTransport},
+    runtime,
+};
 #[cfg(debug_assertions)]
 use specta_typescript::Typescript;
 #[cfg(debug_assertions)]
@@ -25,27 +28,50 @@ fn spawn_mcp_proxy(app: &tauri::AppHandle) {
     let app_handle = app.clone();
     tauri::async_runtime::spawn(async move {
         let logger = SqlitePublisher;
-        let primary = std::net::SocketAddr::from(([127, 0, 0, 1], 8091));
-        if let Err(e) = start_http_server(
+        let settings = mcp_bouncer::config::load_settings();
+        let addr_or_path = match settings.transport {
+            ServerTransport::Tcp => {
+                // Try primary port, fallback to ephemeral
+                let primary = std::net::SocketAddr::from(([127, 0, 0, 1], 8091));
+                match start_server(
+                    mcp_bouncer::events::TauriEventEmitter(app_handle.clone()),
+                    mcp_bouncer::config::OsConfigProvider,
+                    logger.clone(),
+                    ServerTransport::Tcp,
+                    primary.to_string(),
+                )
+                .await
+                {
+                    Ok((_handle, _bound)) => {
+                        tracing::info!("[server] started on TCP {}", primary);
+                        return;
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "[server] bind {} failed: {}; falling back to ephemeral port",
+                            primary,
+                            e
+                        );
+                        std::net::SocketAddr::from(([127, 0, 0, 1], 0)).to_string()
+                    }
+                }
+            }
+            ServerTransport::Unix => "/tmp/mcp-bouncer.sock".to_string(),
+            ServerTransport::Stdio => {
+                "".to_string() // No address needed for stdio
+            }
+        };
+
+        if let Err(e) = start_server(
             mcp_bouncer::events::TauriEventEmitter(app_handle.clone()),
             mcp_bouncer::config::OsConfigProvider,
-            logger.clone(),
-            primary,
+            logger,
+            settings.transport.clone(),
+            addr_or_path,
         )
         .await
         {
-            tracing::warn!(
-                "[server] bind {} failed: {}; falling back to ephemeral port",
-                primary,
-                e
-            );
-            let _ = start_http_server(
-                mcp_bouncer::events::TauriEventEmitter(app_handle.clone()),
-                mcp_bouncer::config::OsConfigProvider,
-                logger,
-                std::net::SocketAddr::from(([127, 0, 0, 1], 0)),
-            )
-            .await;
+            tracing::error!("[server] failed to start: {}", e);
         }
     });
 }
@@ -72,6 +98,7 @@ fn main() {
         let builder = SpectaBuilder::<tauri::Wry>::new().commands(collect_commands![
             commands::mcp_list,
             commands::mcp_listen_addr,
+            commands::mcp_socket_bridge_path,
             commands::mcp_is_active,
             commands::mcp_get_client_status,
             commands::mcp_get_incoming_clients,
@@ -150,6 +177,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::mcp_list,
             commands::mcp_listen_addr,
+            commands::mcp_socket_bridge_path,
             commands::mcp_is_active,
             commands::mcp_get_client_status,
             commands::mcp_get_incoming_clients,

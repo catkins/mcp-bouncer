@@ -35,6 +35,7 @@ MCP Bouncer acts as a centralized hub for managing Model Context Protocol server
 - **stdio**: Process‑based transport for local MCP servers (via rmcp TokioChildProcess)
 - **Streamable HTTP**: HTTP transport with streaming capabilities (via rmcp client/server)
 - SSE transport is supported; the UI models it and the backend includes an integration test validating header forwarding and tool listing.
+- Built-in proxy exposure now supports TCP (default), Unix sockets, and stdio via `settings.transport`; see Proxy Transport Settings.
 
 ### 🎨 Modern UI
 
@@ -178,7 +179,8 @@ The application automatically manages settings in platform-specific locations:
       "enabled": false
     }
   ],
-  "listen_addr": "http://localhost:8091/mcp"
+  "listen_addr": "http://127.0.0.1:8091/mcp",
+  "transport": "tcp"
 }
 ```
 
@@ -195,6 +197,51 @@ The application automatically manages settings in platform-specific locations:
 | `endpoint`    | string  | For HTTP    | HTTP endpoint URL                                    |
 | `headers`     | object  | For HTTP    | HTTP headers                                         |
 | `enabled`     | boolean | No          | Auto-start on application launch                     |
+
+### Proxy Transport Settings
+
+Configure how external MCP clients reach the built-in proxy via the top-level `transport` field in `settings.json`:
+
+- `tcp` (default): Binds to `127.0.0.1:8091`. If that port is unavailable, MCP Bouncer falls back to an ephemeral port; the header badge updates using the runtime address returned by `mcp_listen_addr`.
+- `unix` (macOS/Linux): Listens on `/tmp/mcp-bouncer.sock`. Any pre-existing socket file at that path is removed on startup before binding. Use the helper CLI `mcp-bouncer-socket-bridge` (see below) when a client expects a stdio bridge. Keeping the proxy bound to a filesystem socket means random browser tabs, Electron apps, or other processes on `127.0.0.1` cannot poke at your MCP server, and there is no risk of accidentally binding to `0.0.0.0`.
+- `stdio`: Serves the proxy over standard input/output without creating a socket. Use this when embedding MCP Bouncer inside another supervisor and wiring pipes manually; the UI surfaces the listen address as `stdio`.
+
+The persisted `listen_addr` remains for backward compatibility, but the live value displayed in the UI is derived from the active transport. Selecting `unix` on non-Unix platforms surfaces an explicit startup error. The bridge CLI is your deliberate “opt-in” moment: you only splice the Unix socket into stdio when you trust the downstream client.
+
+#### Unix Socket Bridge CLI
+
+Expose a Unix-socket Bouncer over stdio for tools that only speak the MCP stdio transport. This helper exists so the MCP HTTP server never needs to listen on a TCP port, blocking drive-by localhost requests from untrusted webpages or other desktop apps, and keeping the proxy unreachable from your LAN:
+
+```bash
+cargo run --manifest-path src-tauri/Cargo.toml --bin mcp-bouncer-socket-bridge -- \
+  --socket /tmp/mcp-bouncer.sock
+```
+
+- `--socket` points at the MCP Bouncer socket path (defaults to `/tmp/mcp-bouncer.sock`).
+- `--endpoint` lets you override the HTTP path inside the unix socket (defaults to `/mcp`).
+- The command reads requests from `stdin` and forwards them to the running Unix-socket bridge, writing responses back to `stdout`. Because only the bridge process has filesystem access to the socket, untrusted webpages cannot reach your MCP instance even if they try to call `fetch('http://127.0.0.1:8091')`.
+- Build a standalone binary with `cargo build --manifest-path src-tauri/Cargo.toml --bin mcp-bouncer-socket-bridge --release` (output lives at `src-tauri/target/release/mcp-bouncer-socket-bridge`).
+- Running `npx tauri dev` or `cargo tauri build` will automatically trigger the bridge build via the new `npm run dev:tauri` / `npm run build:bridge:release` scripts, so the UI badge should detect the helper without extra steps in most workflows.
+
+Running the bridge typically looks like:
+
+1. In `settings.json`, set the top-level `"transport": "unix"` and restart MCP Bouncer so it binds the socket.  
+2. In a terminal, launch the bridge CLI (as above) to connect stdio ↔ unix.  
+3. Point your stdio client at the bridge. Example with [`mcp-remote`](https://www.npmjs.com/package/mcp-remote):
+
+   ```bash
+   npx mcp-remote --transport stdio --command mcp-bouncer-socket-bridge -- --socket /tmp/mcp-bouncer.sock
+   ```
+
+For a richer inspection experience, try the official MCP Inspector:
+
+```bash
+npx -y @modelcontextprotocol/inspector -- ./src-tauri/target/release/mcp-bouncer-socket-bridge --socket /tmp/mcp-bouncer.sock
+```
+
+Start the CLI in one terminal (it will wait for connections), then launch the Inspector command in another to browse the advertised tools and send requests interactively.
+
+When you bundle the desktop app (`cargo tauri build`), the helper binary is produced alongside the main application; ship both if Unix socket support is required.
 
 ### SSE Transport
 
@@ -269,10 +316,11 @@ mcp-bouncer/
 
 ### Dev Commands
 
-- Dev app: `npx tauri dev`
+- Dev app: `npx tauri dev` (runs `npm run dev:tauri` under the hood, which rebuilds the Unix socket bridge helper before starting Vite)
 - Build app: `cargo tauri build`
 - Just backend: `cargo build --manifest-path src-tauri/Cargo.toml`
 - Just frontend: `npm run dev` / `npm run build`
+- Socket bridge helper only: `npm run build:bridge` (debug) / `npm run build:bridge:release`
 
 From the repository root, pass `--manifest-path` for Rust backend workflows:
 

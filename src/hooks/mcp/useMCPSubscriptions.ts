@@ -8,6 +8,7 @@ type Loads = {
   loadSettings: () => Promise<void>;
   loadMcpUrl: () => Promise<void>;
   loadClientStatus: () => Promise<void>;
+  loadSocketBridgePath?: () => Promise<void>;
 };
 
 export function useMCPSubscriptions(opts: Loads) {
@@ -23,19 +24,27 @@ export function useMCPSubscriptions(opts: Loads) {
 
     on(EVENT_SERVERS_UPDATED, async (event) => {
       if (import.meta.env.DEV) console.log('Received mcp:servers_updated event:', event);
-      const { loadServers, loadActive, loadClientStatus } = loadsRef.current;
+      const { loadServers, loadActive, loadClientStatus, loadSocketBridgePath } = loadsRef.current;
       await loadServers();
       await loadActive();
       await loadClientStatus();
+      if (loadSocketBridgePath) await loadSocketBridgePath();
     }).then(u => (cancelled ? safeUnlisten(u) : unsubs.push(u))).catch(() => {});
 
     on(EVENT_SETTINGS_UPDATED, async (event) => {
       if (import.meta.env.DEV) console.log('Received settings:updated event:', event);
-      const { loadSettings, loadMcpUrl, loadServers, loadClientStatus } = loadsRef.current;
+      const {
+        loadSettings,
+        loadMcpUrl,
+        loadServers,
+        loadClientStatus,
+        loadSocketBridgePath,
+      } = loadsRef.current;
       await loadSettings();
       await loadMcpUrl();
       await loadServers();
       await loadClientStatus();
+      if (loadSocketBridgePath) await loadSocketBridgePath();
     }).then(u => (cancelled ? safeUnlisten(u) : unsubs.push(u))).catch(() => {});
 
     on(EVENT_CLIENT_STATUS_CHANGED, async (event) => {

@@ -1,13 +1,20 @@
 use axum::Router;
 use futures::future::join_all;
 use rmcp::model as mcp;
+use rmcp::transport::stdio;
 use rmcp::transport::streamable_http_server::{
     StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
 };
-use rmcp::{RoleServer, Service as McpService};
+use rmcp::{RoleServer, Service as McpService, ServiceExt};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+
+#[cfg(unix)]
+use {
+    hyper::server::conn::http1, hyper_util::rt::TokioIo, hyper_util::service::TowerToHyperService,
+    tokio::net::UnixListener,
+};
 
 use crate::client::{apply_log_context_from_client, ensure_rmcp_client, fetch_tools_for_cfg};
 use crate::config::{ConfigProvider, MCPServerConfig, load_settings_with};
@@ -546,7 +553,7 @@ mod tests {
     async fn stop_server_aborts_task() {
         let emitter = crate::events::BufferingEventEmitter::default();
         let cp = TestProvider::new();
-        let (handle, _addr) = super::start_http_server(
+        let (handle, _bound) = super::start_tcp_server(
             emitter.clone(),
             cp.clone(),
             NoopLogger,
@@ -555,7 +562,68 @@ mod tests {
         .await
         .unwrap();
         // Abort the server handle and ensure task finishes promptly
-        super::stop_http_server(&handle);
+        super::stop_server(&handle);
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        assert!(handle.is_finished());
+    }
+
+    #[tokio::test]
+    async fn start_server_tcp_transport() {
+        let emitter = crate::events::BufferingEventEmitter::default();
+        let cp = TestProvider::new();
+        let (handle, _bound_opt) = super::start_server(
+            emitter.clone(),
+            cp.clone(),
+            NoopLogger,
+            crate::config::ServerTransport::Tcp,
+            "127.0.0.1:0".to_string(),
+        )
+        .await
+        .unwrap();
+        // Stop the server
+        super::stop_server(&handle);
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        assert!(handle.is_finished());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn start_server_unix_transport() {
+        let emitter = crate::events::BufferingEventEmitter::default();
+        let cp = TestProvider::new();
+        let socket_path = format!("/tmp/test-mcp-bouncer-{}.sock", std::process::id());
+        let (handle, _bound) = super::start_server(
+            emitter.clone(),
+            cp.clone(),
+            NoopLogger,
+            crate::config::ServerTransport::Unix,
+            socket_path.clone(),
+        )
+        .await
+        .unwrap();
+        // Stop the server
+        super::stop_server(&handle);
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        assert!(handle.is_finished());
+        // Clean up socket file
+        let _ = std::fs::remove_file(&socket_path);
+    }
+
+    #[tokio::test]
+    async fn start_server_stdio_transport() {
+        let emitter = crate::events::BufferingEventEmitter::default();
+        let cp = TestProvider::new();
+        let (handle, _bound) = super::start_server(
+            emitter.clone(),
+            cp.clone(),
+            NoopLogger,
+            crate::config::ServerTransport::Stdio,
+            "".to_string(),
+        )
+        .await
+        .unwrap();
+        // Stop the server
+        super::stop_server(&handle);
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         assert!(handle.is_finished());
     }
@@ -572,7 +640,48 @@ mod tests {
     }
 }
 
-pub async fn start_http_server<E, CP, L>(
+pub async fn start_server<E, CP, L>(
+    emitter: E,
+    cp: CP,
+    logger: L,
+    transport: crate::config::ServerTransport,
+    addr_or_path: String,
+) -> Result<(tokio::task::JoinHandle<()>, Option<std::net::SocketAddr>), String>
+where
+    E: EventEmitter + Clone + Send + Sync + 'static,
+    CP: ConfigProvider + Clone + Send + Sync + 'static,
+    L: RpcEventPublisher,
+{
+    match transport {
+        crate::config::ServerTransport::Tcp => {
+            let (handle, addr) = start_tcp_server(
+                emitter,
+                cp,
+                logger,
+                addr_or_path
+                    .parse()
+                    .map_err(|e| format!("Invalid TCP address: {}", e))?,
+            )
+            .await?;
+            Ok((handle, Some(addr)))
+        }
+        #[cfg(unix)]
+        crate::config::ServerTransport::Unix => {
+            let handle = start_unix_server(emitter, cp, logger, addr_or_path).await?;
+            Ok((handle, None))
+        }
+        #[cfg(not(unix))]
+        crate::config::ServerTransport::Unix => {
+            Err("Unix sockets not supported on this platform".to_string())
+        }
+        crate::config::ServerTransport::Stdio => {
+            let handle = start_stdio_server(emitter, cp, logger).await?;
+            Ok((handle, None))
+        }
+    }
+}
+
+async fn start_tcp_server<E, CP, L>(
     emitter: E,
     cp: CP,
     logger: L,
@@ -624,15 +733,127 @@ where
     let local = listener.local_addr().map_err(|e| e.to_string())?;
     // Record the runtime-bound address for UI/commands to query
     set_runtime_listen_addr(local);
-    tracing::info!(target = "server", ip=%local.ip(), port=local.port(), "proxy_listening");
+    tracing::info!(target = "server", ip=%local.ip(), port=local.port(), "proxy_listening_tcp");
     let handle = tokio::spawn(async move {
         let _ = axum::serve(listener, router).await;
     });
     Ok((handle, local))
 }
 
-// Abort the HTTP server task. Intended for integration tests or coordinated shutdown.
-pub fn stop_http_server(handle: &tokio::task::JoinHandle<()>) {
+#[cfg(unix)]
+async fn start_unix_server<E, CP, L>(
+    emitter: E,
+    cp: CP,
+    logger: L,
+    path: String,
+) -> Result<tokio::task::JoinHandle<()>, String>
+where
+    E: EventEmitter + Clone + Send + Sync + 'static,
+    CP: ConfigProvider + Clone + Send + Sync + 'static,
+    L: RpcEventPublisher,
+{
+    // Initialize logging (idempotent)
+    let settings = load_settings_with(&cp);
+    logger.init_with(&cp, &settings);
+    let session_manager = Arc::new(InterceptingSessionManager::new(
+        LocalSessionManager::default(),
+        emitter.clone(),
+        logger.clone(),
+    ));
+    let tool_aliases: Arc<RwLock<HashMap<String, (String, String)>>> =
+        Arc::new(RwLock::new(HashMap::new()));
+    let service: StreamableHttpService<
+        BouncerService<E, CP, L>,
+        InterceptingSessionManager<LocalSessionManager, E, L>,
+    > = StreamableHttpService::new(
+        {
+            let emitter = emitter.clone();
+            let cp = cp.clone();
+            let logger = logger.clone();
+            let tool_aliases = tool_aliases.clone();
+            move || {
+                Ok(BouncerService {
+                    emitter: emitter.clone(),
+                    cp: cp.clone(),
+                    logger: logger.clone(),
+                    tool_aliases: tool_aliases.clone(),
+                })
+            }
+        },
+        session_manager,
+        StreamableHttpServerConfig {
+            stateful_mode: true,
+            sse_keep_alive: Some(std::time::Duration::from_secs(15)),
+        },
+    );
+    let router = Router::new().nest_service("/mcp", service);
+
+    // Remove existing socket file if it exists
+    if std::fs::metadata(&path).is_ok() {
+        std::fs::remove_file(&path)
+            .map_err(|e| format!("Failed to remove existing socket: {}", e))?;
+    }
+
+    let listener =
+        UnixListener::bind(&path).map_err(|e| format!("Failed to bind Unix socket: {}", e))?;
+
+    tracing::info!(target = "server", path = %path, "proxy_listening_unix");
+    let handle = tokio::spawn(async move {
+        loop {
+            match listener.accept().await {
+                Ok((stream, _addr)) => {
+                    let service = TowerToHyperService::new(router.clone());
+                    let io = TokioIo::new(stream);
+                    tokio::spawn(async move {
+                        if let Err(err) = http1::Builder::new().serve_connection(io, service).await
+                        {
+                            tracing::error!("Error serving connection: {:?}", err);
+                        }
+                    });
+                }
+                Err(err) => {
+                    tracing::error!("Error accepting connection: {:?}", err);
+                    break;
+                }
+            }
+        }
+    });
+    Ok(handle)
+}
+
+async fn start_stdio_server<E, CP, L>(
+    emitter: E,
+    cp: CP,
+    logger: L,
+) -> Result<tokio::task::JoinHandle<()>, String>
+where
+    E: EventEmitter + Clone + Send + Sync + 'static,
+    CP: ConfigProvider + Clone + Send + Sync + 'static,
+    L: RpcEventPublisher,
+{
+    // Initialize logging (idempotent)
+    let settings = load_settings_with(&cp);
+    logger.init_with(&cp, &settings);
+
+    let tool_aliases: Arc<RwLock<HashMap<String, (String, String)>>> =
+        Arc::new(RwLock::new(HashMap::new()));
+
+    let service = BouncerService {
+        emitter,
+        cp,
+        logger,
+        tool_aliases,
+    };
+
+    tracing::info!(target = "server", "proxy_listening_stdio");
+    let handle = tokio::spawn(async move {
+        let _ = service.serve(stdio()).await;
+    });
+    Ok(handle)
+}
+
+// Abort the server task. Intended for integration tests or coordinated shutdown.
+pub fn stop_server(handle: &tokio::task::JoinHandle<()>) {
     handle.abort();
 }
 

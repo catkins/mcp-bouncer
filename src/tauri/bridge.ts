@@ -14,7 +14,9 @@ export type MCPServerConfig = {
   requires_auth?: boolean;
   enabled: boolean;
 };
-export type Settings = { mcp_servers: MCPServerConfig[]; listen_addr: string };
+export type ServerTransport = 'tcp' | 'unix' | 'stdio';
+export type Settings = { mcp_servers: MCPServerConfig[]; listen_addr: string; transport: ServerTransport };
+export type SocketBridgeInfo = { path: string; exists: boolean };
 export type ClientConnectionState = 'disconnected' | 'connecting' | 'errored' | 'connected' | 'requires_authorization' | 'authorizing';
 export type ClientStatus = { name: string; state: ClientConnectionState; tools: number; last_error?: string | null; authorization_required: boolean; oauth_authenticated: boolean };
 export type IncomingClient = { id: string; name: string; version: string; title?: string | null; connected_at?: string | null };
@@ -95,5 +97,11 @@ export const SettingsService = {
   },
   async OpenConfigDirectory(): Promise<void> {
     await invoke('settings_open_config_directory');
+  },
+};
+
+export const MiscService = {
+  async GetSocketBridgePath(): Promise<SocketBridgeInfo | null> {
+    return await invoke('mcp_socket_bridge_path');
   },
 };

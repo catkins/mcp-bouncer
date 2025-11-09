@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 
+use mcp_bouncer::BIN_NAME_SOCKET_BRIDGE;
 use mcp_bouncer::client::{ensure_rmcp_client, fetch_tools_for_cfg, remove_rmcp_client};
 use mcp_bouncer::config::{
-    ClientConnectionState, ClientStatus, ConfigProvider, IncomingClient, MCPServerConfig, Settings,
-    config_dir, default_settings, load_settings, save_settings, save_settings_with,
+    ClientConnectionState, ClientStatus, ConfigProvider, IncomingClient, MCPServerConfig,
+    ServerTransport, Settings, config_dir, default_settings, load_settings, save_settings,
+    save_settings_with,
 };
 use mcp_bouncer::events::{
     EventEmitter, TauriEventEmitter, client_error, client_status_changed, servers_updated,
@@ -15,6 +17,7 @@ use mcp_bouncer::oauth::{self, start_oauth_for_server};
 use mcp_bouncer::server::get_runtime_listen_addr;
 use mcp_bouncer::types::ToolInfo;
 use rmcp::{ServiceError, model as mcp};
+use serde::Serialize;
 use serde_json::{Value as JsonValue, json};
 use specta::Type;
 
@@ -36,10 +39,77 @@ pub async fn mcp_list() -> Result<Vec<MCPServerConfig>, String> {
 #[specta::specta]
 #[tauri::command]
 pub async fn mcp_listen_addr() -> Result<String, String> {
-    if let Some(addr) = get_runtime_listen_addr() {
-        return Ok(format!("http://{}:{}/mcp", addr.ip(), addr.port()));
+    let settings = load_settings();
+    match settings.transport {
+        ServerTransport::Tcp => {
+            if let Some(addr) = get_runtime_listen_addr() {
+                Ok(format!("http://{}:{}/mcp", addr.ip(), addr.port()))
+            } else {
+                Ok(settings.listen_addr)
+            }
+        }
+        ServerTransport::Unix => Ok("/tmp/mcp-bouncer.sock".to_string()),
+        ServerTransport::Stdio => Ok("stdio".to_string()),
     }
-    Ok(load_settings().listen_addr)
+}
+
+#[derive(Serialize, Type)]
+pub struct SocketBridgeInfo {
+    pub path: String,
+    pub exists: bool,
+}
+
+impl SocketBridgeInfo {
+    fn new(path: std::path::PathBuf, exists: bool) -> Self {
+        Self {
+            path: path.to_string_lossy().into_owned(),
+            exists,
+        }
+    }
+}
+
+#[specta::specta]
+#[tauri::command]
+pub async fn mcp_socket_bridge_path(
+    _app: tauri::AppHandle,
+) -> Result<Option<SocketBridgeInfo>, String> {
+    let settings = load_settings();
+    if settings.transport != ServerTransport::Unix {
+        return Ok(None);
+    }
+
+    let mut candidates: Vec<std::path::PathBuf> = Vec::new();
+
+    if let Ok(exe_path) = std::env::current_exe()
+        && let Some(dir) = exe_path.parent()
+    {
+        candidates.push(dir.join(BIN_NAME_SOCKET_BRIDGE));
+    }
+
+    if cfg!(debug_assertions)
+        && let Some(dev_path) = dev_socket_bridge_path()
+    {
+        candidates.push(dev_path);
+    }
+
+    if candidates.is_empty() {
+        return Ok(None);
+    }
+
+    let mut tagged: Vec<(std::path::PathBuf, bool)> = candidates
+        .into_iter()
+        .map(|path| {
+            let exists = path.exists();
+            (path, exists)
+        })
+        .collect();
+
+    if let Some((path, _)) = tagged.iter().find(|(_, exists)| *exists) {
+        return Ok(Some(SocketBridgeInfo::new(path.clone(), true)));
+    }
+
+    let (path, exists) = tagged.remove(0);
+    Ok(Some(SocketBridgeInfo::new(path, exists)))
 }
 
 #[specta::specta]
@@ -130,7 +200,8 @@ pub async fn mcp_update_server(
                         "requires_authorization",
                     );
                 } else {
-                    connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg).await;
+                    connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg)
+                        .await;
                 }
             }
         } else {
@@ -566,6 +637,22 @@ fn update_settings<E: EventEmitter>(
 
 fn notify_servers_changed<E: EventEmitter>(emitter: &E, reason: &str) {
     servers_updated(emitter, reason);
+}
+
+fn dev_socket_bridge_path() -> Option<std::path::PathBuf> {
+    let mut base = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    base.pop();
+    base.push("target");
+
+    ["debug", "release"].into_iter().map(|profile| {
+        let mut candidate = base.join(profile).join(BIN_NAME_SOCKET_BRIDGE);
+        if cfg!(target_os = "windows") && !candidate.as_os_str().to_string_lossy().ends_with(".exe")
+        {
+            candidate.set_extension("exe");
+        }
+        candidate
+    })
+    .next()
 }
 
 fn build_debug_call_error_payload(error: &mcp::ErrorData) -> JsonValue {
