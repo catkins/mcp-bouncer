@@ -21,6 +21,9 @@ describe('Header', () => {
     const configBtn = screen.getByRole('button', { name: /open config directory/i });
     await userEvent.click(configBtn);
     expect(onOpenConfig).toHaveBeenCalled();
+    expect(configBtn).toHaveAttribute('title', 'Open config directory');
+    const themeBtn = screen.getByRole('button', { name: /toggle theme/i });
+    expect(themeBtn).toHaveAttribute('title', 'Switch to dark mode');
   });
 
   it('renders bridge info when provided', async () => {
@@ -36,8 +39,16 @@ describe('Header', () => {
         toggleTheme={toggleTheme}
       />,
     );
-    expect(screen.getByText('/tmp/proxy')).toBeInTheDocument();
-    const buttons = screen.getAllByRole('button', { name: /copy/i });
-    expect(buttons.length).toBeGreaterThan(1);
+    const pathEl = screen.getByText('/tmp/proxy');
+    expect(pathEl).toHaveAttribute('title', '/tmp/proxy');
+    expect(pathEl).toHaveAttribute(
+      'aria-description',
+      'Path to the Unix stdio bridge helper binary',
+    );
+    expect(screen.queryByText('stdio')).not.toBeInTheDocument();
+    const copyBtn = screen.getByRole('button', { name: /copy bridge path/i });
+    expect(copyBtn).toBeDisabled();
+    expect(copyBtn).toHaveAttribute('title', 'Copy path to stdio bridge');
+    expect(screen.getByText(/build helper/i)).toBeInTheDocument();
   });
 });

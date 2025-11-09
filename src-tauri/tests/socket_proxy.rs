@@ -51,7 +51,7 @@ impl RpcEventPublisher for NoopLogger {
 async fn unix_proxy_bridges_requests() {
     let cp = TestProvider::new();
     let emitter = BufferingEventEmitter::default();
-    let logger = NoopLogger::default();
+    let logger = NoopLogger;
     let socket_path = cp.base_dir().join("bouncer.sock");
 
     let (server_handle, _bound) = server::start_server(

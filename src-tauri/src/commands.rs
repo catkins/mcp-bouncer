@@ -80,16 +80,16 @@ pub async fn mcp_socket_bridge_path(
 
     let mut candidates: Vec<std::path::PathBuf> = Vec::new();
 
-    if let Ok(exe_path) = std::env::current_exe() {
-        if let Some(dir) = exe_path.parent() {
-            candidates.push(dir.join(BIN_NAME_SOCKET_PROXY));
-        }
+    if let Ok(exe_path) = std::env::current_exe()
+        && let Some(dir) = exe_path.parent()
+    {
+        candidates.push(dir.join(BIN_NAME_SOCKET_PROXY));
     }
 
-    if cfg!(debug_assertions) {
-        if let Some(dev_path) = dev_socket_proxy_path() {
-            candidates.push(dev_path);
-        }
+    if cfg!(debug_assertions)
+        && let Some(dev_path) = dev_socket_proxy_path()
+    {
+        candidates.push(dev_path);
     }
 
     if candidates.is_empty() {
@@ -644,15 +644,15 @@ fn dev_socket_proxy_path() -> Option<std::path::PathBuf> {
     base.pop();
     base.push("target");
 
-    for profile in ["debug", "release"] {
+    ["debug", "release"].into_iter().map(|profile| {
         let mut candidate = base.join(profile).join(BIN_NAME_SOCKET_PROXY);
         if cfg!(target_os = "windows") && !candidate.as_os_str().to_string_lossy().ends_with(".exe")
         {
             candidate.set_extension("exe");
         }
-        return Some(candidate);
-    }
-    None
+        candidate
+    })
+    .next()
 }
 
 fn build_debug_call_error_payload(error: &mcp::ErrorData) -> JsonValue {

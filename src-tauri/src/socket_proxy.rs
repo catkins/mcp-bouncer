@@ -542,20 +542,20 @@ impl UnixStreamClient {
         &self,
         response: hyper::Response<Incoming>,
     ) -> Result<StreamableHttpPostResponse, StreamableHttpError<UnixClientError>> {
-        if response.status() == StatusCode::UNAUTHORIZED {
-            if let Some(header) = response.headers().get(header::WWW_AUTHENTICATE) {
-                let header = header
-                    .to_str()
-                    .map_err(|_| {
-                        StreamableHttpError::UnexpectedServerResponse(
-                            "invalid WWW-Authenticate header".into(),
-                        )
-                    })?
-                    .to_string();
-                return Err(StreamableHttpError::AuthRequired(AuthRequiredError {
-                    www_authenticate_header: header,
-                }));
-            }
+        if response.status() == StatusCode::UNAUTHORIZED
+            && let Some(header) = response.headers().get(header::WWW_AUTHENTICATE)
+        {
+            let header = header
+                .to_str()
+                .map_err(|_| {
+                    StreamableHttpError::UnexpectedServerResponse(
+                        "invalid WWW-Authenticate header".into(),
+                    )
+                })?
+                .to_string();
+            return Err(StreamableHttpError::AuthRequired(AuthRequiredError {
+                www_authenticate_header: header,
+            }));
         }
 
         let status = response.status();
