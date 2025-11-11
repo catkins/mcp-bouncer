@@ -222,9 +222,9 @@ export function ServerForm({
         role="dialog"
         aria-modal="true"
         aria-labelledby="server-form-title"
-        className="relative w-full max-w-3xl rounded-2xl border border-surface-200 bg-surface-50/95 shadow-2xl dark:border-surface-800 dark:bg-surface-900/95 max-h-[90vh] overflow-hidden"
+        className="relative flex w-full max-w-3xl flex-col rounded-2xl border border-surface-200 bg-surface-50/95 shadow-2xl dark:border-surface-800 dark:bg-surface-900/95 max-h-[90vh] min-h-0 overflow-hidden"
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-surface-200 dark:border-surface-800">
+        <div className="flex flex-shrink-0 items-center justify-between px-5 py-4 border-b border-surface-200 dark:border-surface-800">
           <div className="flex items-center gap-3">
             <WrenchScrewdriverIcon className="h-5 w-5 text-brand-600 dark:text-brand-300" />
             <div>
@@ -248,209 +248,212 @@ export function ServerForm({
           </LoadingButton>
         </div>
 
-        <form onSubmit={handleSubmit} className="px-5 py-4 space-y-4 overflow-y-auto max-h-[calc(90vh-64px)]">
-          {/* Submit error */}
-          {submitError && (
-            <div className="rounded-lg border border-red-200 bg-red-50/80 px-3 py-2 text-sm text-red-600 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
-              <div className="flex items-center gap-2">
-                <ExclamationTriangleIcon className="h-3 w-3 flex-shrink-0" />
-                <span>{submitError}</span>
+        <form onSubmit={handleSubmit} className="flex flex-1 min-h-0 flex-col">
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0">
+            {/* Submit error */}
+            {submitError && (
+              <div className="rounded-lg border border-red-200 bg-red-50/80 px-3 py-2 text-sm text-red-600 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
+                <div className="flex items-center gap-2">
+                  <ExclamationTriangleIcon className="h-3 w-3 flex-shrink-0" />
+                  <span>{submitError}</span>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          <section className="space-y-3 rounded-2xl border border-surface-200 bg-white/70 p-3 shadow-sm dark:border-surface-800 dark:bg-surface-900/60">
-            <div>
-              <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">Server details</p>
-              <p className="text-xs text-surface-500 dark:text-surface-400">
-                Friendly names help you recognize servers across tabs.
-              </p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <FormInput
-                id="server-name"
-                label="Name"
-                value={formData.name}
-                onChange={value => {
-                  setFormData((prev: MCPServerConfig) => ({ ...prev, name: value }));
-                  if (errors.name) {
-                    setErrors((prev: Record<string, string>) => ({ ...prev, name: '' }));
-                  }
-                }}
-                {...(errors.name ? { error: errors.name } : {})}
-                required
-              />
-              <FormInput
-                id="server-description"
-                label="Description"
-                value={formData.description}
-                onChange={value => setFormData((prev: MCPServerConfig) => ({ ...prev, description: value }))}
-              />
-            </div>
-          </section>
-
-          <section className="space-y-3 rounded-2xl border border-surface-200 bg-white/70 p-3 shadow-sm dark:border-surface-800 dark:bg-surface-900/60">
-            <div className="flex flex-col gap-1">
-              <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">Transport</p>
-              <p className="text-xs text-surface-500 dark:text-surface-400">
-                Choose how MCP Bouncer should reach this upstream.
-              </p>
-            </div>
-            <DropdownSelect
-              label="Transport type"
-              value={formData.transport}
-              onChange={event => {
-                const newTransport = event.target.value as TransportType;
-                setFormData((prev: MCPServerConfig) => ({ ...prev, transport: newTransport }));
-                setErrors((prev: Record<string, string>) => {
-                  const newErrors = { ...prev };
-                  if (newTransport !== TransportType.Stdio) {
-                    delete newErrors.command;
-                  }
-                  if (newTransport === TransportType.Stdio) {
-                    delete newErrors.endpoint;
-                  }
-                  return newErrors;
-                });
-              }}
-              options={[
-                { value: TransportType.Stdio, label: 'stdio' },
-                { value: TransportType.Sse, label: 'sse' },
-                { value: TransportType.StreamableHttp, label: 'streamable http' },
-              ]}
-              fullWidth
-            />
-
-            {(formData.transport === TransportType.Sse ||
-              formData.transport === TransportType.StreamableHttp) && (
+            <section className="space-y-3 rounded-2xl border border-surface-200 bg-white/70 p-3 shadow-sm dark:border-surface-800 dark:bg-surface-900/60">
+              <div>
+                <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">Server details</p>
+                <p className="text-xs text-surface-500 dark:text-surface-400">
+                  Friendly names help you recognize servers across tabs.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
                 <FormInput
-                  id="server-endpoint"
-                  label="Endpoint"
-                  value={formData.endpoint || ''}
+                  id="server-name"
+                  label="Name"
+                  value={formData.name}
                   onChange={value => {
-                    setFormData((prev: MCPServerConfig) => ({ ...prev, endpoint: value }));
-                    if (errors.endpoint) {
-                      setErrors((prev: Record<string, string>) => ({ ...prev, endpoint: '' }));
+                    setFormData((prev: MCPServerConfig) => ({ ...prev, name: value }));
+                    if (errors.name) {
+                      setErrors((prev: Record<string, string>) => ({ ...prev, name: '' }));
                     }
                   }}
-                  {...(errors.endpoint ? { error: errors.endpoint } : {})}
+                  {...(errors.name ? { error: errors.name } : {})}
                   required
-                  placeholder="https://example.com/mcp"
                 />
-              )}
+                <FormInput
+                  id="server-description"
+                  label="Description"
+                  value={formData.description}
+                  onChange={value => setFormData((prev: MCPServerConfig) => ({ ...prev, description: value }))}
+                />
+              </div>
+            </section>
 
-            {formData.transport === TransportType.Stdio && (
-              <FormInput
-                id="server-command"
-                label="Command"
-                value={formData.command}
-                onChange={value => {
-                  setFormData((prev: MCPServerConfig) => ({ ...prev, command: value }));
-                  if (errors.command) {
-                    setErrors((prev: Record<string, string>) => ({ ...prev, command: '' }));
-                  }
-                }}
-                {...(errors.command ? { error: errors.command } : {})}
-                required
-              />
-            )}
-          </section>
-
-          {formData.transport === TransportType.Stdio && (
             <section className="space-y-3 rounded-2xl border border-surface-200 bg-white/70 p-3 shadow-sm dark:border-surface-800 dark:bg-surface-900/60">
               <div className="flex flex-col gap-1">
-                <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">Command options</p>
-                <p className="text-xs text-surface-500 dark:text-surface-400">Pass arguments and env vars to your stdio server.</p>
+                <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">Transport</p>
+                <p className="text-xs text-surface-500 dark:text-surface-400">
+                  Choose how MCP Bouncer should reach this upstream.
+                </p>
               </div>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-medium text-surface-700 dark:text-surface-200">Arguments</label>
-                  <LoadingButton type="button" onClick={addArg} variant="secondary" size="sm" className="text-xs px-2 py-1">
-                    <PlusIcon className="h-3 w-3" />
-                    Add
-                  </LoadingButton>
-                </div>
-                <div className="space-y-2">
-                  {(formData.args || []).map((arg, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={arg}
-                        onChange={e => updateArg(index, e.target.value)}
-                        className="flex-1 rounded-md border border-surface-300 bg-surface-100 px-2 py-1.5 text-sm text-surface-900 focus:border-transparent focus:ring-2 focus:ring-brand-400 dark:border-surface-600 dark:bg-surface-800 dark:text-white dark:focus:ring-brand-500"
-                        placeholder="Argument"
-                        aria-label={`Argument ${index + 1}`}
-                      />
-                      <LoadingButton
-                        type="button"
-                        onClick={() => removeArg(index)}
-                        variant="danger"
-                        size="sm"
-                        className="p-1.5"
-                        ariaLabel={`Remove argument ${index + 1}`}
-                      >
-                        <TrashIcon className="h-3 w-3" />
-                      </LoadingButton>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <KeyValueList
-                label="Environment Variables"
-                items={Object.fromEntries(envList.map(r => [r.key, r.value]))}
-                keyPlaceholder="Variable name"
-                valuePlaceholder="Value"
-                onAdd={addEnvVar}
-                onUpdate={updateEnvVar}
-                onRemove={removeEnvVar}
-                ariaLabelBase="Environment variable"
+              <DropdownSelect
+                label="Transport type"
+                value={formData.transport}
+                onChange={event => {
+                  const newTransport = event.target.value as TransportType;
+                  setFormData((prev: MCPServerConfig) => ({ ...prev, transport: newTransport }));
+                  setErrors((prev: Record<string, string>) => {
+                    const newErrors = { ...prev };
+                    if (newTransport !== TransportType.Stdio) {
+                      delete newErrors.command;
+                    }
+                    if (newTransport === TransportType.Stdio) {
+                      delete newErrors.endpoint;
+                    }
+                    return newErrors;
+                  });
+                }}
+                options={[
+                  { value: TransportType.Stdio, label: 'stdio' },
+                  { value: TransportType.Sse, label: 'sse' },
+                  { value: TransportType.StreamableHttp, label: 'streamable http' },
+                ]}
+                fullWidth
               />
-            </section>
-          )}
 
-          {(formData.transport === TransportType.Sse ||
-            formData.transport === TransportType.StreamableHttp) && (
+              {(formData.transport === TransportType.Sse ||
+                formData.transport === TransportType.StreamableHttp) && (
+                  <FormInput
+                    id="server-endpoint"
+                    label="Endpoint"
+                    value={formData.endpoint || ''}
+                    onChange={value => {
+                      setFormData((prev: MCPServerConfig) => ({ ...prev, endpoint: value }));
+                      if (errors.endpoint) {
+                        setErrors((prev: Record<string, string>) => ({ ...prev, endpoint: '' }));
+                      }
+                    }}
+                    {...(errors.endpoint ? { error: errors.endpoint } : {})}
+                    required
+                    placeholder="https://example.com/mcp"
+                  />
+                )}
+
+              {formData.transport === TransportType.Stdio && (
+                <FormInput
+                  id="server-command"
+                  label="Command"
+                  value={formData.command}
+                  onChange={value => {
+                    setFormData((prev: MCPServerConfig) => ({ ...prev, command: value }));
+                    if (errors.command) {
+                      setErrors((prev: Record<string, string>) => ({ ...prev, command: '' }));
+                    }
+                  }}
+                  {...(errors.command ? { error: errors.command } : {})}
+                  required
+                />
+              )}
+            </section>
+
+            {formData.transport === TransportType.Stdio && (
               <section className="space-y-3 rounded-2xl border border-surface-200 bg-white/70 p-3 shadow-sm dark:border-surface-800 dark:bg-surface-900/60">
-                <div>
-                  <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">HTTP headers</p>
-                  <p className="text-xs text-surface-500 dark:text-surface-400">Attach tokens or custom metadata.</p>
+                <div className="flex flex-col gap-1">
+                  <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">Command options</p>
+                  <p className="text-xs text-surface-500 dark:text-surface-400">Pass arguments and env vars to your stdio server.</p>
                 </div>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium text-surface-700 dark:text-surface-200">Arguments</label>
+                    <LoadingButton type="button" onClick={addArg} variant="secondary" size="sm" className="text-xs px-2 py-1">
+                      <PlusIcon className="h-3 w-3" />
+                      Add
+                    </LoadingButton>
+                  </div>
+                  <div className="space-y-2">
+                    {(formData.args || []).map((arg, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={arg}
+                          onChange={e => updateArg(index, e.target.value)}
+                          className="flex-1 rounded-md border border-surface-300 bg-surface-100 px-2 py-1.5 text-sm text-surface-900 focus:border-transparent focus:ring-2 focus:ring-brand-400 dark:border-surface-600 dark:bg-surface-800 dark:text-white dark:focus:ring-brand-500"
+                          placeholder="Argument"
+                          aria-label={`Argument ${index + 1}`}
+                        />
+                        <LoadingButton
+                          type="button"
+                          onClick={() => removeArg(index)}
+                          variant="danger"
+                          size="sm"
+                          className="p-1.5"
+                          ariaLabel={`Remove argument ${index + 1}`}
+                        >
+                          <TrashIcon className="h-3 w-3" />
+                        </LoadingButton>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 <KeyValueList
-                  label="Headers"
-                  items={Object.fromEntries(headerList.map(r => [r.key, r.value]))}
-                  keyPlaceholder="Header name"
+                  label="Environment Variables"
+                  items={Object.fromEntries(envList.map(r => [r.key, r.value]))}
+                  keyPlaceholder="Variable name"
                   valuePlaceholder="Value"
-                  onAdd={addHeader}
-                  onUpdate={updateHeader}
-                  onRemove={removeHeader}
-                  ariaLabelBase="HTTP header"
+                  onAdd={addEnvVar}
+                  onUpdate={updateEnvVar}
+                  onRemove={removeEnvVar}
+                  ariaLabelBase="Environment variable"
                 />
               </section>
             )}
 
-          <section className="space-y-3 rounded-2xl border border-surface-200 bg-white/70 p-3 shadow-sm dark:border-surface-800 dark:bg-surface-900/60">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">Status</p>
-                <p className="text-xs text-surface-500 dark:text-surface-400">Disabled servers stay in your list but won’t connect.</p>
-              </div>
-              <ToggleSwitch
-                checked={formData.enabled}
-                onChange={checked => setFormData((prev: MCPServerConfig) => ({ ...prev, enabled: checked }))}
-                label="Enable server"
-                size="sm"
-              />
-            </div>
-          </section>
+            {(formData.transport === TransportType.Sse ||
+              formData.transport === TransportType.StreamableHttp) && (
+                <section className="space-y-3 rounded-2xl border border-surface-200 bg-white/70 p-3 shadow-sm dark:border-surface-800 dark:bg-surface-900/60">
+                  <div>
+                    <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">HTTP headers</p>
+                    <p className="text-xs text-surface-500 dark:text-surface-400">Attach tokens or custom metadata.</p>
+                  </div>
+                  <KeyValueList
+                    label="Headers"
+                    items={Object.fromEntries(headerList.map(r => [r.key, r.value]))}
+                    keyPlaceholder="Header name"
+                    valuePlaceholder="Value"
+                    onAdd={addHeader}
+                    onUpdate={updateHeader}
+                    onRemove={removeHeader}
+                    ariaLabelBase="HTTP header"
+                  />
+                </section>
+              )}
 
-          <div className="flex items-center justify-end gap-3 pt-2">
-            <LoadingButton type="button" onClick={onCancel} variant="secondary" size="sm">
-              Cancel
-            </LoadingButton>
-            <LoadingButton type="submit" loading={loading} size="sm">
-              {server ? 'Update Server' : 'Add Server'}
-            </LoadingButton>
+            <section className="space-y-3 rounded-2xl border border-surface-200 bg-white/70 p-3 shadow-sm dark:border-surface-800 dark:bg-surface-900/60">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">Status</p>
+                  <p className="text-xs text-surface-500 dark:text-surface-400">Disabled servers stay in your list but won’t connect.</p>
+                </div>
+                <ToggleSwitch
+                  checked={formData.enabled}
+                  onChange={checked => setFormData((prev: MCPServerConfig) => ({ ...prev, enabled: checked }))}
+                  label="Enable server"
+                  size="sm"
+                />
+              </div>
+            </section>
+          </div>
+          <div className="flex-shrink-0 border-t border-surface-200 bg-white/95 px-5 py-3 dark:border-surface-800 dark:bg-surface-900/95">
+            <div className="flex items-center justify-end gap-3">
+              <LoadingButton type="button" onClick={onCancel} variant="secondary" size="sm">
+                Cancel
+              </LoadingButton>
+              <LoadingButton type="submit" loading={loading} size="sm">
+                {server ? 'Update Server' : 'Add Server'}
+              </LoadingButton>
+            </div>
           </div>
         </form>
       </div>
