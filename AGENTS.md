@@ -147,6 +147,7 @@ This is a **Tauri v2** desktop app (Rust backend + WebView frontend) with the of
 - Events: match existing event names; the UI hooks already listen for them.
 - Secrets: new persistence should use `SecretStore` so production stays on the OS keyring and tests can swap in the in-memory store; do not write sensitive payloads to disk.
 - Rust `format!` style: prefer inlined capture syntax (e.g., `format!("{var}")`, `format!("{base}/path")`) over placeholder form (`format!("{}", var)`). This satisfies clippy (`uninlined_format_args`) and keeps code concise.
+- Documentation tone: less is more. Add only the minimum text required to explain a change; prefer concise bullet points over paragraphs.
 
 ### Code Hygiene (for agents)
 - When removing or replacing code, do not leave stale comments behind — delete them together with the code. Keep diffs focused and free of dead commentary.

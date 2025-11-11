@@ -55,7 +55,7 @@ Minimal example:
 ```jsonc
 {
   "listen_addr": "http://127.0.0.1:8091/mcp",
-  "transport": "tcp",                // tcp | unix | stdio
+  "transport": "streamable_http",    // streamable_http | unix
   "mcp_servers": [
     {
       "name": "local-http",
@@ -82,9 +82,10 @@ Changes are picked up live; the UI also surfaces add/edit forms if you prefer no
 
 | Setting (`settings.transport`) | When to use | MCP URL shown in UI |
 | ------------------------------ | ----------- | ------------------- |
-| `tcp` (default)                | Simple localhost HTTP proxy | `http://127.0.0.1:8091/mcp` (or fallback port) |
-| `unix` (macOS/Linux)           | You want to **keep the proxy off TCP** and only allow local processes with filesystem access to connect | `/tmp/mcp-bouncer.sock` |
-| `stdio`                        | Embedding the proxy inside another supervisor or piping it into a CLI | `stdio` |
+| `streamable_http` (default)    | Simple localhost HTTP proxy over MCP's streamable HTTP transport | `http://127.0.0.1:8091/mcp` (or fallback port) |
+| `unix` (macOS/Linux)           | You want to **keep the proxy off TCP** and only allow local processes with filesystem access to connect. Pair with the socket bridge for stdio-only clients. | `/tmp/mcp-bouncer.sock` |
+
+Need stdio clients but prefer not to expose TCP? Switch to `unix` mode and run `mcp-bouncer-socket-bridge` so tools like `mcp-remote` can continue to connect via stdio pipes. The UI header and settings modal will always surface the exact helper path the app detects, so you can copy/paste it without guessing.
 
 Selecting `unix` on unsupported platforms surfaces an explicit startup error. The persisted `listen_addr` field is legacy; the live value in the header always reflects the active transport.
 
@@ -103,13 +104,15 @@ The helper binary `mcp-bouncer-socket-bridge` connects **stdio clients** (e.g., 
 
 ```bash
 cargo run --manifest-path src-tauri/Cargo.toml \
-  --bin mcp-bouncer-socket-bridge -- --socket /tmp/mcp-bouncer.sock
+  --bin mcp-bouncer-socket-bridge -- --socket /tmp/mcp-bouncer.sock --endpoint /mcp
 ```
 
 Flags:
 
 - `--socket` (default `/tmp/mcp-bouncer.sock`)
 - `--endpoint` (default `/mcp`)
+
+If you stick with the defaults you can omit the flags entirely; they’re shown above and in the settings panel to make the contract explicit when you do need to customize paths.
 
 ### Connect a stdio client
 
@@ -142,7 +145,7 @@ The UI header shows the bridge path and a copy button whenever the helper binary
 ## Troubleshooting
 
 - **“Build helper to enable” badge:** Run `npm run build:bridge` (dev) or `npm run build:bridge:release` (release). `npx tauri dev` does this automatically; standalone frontend runs (`npm run dev`) do not.
-- **Port already in use:** When `transport = "tcp"` and port 8091 is busy, MCP Bouncer picks an ephemeral port and updates the header badge automatically.
+- **Port already in use:** When `transport = "streamable_http"` and port 8091 is busy, MCP Bouncer picks an ephemeral port and updates the header badge automatically.
 - **Keyring errors on Linux:** Install `keyutils` / `libkeyutils`. Without them OAuth tokens fall back to plaintext storage.
 - **Stale Unix socket:** If `/tmp/mcp-bouncer.sock` already exists from a crash, MCP Bouncer removes it on startup. If the removal fails (permissions, readonly FS), delete it manually and restart.
 

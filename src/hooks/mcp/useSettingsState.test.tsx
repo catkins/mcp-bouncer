@@ -40,11 +40,11 @@ describe('useSettingsState', () => {
     await st.openConfigDirectory();
     expect(SettingsService.OpenConfigDirectory).toHaveBeenCalled();
 
-    await st.updateSettings({ listen_addr: 'http://y', mcp_servers: [], transport: 'tcp' });
+    await st.updateSettings({ listen_addr: 'http://y', mcp_servers: [], transport: 'streamable_http' });
     expect(SettingsService.UpdateSettings).toHaveBeenCalledWith({
       listen_addr: 'http://y',
       mcp_servers: [],
-      transport: 'tcp',
+      transport: 'streamable_http',
     });
     await waitFor(() => {
       expect(st.settings?.listen_addr).toBe('http://y');

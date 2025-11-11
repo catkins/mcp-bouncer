@@ -3,7 +3,7 @@ import { SettingsModal } from './SettingsModal';
 
 const baseSettings = {
   listen_addr: 'http://127.0.0.1:8091/mcp',
-  transport: 'tcp' as const,
+  transport: 'streamable_http' as const,
   mcp_servers: [],
 };
 
@@ -17,6 +17,7 @@ const meta: Meta<typeof SettingsModal> = {
     isOpen: true,
     settings: baseSettings,
     settingsPath: '/Users/me/Library/Application Support/app.mcp.bouncer/settings.json',
+    socketBridgePath: { path: '/tmp/mcp-bouncer-socket-bridge', exists: true },
   },
   argTypes: {
     onSave: { action: 'save' },
@@ -33,11 +34,5 @@ export const Default: Story = {};
 export const UnixTransport: Story = {
   args: {
     settings: { ...baseSettings, transport: 'unix' },
-  },
-};
-
-export const StdioTransport: Story = {
-  args: {
-    settings: { ...baseSettings, transport: 'stdio' },
   },
 };

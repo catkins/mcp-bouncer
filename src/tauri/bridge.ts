@@ -13,7 +13,7 @@ export type MCPServerConfig = {
   headers?: Partial<Record<string, string>>;
   enabled: boolean;
 };
-export type ServerTransport = 'tcp' | 'unix' | 'stdio';
+export type ServerTransport = 'streamable_http' | 'unix';
 export type Settings = { mcp_servers: MCPServerConfig[]; listen_addr: string; transport: ServerTransport };
 export type SettingsDetail = { settings: Settings; path: string };
 export type SocketBridgeInfo = { path: string; exists: boolean };

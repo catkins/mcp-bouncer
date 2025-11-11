@@ -56,5 +56,6 @@
       "enabled": false
     }
   ],
-  "listen_addr": "localhost:8091",
+  "listen_addr": "http://127.0.0.1:8091/mcp",
+  "transport": "streamable_http"
 }

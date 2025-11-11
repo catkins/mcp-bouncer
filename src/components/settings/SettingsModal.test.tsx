@@ -5,7 +5,7 @@ import { SettingsModal } from './SettingsModal';
 
 const baseSettings = {
   listen_addr: 'http://127.0.0.1:8091/mcp',
-  transport: 'tcp' as const,
+  transport: 'streamable_http' as const,
   mcp_servers: [],
 };
 
@@ -32,6 +32,7 @@ describe('SettingsModal', () => {
         isOpen
         settings={baseSettings}
         settingsPath="/tmp/settings.json"
+        socketBridgePath={null}
         onSave={onSave}
         onClose={onClose}
         onOpenDirectory={vi.fn()}
@@ -54,13 +55,14 @@ describe('SettingsModal', () => {
     );
   });
 
-  it('disables listen address input when not in tcp mode and opens directory', async () => {
+  it('disables listen address input when not in streamable_http mode and opens directory', async () => {
     const onOpenDirectory = vi.fn().mockResolvedValue(undefined);
     render(
       <SettingsModal
         isOpen
         settings={baseSettings}
         settingsPath={''}
+        socketBridgePath={{ path: '/tmp/bridge', exists: true }}
         onSave={vi.fn()}
         onClose={() => {}}
         onOpenDirectory={onOpenDirectory}
@@ -69,7 +71,7 @@ describe('SettingsModal', () => {
 
     const listenInput = screen.getByLabelText(/http listen address/i) as HTMLInputElement;
     expect(listenInput).not.toBeDisabled();
-    await userEvent.click(screen.getByLabelText(/embedded stdio/i));
+    await userEvent.click(screen.getByLabelText(/unix domain socket/i));
     expect(listenInput).toBeDisabled();
 
     await userEvent.click(screen.getByRole('button', { name: /open config directory/i }));
@@ -83,6 +85,7 @@ describe('SettingsModal', () => {
         isOpen
         settings={{ ...baseSettings, listen_addr: '' }}
         settingsPath="/tmp/settings.json"
+        socketBridgePath={null}
         onSave={onSave}
         onClose={() => {}}
         onOpenDirectory={vi.fn()}
@@ -102,6 +105,7 @@ describe('SettingsModal', () => {
         isOpen
         settings={baseSettings}
         settingsPath="/tmp/settings.json"
+        socketBridgePath={null}
         onSave={onSave}
         onClose={() => {}}
         onOpenDirectory={vi.fn()}

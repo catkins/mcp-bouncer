@@ -40,9 +40,8 @@ fn default_transport() -> TransportType {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum ServerTransport {
-    Tcp,
+    StreamableHttp,
     Unix,
-    Stdio,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -108,7 +107,7 @@ pub fn default_settings() -> Settings {
     Settings {
         mcp_servers: Vec::new(),
         listen_addr: "http://localhost:8091/mcp".to_string(),
-        transport: ServerTransport::Tcp,
+        transport: ServerTransport::StreamableHttp,
     }
 }
 
@@ -251,21 +250,17 @@ mod tests {
 
     #[test]
     fn server_transport_serialization() {
-        let transport = ServerTransport::Tcp;
+        let transport = ServerTransport::StreamableHttp;
         let json = serde_json::to_string(&transport).unwrap();
-        assert_eq!(json, "\"tcp\"");
+        assert_eq!(json, "\"streamable_http\"");
 
         let transport = ServerTransport::Unix;
         let json = serde_json::to_string(&transport).unwrap();
         assert_eq!(json, "\"unix\"");
 
-        let transport = ServerTransport::Stdio;
-        let json = serde_json::to_string(&transport).unwrap();
-        assert_eq!(json, "\"stdio\"");
-
         // Test deserialization
-        let parsed: ServerTransport = serde_json::from_str("\"tcp\"").unwrap();
-        assert!(matches!(parsed, ServerTransport::Tcp));
+        let parsed: ServerTransport = serde_json::from_str("\"streamable_http\"").unwrap();
+        assert!(matches!(parsed, ServerTransport::StreamableHttp));
     }
 
     #[test]

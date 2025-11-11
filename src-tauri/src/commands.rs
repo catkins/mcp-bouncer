@@ -45,9 +45,7 @@ pub struct SettingsDetail {
 impl SettingsDetail {
     fn from_provider(cp: &dyn ConfigProvider) -> Self {
         let settings = load_settings_with(cp);
-        let path = settings_path(cp)
-            .to_string_lossy()
-            .into_owned();
+        let path = settings_path(cp).to_string_lossy().into_owned();
         Self { settings, path }
     }
 }
@@ -57,7 +55,7 @@ impl SettingsDetail {
 pub async fn mcp_listen_addr() -> Result<String, String> {
     let settings = load_settings();
     match settings.transport {
-        ServerTransport::Tcp => {
+        ServerTransport::StreamableHttp => {
             if let Some(addr) = get_runtime_listen_addr() {
                 Ok(format!("http://{}:{}/mcp", addr.ip(), addr.port()))
             } else {
@@ -65,7 +63,6 @@ pub async fn mcp_listen_addr() -> Result<String, String> {
             }
         }
         ServerTransport::Unix => Ok("/tmp/mcp-bouncer.sock".to_string()),
-        ServerTransport::Stdio => Ok("stdio".to_string()),
     }
 }
 
@@ -181,8 +178,7 @@ pub async fn mcp_update_server(
         notify_servers_changed(&TauriEventEmitter(app.clone()), "update");
         if enabling {
             if let Some(cfg) = get_server_by_name(&server_name) {
-                connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg)
-                    .await;
+                connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg).await;
             }
         } else {
             let _ = remove_rmcp_client(&server_name).await;
@@ -227,8 +223,7 @@ pub async fn mcp_toggle_server_enabled(
         save_settings(&s)?;
         if enabled {
             if let Some(cfg) = get_server_by_name(&server_name) {
-                connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg)
-                    .await;
+                connect_and_initialize(&TauriEventEmitter(app.clone()), &server_name, &cfg).await;
             }
         } else {
             let _ = remove_rmcp_client(&server_name).await;
@@ -422,7 +417,9 @@ pub async fn mcp_toggle_tool(
 #[specta::specta]
 #[tauri::command]
 pub async fn settings_get_settings() -> Result<SettingsDetail, String> {
-    Ok(SettingsDetail::from_provider(&mcp_bouncer::config::OsConfigProvider))
+    Ok(SettingsDetail::from_provider(
+        &mcp_bouncer::config::OsConfigProvider,
+    ))
 }
 
 #[specta::specta]
@@ -606,15 +603,18 @@ fn dev_socket_bridge_path() -> Option<std::path::PathBuf> {
     base.pop();
     base.push("target");
 
-    ["debug", "release"].into_iter().map(|profile| {
-        let mut candidate = base.join(profile).join(BIN_NAME_SOCKET_BRIDGE);
-        if cfg!(target_os = "windows") && !candidate.as_os_str().to_string_lossy().ends_with(".exe")
-        {
-            candidate.set_extension("exe");
-        }
-        candidate
-    })
-    .next()
+    ["debug", "release"]
+        .into_iter()
+        .map(|profile| {
+            let mut candidate = base.join(profile).join(BIN_NAME_SOCKET_BRIDGE);
+            if cfg!(target_os = "windows")
+                && !candidate.as_os_str().to_string_lossy().ends_with(".exe")
+            {
+                candidate.set_extension("exe");
+            }
+            candidate
+        })
+        .next()
 }
 
 fn build_debug_call_error_payload(error: &mcp::ErrorData) -> JsonValue {
@@ -748,9 +748,11 @@ mod tests {
         let cp = TestProvider::new();
         let detail = super::SettingsDetail::from_provider(&cp);
         assert!(detail.path.ends_with("settings.json"));
-        assert!(detail
-            .path
-            .contains(&format!("mcp-bouncer-logic-{}", std::process::id())));
+        assert!(
+            detail
+                .path
+                .contains(&format!("mcp-bouncer-logic-{}", std::process::id()))
+        );
         assert_eq!(detail.settings.mcp_servers.len(), 0);
         assert_eq!(detail.settings.listen_addr, default_settings().listen_addr);
     }

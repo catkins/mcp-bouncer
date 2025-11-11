@@ -161,7 +161,7 @@ async fn logging_persists_events_to_sqlite() {
         NoopEmitter,
         cp.clone(),
         SqlitePublisher,
-        ServerTransport::Tcp,
+        ServerTransport::StreamableHttp,
         addr_str,
     )
     .await
@@ -358,7 +358,7 @@ async fn logging_persists_error_and_redacts_sensitive_fields() {
         NoopEmitter,
         cp.clone(),
         SqlitePublisher,
-        ServerTransport::Tcp,
+        ServerTransport::StreamableHttp,
         addr_str,
     )
     .await
@@ -550,7 +550,7 @@ async fn logging_persists_many_calltool_events_in_batches() {
         NoopEmitter,
         cp.clone(),
         SqlitePublisher,
-        ServerTransport::Tcp,
+        ServerTransport::StreamableHttp,
         addr_str,
     )
     .await

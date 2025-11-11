@@ -1,11 +1,10 @@
 use axum::Router;
 use futures::future::join_all;
 use rmcp::model as mcp;
-use rmcp::transport::stdio;
 use rmcp::transport::streamable_http_server::{
     StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
 };
-use rmcp::{RoleServer, Service as McpService, ServiceExt};
+use rmcp::{RoleServer, Service as McpService};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -573,7 +572,7 @@ mod tests {
             emitter.clone(),
             cp.clone(),
             NoopLogger,
-            crate::config::ServerTransport::Tcp,
+            crate::config::ServerTransport::StreamableHttp,
             "127.0.0.1:0".to_string(),
         )
         .await
@@ -608,25 +607,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn start_server_stdio_transport() {
-        let emitter = crate::events::BufferingEventEmitter::default();
-        let cp = TestProvider::new();
-        let (handle, _bound) = super::start_server(
-            emitter.clone(),
-            cp.clone(),
-            NoopLogger,
-            crate::config::ServerTransport::Stdio,
-            "".to_string(),
-        )
-        .await
-        .unwrap();
-        // Stop the server
-        super::stop_server(&handle);
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-        assert!(handle.is_finished());
-    }
-
-    #[tokio::test]
     async fn list_tools_does_not_emit_events() {
         use crate::events::BufferingEventEmitter;
         let emitter = BufferingEventEmitter::default();
@@ -651,14 +631,14 @@ where
     L: RpcEventPublisher,
 {
     match transport {
-        crate::config::ServerTransport::Tcp => {
+        crate::config::ServerTransport::StreamableHttp => {
             let (handle, addr) = start_tcp_server(
                 emitter,
                 cp,
                 logger,
                 addr_or_path
                     .parse()
-                    .map_err(|e| format!("Invalid TCP address: {}", e))?,
+                    .map_err(|e| format!("Invalid HTTP listen address: {}", e))?,
             )
             .await?;
             Ok((handle, Some(addr)))
@@ -671,10 +651,6 @@ where
         #[cfg(not(unix))]
         crate::config::ServerTransport::Unix => {
             Err("Unix sockets not supported on this platform".to_string())
-        }
-        crate::config::ServerTransport::Stdio => {
-            let handle = start_stdio_server(emitter, cp, logger).await?;
-            Ok((handle, None))
         }
     }
 }
@@ -731,7 +707,7 @@ where
     let local = listener.local_addr().map_err(|e| e.to_string())?;
     // Record the runtime-bound address for UI/commands to query
     set_runtime_listen_addr(local);
-    tracing::info!(target = "server", ip=%local.ip(), port=local.port(), "proxy_listening_tcp");
+    tracing::info!(target = "server", ip=%local.ip(), port=local.port(), "proxy_listening_http");
     let handle = tokio::spawn(async move {
         let _ = axum::serve(listener, router).await;
     });
@@ -815,37 +791,6 @@ where
                 }
             }
         }
-    });
-    Ok(handle)
-}
-
-async fn start_stdio_server<E, CP, L>(
-    emitter: E,
-    cp: CP,
-    logger: L,
-) -> Result<tokio::task::JoinHandle<()>, String>
-where
-    E: EventEmitter + Clone + Send + Sync + 'static,
-    CP: ConfigProvider + Clone + Send + Sync + 'static,
-    L: RpcEventPublisher,
-{
-    // Initialize logging (idempotent)
-    let settings = load_settings_with(&cp);
-    logger.init_with(&cp, &settings);
-
-    let tool_aliases: Arc<RwLock<HashMap<String, (String, String)>>> =
-        Arc::new(RwLock::new(HashMap::new()));
-
-    let service = BouncerService {
-        emitter,
-        cp,
-        logger,
-        tool_aliases,
-    };
-
-    tracing::info!(target = "server", "proxy_listening_stdio");
-    let handle = tokio::spawn(async move {
-        let _ = service.serve(stdio()).await;
     });
     Ok(handle)
 }

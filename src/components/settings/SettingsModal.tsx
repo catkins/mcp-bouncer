@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
 import { Cog6ToothIcon, FolderOpenIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import type { ServerTransport, Settings } from '../../tauri/bridge';
+import type { ServerTransport, Settings, SocketBridgeInfo } from '../../tauri/bridge';
 import { FormInput } from '../FormInput';
 import { LoadingButton } from '../LoadingButton';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
@@ -11,6 +11,7 @@ interface SettingsModalProps {
   onClose: () => void;
   settings: Settings | null;
   settingsPath?: string;
+  socketBridgePath: SocketBridgeInfo | null;
   onSave: (next: Settings) => Promise<void>;
   onOpenDirectory: () => Promise<void>;
 }
@@ -24,22 +25,16 @@ const transportOptions: Array<{
   detail: string;
 }> = [
   {
-    value: 'tcp',
-    label: 'Local HTTP (tcp)',
+    value: 'streamable_http',
+    label: 'Local HTTP (streamable_http)',
     description: 'Expose the MCP proxy on http://127.0.0.1:8091/mcp (or a fallback port).',
-    detail: 'Best for desktop apps that connect over HTTP. Access stays on localhost only.',
+    detail: 'Uses the MCP streamable HTTP transport and keeps traffic on localhost only.',
   },
   {
     value: 'unix',
     label: 'Unix domain socket (unix)',
     description: 'Bind to /tmp/mcp-bouncer.sock instead of a TCP port (macOS/Linux only).',
-    detail: 'Pair with the mcp-bouncer-socket-bridge to forward stdio clients securely.',
-  },
-  {
-    value: 'stdio',
-    label: 'Embedded stdio (stdio)',
-    description: 'Disable listeners and run the proxy behind another supervisor.',
-    detail: 'Use when another process manages IO pipes and the proxy should stay hidden.',
+    detail: 'Pair with the mcp-bouncer-socket-bridge helper to forward stdio clients securely.',
   },
 ];
 
@@ -48,6 +43,7 @@ export function SettingsModal({
   onClose,
   settings,
   settingsPath,
+  socketBridgePath,
   onSave,
   onOpenDirectory,
 }: SettingsModalProps) {
@@ -86,7 +82,8 @@ export function SettingsModal({
   if (!isOpen) return null;
 
   const currentTransport = formState?.transport;
-  const isTcp = currentTransport === 'tcp';
+  const isHttp = currentTransport === 'streamable_http';
+  const bridgeBinaryPath = socketBridgePath?.path || './target/release/mcp-bouncer-socket-bridge';
 
   const handleTransportChange = (value: ServerTransport) => {
     if (!formState) return;
@@ -101,21 +98,21 @@ export function SettingsModal({
   const validate = () => {
     if (!formState) return false;
     const nextErrors: FieldErrors = {};
-    if (formState.transport === 'tcp' && !formState.listen_addr.trim()) {
-      nextErrors.listen_addr = 'Listen address is required when transport is tcp';
+    if (formState.transport === 'streamable_http' && !formState.listen_addr.trim()) {
+      nextErrors.listen_addr = 'Listen address is required for streamable_http mode';
     }
     setFieldErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
 
   const describeTransport = (next: Settings) => {
-    if (next.transport === 'tcp') {
+    if (next.transport === 'streamable_http') {
       return `Listening at ${next.listen_addr}`;
     }
     if (next.transport === 'unix') {
       return 'Unix socket mode enabled (/tmp/mcp-bouncer.sock)';
     }
-    return 'Stdio-only transport enabled';
+    return 'Transport updated';
   };
 
   const handleSubmit = async (event: FormEvent) => {
@@ -237,6 +234,30 @@ export function SettingsModal({
                       <p className="ml-6 text-xs text-surface-400 dark:text-surface-500">{option.detail}</p>
                     </label>
                   ))}
+                  <p className="text-[11px] text-surface-500 dark:text-surface-400">
+                    Need stdio-only clients? Build the <code>mcp-bouncer-socket-bridge</code>
+                    helper (run <code>npm run build:bridge</code>) and point it at the unix
+                    socket path when you switch modes.
+                  </p>
+                  {currentTransport === 'unix' && (
+                    <div className="rounded-md border border-dashed border-surface-200 bg-surface-50 p-3 text-[11px] text-surface-600 dark:border-surface-600 dark:bg-surface-800/50 dark:text-surface-300">
+                      <p className="font-semibold text-surface-800 dark:text-surface-100">Bridge connection instructions</p>
+                      <ol className="list-decimal pl-5">
+                        <li>Run <code>npm run build:bridge</code> (or the release variant) to build the helper.</li>
+                        <li>
+                          Launch the helper (matches the header path):
+                          <div className="mt-1 rounded bg-black/5 px-2 py-1 font-mono text-[10px] break-all dark:bg-white/10">
+                            <code>{bridgeBinaryPath}</code>
+                          </div>
+                          <p className="mt-1 text-[10px] text-surface-500 dark:text-surface-400">
+                            Defaults: <code>--socket /tmp/mcp-bouncer.sock</code>, <code>--endpoint /mcp</code>. Only override if you customized the backend path.
+                          </p>
+                        </li>
+                        <li>Point stdio clients (e.g., <code>mcp-remote</code>) at that helper binary.</li>
+                      </ol>
+                      <p className="mt-2">The header shows the bridge path once the binary exists locally.</p>
+                    </div>
+                  )}
                 </div>
               </section>
 
@@ -248,12 +269,12 @@ export function SettingsModal({
                   onChange={handleListenAddrChange}
                   error={fieldErrors.listen_addr ?? null}
                   placeholder="http://127.0.0.1:8091/mcp"
-                  disabled={!isTcp}
+                  disabled={!isHttp}
                 />
                 <p className="text-xs text-surface-500 dark:text-surface-400">
-                  {isTcp
-                    ? 'Shown to MCP clients when transport = tcp. Change the host or port if 8091 is busy.'
-                    : 'Listen address is ignored for unix/stdio modes.'}
+                  {isHttp
+                    ? 'Shown to MCP clients when streamable_http mode is active. Change the host or port if 8091 is busy.'
+                    : 'Listen address is ignored when unix mode is active.'}
                 </p>
               </section>
 

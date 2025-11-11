@@ -30,14 +30,14 @@ fn spawn_mcp_proxy(app: &tauri::AppHandle) {
         let logger = SqlitePublisher;
         let settings = mcp_bouncer::config::load_settings();
         let addr_or_path = match settings.transport {
-            ServerTransport::Tcp => {
+            ServerTransport::StreamableHttp => {
                 // Try primary port, fallback to ephemeral
                 let primary = std::net::SocketAddr::from(([127, 0, 0, 1], 8091));
                 match start_server(
                     mcp_bouncer::events::TauriEventEmitter(app_handle.clone()),
                     mcp_bouncer::config::OsConfigProvider,
                     logger.clone(),
-                    ServerTransport::Tcp,
+                    ServerTransport::StreamableHttp,
                     primary.to_string(),
                 )
                 .await
@@ -57,9 +57,6 @@ fn spawn_mcp_proxy(app: &tauri::AppHandle) {
                 }
             }
             ServerTransport::Unix => "/tmp/mcp-bouncer.sock".to_string(),
-            ServerTransport::Stdio => {
-                "".to_string() // No address needed for stdio
-            }
         };
 
         if let Err(e) = start_server(

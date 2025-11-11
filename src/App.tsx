@@ -157,6 +157,7 @@ function AppContent() {
         onClose={handleCloseSettings}
         settings={settings}
         settingsPath={settingsPath}
+        socketBridgePath={socketBridgePath}
         onSave={handleSaveSettings}
         onOpenDirectory={openConfigDirectory}
       />
