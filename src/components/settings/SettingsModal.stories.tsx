@@ -1,0 +1,43 @@
+import type { Meta, StoryObj } from '@storybook/react';
+import { SettingsModal } from './SettingsModal';
+
+const baseSettings = {
+  listen_addr: 'http://127.0.0.1:8091/mcp',
+  transport: 'tcp' as const,
+  mcp_servers: [],
+};
+
+const meta: Meta<typeof SettingsModal> = {
+  title: 'Components/Settings/SettingsModal',
+  component: SettingsModal,
+  parameters: {
+    layout: 'fullscreen',
+  },
+  args: {
+    isOpen: true,
+    settings: baseSettings,
+    settingsPath: '/Users/me/Library/Application Support/app.mcp.bouncer/settings.json',
+  },
+  argTypes: {
+    onSave: { action: 'save' },
+    onClose: { action: 'close' },
+    onOpenDirectory: { action: 'openDirectory' },
+  },
+};
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+export const Default: Story = {};
+
+export const UnixTransport: Story = {
+  args: {
+    settings: { ...baseSettings, transport: 'unix' },
+  },
+};
+
+export const StdioTransport: Story = {
+  args: {
+    settings: { ...baseSettings, transport: 'stdio' },
+  },
+};

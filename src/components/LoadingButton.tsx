@@ -1,14 +1,12 @@
-import { ReactNode } from 'react';
+import { type ButtonHTMLAttributes, type ReactNode } from 'react';
 
-interface LoadingButtonProps {
+interface LoadingButtonProps
+  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onClick' | 'children'> {
   children: ReactNode;
   onClick?: () => void | Promise<void>;
   loading?: boolean;
-  disabled?: boolean;
   variant?: 'primary' | 'secondary' | 'danger';
   size?: 'sm' | 'md' | 'lg';
-  className?: string;
-  type?: 'button' | 'submit';
   ariaLabel?: string;
 }
 
@@ -16,12 +14,13 @@ export function LoadingButton({
   children,
   onClick,
   loading = false,
-  disabled = false,
   variant = 'primary',
   size = 'md',
   className = '',
   type = 'button',
+  disabled = false,
   ariaLabel,
+  ...rest
 }: LoadingButtonProps) {
   const baseClasses =
     'inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface-50 dark:focus:ring-offset-surface-900 disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden';
@@ -61,6 +60,7 @@ export function LoadingButton({
       className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className} ${
         loading ? 'animate-pulse' : ''
       }`}
+      {...rest}
     >
       <span className={`transition-all duration-200 inline-flex items-center gap-1.5 ${loading ? 'opacity-75' : ''}`}>
         {loading && (

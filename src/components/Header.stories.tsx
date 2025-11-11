@@ -31,7 +31,7 @@ const meta: Meta<typeof Header> = {
       options: ['light', 'dark'],
     },
     toggleTheme: { action: 'toggleTheme' },
-    onOpenConfig: { action: 'openConfig' },
+    onOpenSettings: { action: 'openSettings' },
   },
 };
 

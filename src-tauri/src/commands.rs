@@ -4,8 +4,8 @@ use mcp_bouncer::BIN_NAME_SOCKET_BRIDGE;
 use mcp_bouncer::client::{ensure_rmcp_client, fetch_tools_for_cfg, remove_rmcp_client};
 use mcp_bouncer::config::{
     ClientConnectionState, ClientStatus, ConfigProvider, IncomingClient, MCPServerConfig,
-    ServerTransport, Settings, config_dir, default_settings, load_settings, save_settings,
-    save_settings_with,
+    ServerTransport, Settings, config_dir, default_settings, load_settings, load_settings_with,
+    save_settings, save_settings_with, settings_path,
 };
 use mcp_bouncer::events::{
     EventEmitter, TauriEventEmitter, client_error, client_status_changed, servers_updated,
@@ -34,6 +34,22 @@ pub struct DebugCallToolResponse {
 #[tauri::command]
 pub async fn mcp_list() -> Result<Vec<MCPServerConfig>, String> {
     Ok(load_settings().mcp_servers)
+}
+
+#[derive(Serialize, Type, Clone)]
+pub struct SettingsDetail {
+    pub settings: Settings,
+    pub path: String,
+}
+
+impl SettingsDetail {
+    fn from_provider(cp: &dyn ConfigProvider) -> Self {
+        let settings = load_settings_with(cp);
+        let path = settings_path(cp)
+            .to_string_lossy()
+            .into_owned();
+        Self { settings, path }
+    }
 }
 
 #[specta::specta]
@@ -405,8 +421,8 @@ pub async fn mcp_toggle_tool(
 
 #[specta::specta]
 #[tauri::command]
-pub async fn settings_get_settings() -> Result<Option<Settings>, String> {
-    Ok(Some(load_settings()))
+pub async fn settings_get_settings() -> Result<SettingsDetail, String> {
+    Ok(SettingsDetail::from_provider(&mcp_bouncer::config::OsConfigProvider))
 }
 
 #[specta::specta]
@@ -725,5 +741,17 @@ mod tests {
         let events = mock.0.lock().unwrap();
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].0, EVENT_SERVERS_UPDATED);
+    }
+
+    #[test]
+    fn settings_detail_from_provider_includes_path() {
+        let cp = TestProvider::new();
+        let detail = super::SettingsDetail::from_provider(&cp);
+        assert!(detail.path.ends_with("settings.json"));
+        assert!(detail
+            .path
+            .contains(&format!("mcp-bouncer-logic-{}", std::process::id())));
+        assert_eq!(detail.settings.mcp_servers.len(), 0);
+        assert_eq!(detail.settings.listen_addr, default_settings().listen_addr);
     }
 }

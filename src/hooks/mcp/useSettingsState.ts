@@ -4,15 +4,17 @@ import { SettingsService } from '../../tauri/bridge';
 
 export function useSettingsState() {
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [settingsPath, setSettingsPath] = useState<string>('');
 
   const loadSettings = useCallback(async () => {
     try {
-      const st = await SettingsService.GetSettings();
-      setSettings(st);
+      const detail = await SettingsService.GetSettings();
+      setSettings(detail.settings);
+      setSettingsPath(detail.path);
     } catch (error) {
       console.error('Failed to load settings:', error);
     }
-  }, []);
+  }, [setSettings, setSettingsPath]);
 
   const openConfigDirectory = useCallback(async () => {
     try {
@@ -22,6 +24,22 @@ export function useSettingsState() {
     }
   }, []);
 
-  return { settings, setSettings, loadSettings, openConfigDirectory } as const;
-}
+  const updateSettings = useCallback(async (next: Settings) => {
+    try {
+      await SettingsService.UpdateSettings(next);
+      setSettings(next);
+    } catch (error) {
+      console.error('Failed to update settings:', error);
+      throw error;
+    }
+  }, [setSettings]);
 
+  return {
+    settings,
+    setSettings,
+    loadSettings,
+    openConfigDirectory,
+    settingsPath,
+    updateSettings,
+  } as const;
+}

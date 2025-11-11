@@ -12,7 +12,7 @@ interface HeaderProps {
   isActive: boolean | null;
   toggleTheme: () => void;
   theme: 'light' | 'dark';
-  onOpenConfig: () => void;
+  onOpenSettings: () => void;
   mcpUrl: string;
   socketBridgePath: SocketBridgeInfo | null;
 }
@@ -21,7 +21,7 @@ export function Header({
   isActive,
   toggleTheme,
   theme,
-  onOpenConfig,
+  onOpenSettings,
   mcpUrl,
   socketBridgePath,
 }: HeaderProps) {
@@ -78,10 +78,10 @@ export function Header({
             ) : null}
           </div>
           <button
-            onClick={onOpenConfig}
+            onClick={onOpenSettings}
             className="rounded-lg p-1.5 text-surface-600 transition-colors hover:bg-surface-200 hover:text-surface-900 dark:text-surface-400 dark:hover:bg-surface-700 dark:hover:text-white"
-            aria-label="Open config directory"
-            title="Open config directory"
+            aria-label="Open settings"
+            title="Open settings"
           >
             <Cog6ToothIcon className="h-4 w-4" />
           </button>

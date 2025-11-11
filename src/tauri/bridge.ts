@@ -15,6 +15,7 @@ export type MCPServerConfig = {
 };
 export type ServerTransport = 'tcp' | 'unix' | 'stdio';
 export type Settings = { mcp_servers: MCPServerConfig[]; listen_addr: string; transport: ServerTransport };
+export type SettingsDetail = { settings: Settings; path: string };
 export type SocketBridgeInfo = { path: string; exists: boolean };
 export type ClientConnectionState = 'disconnected' | 'connecting' | 'errored' | 'connected' | 'requires_authorization' | 'authorizing';
 export type ClientStatus = { name: string; state: ClientConnectionState; tools: number; last_error?: string | null; authorization_required: boolean; oauth_authenticated: boolean };
@@ -91,11 +92,14 @@ export const MCPService = {
 };
 
 export const SettingsService = {
-  async GetSettings(): Promise<Settings | null> {
+  async GetSettings(): Promise<SettingsDetail> {
     return await invoke('settings_get_settings');
   },
   async OpenConfigDirectory(): Promise<void> {
     await invoke('settings_open_config_directory');
+  },
+  async UpdateSettings(settings: Settings): Promise<void> {
+    await invoke('settings_update_settings', { settings });
   },
 };
 

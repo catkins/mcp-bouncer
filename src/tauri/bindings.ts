@@ -133,7 +133,7 @@ async mcpToggleTool(clientName: string, toolName: string, enabled: boolean) : Pr
     else return { status: "error", error: e  as any };
 }
 },
-async settingsGetSettings() : Promise<Result<Settings | null, string>> {
+async settingsGetSettings() : Promise<Result<SettingsDetail, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("settings_get_settings") };
 } catch (e) {
@@ -177,6 +177,7 @@ export type JsonValue = null | boolean | number | string | JsonValue[] | Partial
 export type MCPServerConfig = { name: string; description: string; transport?: TransportType; command: string; args?: string[]; env?: Partial<{ [key in string]: string }>; endpoint?: string; headers?: Partial<{ [key in string]: string }>; enabled: boolean }
 export type ServerTransport = "tcp" | "unix" | "stdio"
 export type Settings = { mcp_servers: MCPServerConfig[]; listen_addr: string; transport: ServerTransport }
+export type SettingsDetail = { settings: Settings; path: string }
 export type SocketBridgeInfo = { path: string; exists: boolean }
 export type ToolInfo = { name: string; description?: string | null; input_schema?: JsonValue | null }
 export type TransportType = "stdio" | "sse" | "streamable_http"

@@ -18,6 +18,8 @@ import { sqlLoggingService } from './lib/sqlLogging';
 import ServersPage from './pages/ServersPage';
 import { useClientStatusState } from './hooks/mcp/useClientStatusState';
 import DebuggerPage from './pages/DebuggerPage';
+import { SettingsModal } from './components/settings/SettingsModal';
+import type { Settings } from './tauri/bridge';
 
 function AppContent() {
   const { servers, loadServers } = useServersState();
@@ -29,7 +31,13 @@ function AppContent() {
     loadActive,
     loadSocketBridgePath,
   } = useServiceInfo();
-  const { loadSettings, openConfigDirectory } = useSettingsState();
+  const {
+    settings,
+    loadSettings,
+    openConfigDirectory,
+    settingsPath,
+    updateSettings,
+  } = useSettingsState();
   const { clientStatus, loadClientStatus, loaded: statusLoaded } = useClientStatusState();
 
   // Keep service info in sync on settings updates
@@ -64,6 +72,7 @@ function AppContent() {
   const { toasts, removeToast } = useToast();
   const [tab, setTab] = useState<TabKey>('servers');
   const [debugServer, setDebugServer] = useState<string | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [logsCount, setLogsCount] = useState<number>(0);
 
   // Load logs count on startup (keeps parity with earlier behavior)
@@ -117,15 +126,39 @@ function AppContent() {
     setTab('debugger');
   }, []);
 
+  const handleOpenSettings = useCallback(() => {
+    loadSettings();
+    setIsSettingsOpen(true);
+  }, [loadSettings]);
+
+  const handleCloseSettings = useCallback(() => {
+    setIsSettingsOpen(false);
+  }, []);
+
+  const handleSaveSettings = useCallback(
+    async (next: Settings) => {
+      await updateSettings(next);
+    },
+    [updateSettings],
+  );
+
   return (
     <div className="min-h-screen bg-surface-100 text-surface-900 transition-colors dark:bg-surface-950 dark:text-surface-100">
       <Header
         isActive={isActive}
         toggleTheme={toggleTheme}
         theme={theme}
-        onOpenConfig={openConfigDirectory}
+        onOpenSettings={handleOpenSettings}
         mcpUrl={mcpUrl}
         socketBridgePath={socketBridgePath}
+      />
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={handleCloseSettings}
+        settings={settings}
+        settingsPath={settingsPath}
+        onSave={handleSaveSettings}
+        onOpenDirectory={openConfigDirectory}
       />
       <ToastContainer toasts={toasts} onClose={removeToast} />
       <main className="mx-auto max-w-5xl px-6 pb-10 pt-16">
