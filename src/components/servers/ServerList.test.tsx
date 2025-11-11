@@ -50,7 +50,7 @@ describe('ServerList', () => {
 
     // Add Server button opens form
     await userEvent.click(screen.getAllByRole('button', { name: /add server/i })[0]!);
-    expect(await screen.findByText(/Transport Type/)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/transport type/i)).toBeInTheDocument();
 
     // Tools button opens modal (tools count is a button)
     const toolsBtn = await screen.findByRole('button', { name: /open tools for svc/i });

@@ -262,7 +262,7 @@ export function SettingsModal({
                   <div>
                     <p className="text-sm font-semibold text-surface-800 dark:text-surface-100">Settings file</p>
                     <p className="text-xs text-surface-500 dark:text-surface-400">
-                      Stored on disk for compatibility with other MCP tooling.
+                      JSON containing transport mode, listen address, and saved MCP servers.
                     </p>
                   </div>
                   <LoadingButton
