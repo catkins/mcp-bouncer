@@ -1,0 +1,52 @@
+---
+import '../styles/global.css'
+
+const {
+	title: titleProp,
+	description: descriptionProp,
+} = Astro.props;
+
+const metaTitle =
+	titleProp ?? 'MCP Bouncer | Secure MCP proxy for the OpenAI Model Context Protocol';
+const metaDescription =
+	descriptionProp ??
+	'Lock down your MCP tools with a dedicated proxy that logs requests, protects secrets, and keeps untrusted clients off your localhost.';
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/png" href="/appicon.png" />
+		<meta name="generator" content={Astro.generator} />
+		<title>{metaTitle}</title>
+		<meta name="description" content={metaDescription} />
+		<meta property="og:title" content={metaTitle} />
+		<meta property="og:description" content={metaDescription} />
+		<meta property="og:type" content="website" />
+		<link
+			rel="preconnect"
+			href="https://fonts.googleapis.com"
+		/>
+		<link
+			rel="preconnect"
+			href="https://fonts.gstatic.com"
+			crossorigin
+		/>
+		<link
+			href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+			rel="stylesheet"
+		/>
+	</head>
+	<body class="bg-[#181c1f] text-surface-50 antialiased min-h-screen">
+		<div class="pointer-events-none fixed inset-0 -z-10">
+			<div class="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(58,154,148,0.16),transparent_45%),radial-gradient(circle_at_82%_8%,rgba(36,101,96,0.28),transparent_35%),radial-gradient(circle_at_46%_70%,rgba(12,171,160,0.1),transparent_40%)] blur-3xl" />
+			<div class="absolute inset-0 bg-gradient-to-b from-[#181c1f]/85 via-[#181c1f]/94 to-[#181c1f]" />
+		</div>
+
+		<div class="relative isolate flex min-h-screen flex-col">
+			<slot />
+		</div>
+	</body>
+</html>

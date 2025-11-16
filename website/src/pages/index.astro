@@ -1,0 +1,265 @@
+---
+import Layout from '../layouts/Layout.astro'
+
+const pageTitle = 'MCP Bouncer | Desktop gateway for Model Context Protocol servers'
+const pageDescription =
+	'Run one secure MCP proxy, keep untrusted clients off localhost, and get durable JSON-RPC logging. Built with Tauri v2 (Rust + React UI).'
+
+const features = [
+	{
+		title: 'Desktop MCP gateway',
+		body: 'Point every MCP client at a single local proxy. Manage upstream HTTP, SSE, or stdio servers without exposing new ports.',
+		icon: '🛰️',
+	},
+	{
+		title: 'Always-on logging',
+		body: 'Requests, responses, timings, and errors are buffered then flushed to SQLite with secret redaction for deep debugging.',
+		icon: '📜',
+	},
+	{
+		title: 'Socket-first safety',
+		body: 'macOS/Linux can bind to /tmp/mcp-bouncer.sock and splice stdio clients through the bundled bridge CLI—no WAN surface area.',
+		icon: '🛡️',
+	},
+	{
+		title: 'Keychain-backed secrets',
+		body: 'OAuth and API keys live in the OS keyring via SecretStore; tests swap in an in-memory store so nothing leaks to disk.',
+		icon: '🔑',
+	},
+]
+
+const steps = [
+	{
+		title: 'Run the proxy',
+		body: 'Start `mcp-bouncer` once. It boots the rmcp server on 127.0.0.1:8091/mcp (or Unix socket) and the React UI.',
+	},
+	{
+		title: 'Wire up clients',
+		body: 'Point your IDE, CLI, or agents to MCP Bouncer instead of each server. Tool names stay `server::tool` to avoid collisions.',
+	},
+	{
+		title: 'Inspect & ship',
+		body: 'Use the Logs and Debugger tabs to trace initialize/listTools/callTool flows, durations, and redacted payloads.',
+	},
+]
+
+const sampleLog = `{
+  "method": "callTool",
+  "server": "github::search",
+  "duration_ms": 212,
+  "session_id": "afd7…c12b",
+  "request": {
+    "tool": "search_repos",
+    "params": { "query": "tauri mcp examples" }
+  },
+  "response": {
+    "ok": true,
+    "result_preview": "12 matches, top: mcp-bouncer"
+  }
+}`
+---
+
+<Layout title={pageTitle} description={pageDescription}>
+	<main class="mx-auto flex w-full max-w-6xl flex-col gap-16 px-6 py-12 lg:py-16">
+		<header class="flex items-center justify-between gap-6">
+			<div class="flex items-center gap-3">
+				<img src="/appicon.png" alt="MCP Bouncer logo" class="h-12 w-12 rounded-2xl shadow-lg shadow-emerald-900/40 ring-1 ring-white/10" />
+				<div>
+					<p class="text-sm uppercase tracking-[0.2em] text-[#b5dad6]">MCP Bouncer</p>
+					<p class="text-base text-[#e5e7ea]/90">Desktop gateway for Model Context Protocol servers</p>
+				</div>
+			</div>
+			<div class="hidden items-center gap-3 text-sm font-medium text-[#e5e7ea] sm:flex">
+				<a class="rounded-full border border-white/10 px-4 py-2 backdrop-blur transition hover:border-white/30 hover:text-white" href="https://github.com/catkins/mcp-bouncer">
+					View on GitHub
+				</a>
+				<a class="rounded-full bg-white text-[#0f2a29] px-4 py-2 font-semibold shadow-lg shadow-emerald-900/30 transition hover:shadow-emerald-700/40" href="https://github.com/catkins/mcp-bouncer#readme">
+					Read the docs
+				</a>
+			</div>
+		</header>
+
+		<section class="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 px-6 py-10 shadow-2xl backdrop-blur lg:px-12 lg:py-14">
+			<div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(58,154,148,0.12),transparent_45%),radial-gradient(circle_at_82%_12%,rgba(21,57,55,0.28),transparent_35%)]" />
+
+			<div class="relative grid gap-10 lg:grid-cols-[1.35fr_1fr] lg:items-center">
+				<div class="flex flex-col gap-6">
+					<div class="inline-flex max-w-fit items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#d8ebe9]">
+						Local first · Observable · Tauri v2
+					</div>
+					<h1 class="text-3xl font-semibold leading-tight text-white sm:text-4xl lg:text-5xl">
+						Run one secure MCP proxy—then watch every call.
+					</h1>
+					<p class="text-lg text-[#e5e7ea]/90 sm:text-xl">
+						MCP Bouncer keeps untrusted clients off your open ports, records JSON-RPC traffic to SQLite, and routes every tool call through consistent interceptors.
+					</p>
+					<div class="flex flex-wrap items-center gap-3">
+						<a
+							class="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#3a9a94] via-[#2e7f7a] to-[#153937] px-5 py-3 text-base font-semibold text-white shadow-lg shadow-emerald-900/40 transition hover:scale-[1.01]"
+							href="https://github.com/catkins/mcp-bouncer/releases"
+						>
+							Download for macOS (arm64)
+							<span aria-hidden="true">→</span>
+						</a>
+						<a
+							class="inline-flex items-center gap-2 rounded-full border border-white/15 px-5 py-3 text-base font-semibold text-white/90 transition hover:border-white/40 hover:text-white"
+							href="https://github.com/catkins/mcp-bouncer#running"
+						>
+							Setup guide
+						</a>
+					</div>
+					<div class="flex flex-wrap gap-3 text-sm text-[#d8ebe9]/80">
+						<span class="rounded-full border border-white/10 px-3 py-1">Streamable HTTP</span>
+						<span class="rounded-full border border-white/10 px-3 py-1">SSE</span>
+						<span class="rounded-full border border-white/10 px-3 py-1">STDIO</span>
+						<span class="rounded-full border border-white/10 px-3 py-1">Unix socket bridge</span>
+						<span class="rounded-full border border-white/10 px-3 py-1">Keychain secrets</span>
+						<span class="rounded-full border border-white/10 px-3 py-1">SQLite log</span>
+					</div>
+				</div>
+
+				<div class="relative">
+					<div class="absolute inset-6 -z-10 rounded-3xl bg-gradient-to-br from-[#3a9a94]/25 via-[#2e7f7a]/25 to-[#153937]/25 blur-3xl" />
+					<div class="overflow-hidden rounded-2xl border border-white/10 bg-[#0f2a29]/80 shadow-xl shadow-emerald-900/50 backdrop-blur">
+						<div class="flex items-center justify-between border-b border-white/5 px-5 py-3 text-xs text-[#d8ebe9]">
+							<span>request.log</span>
+							<span class="rounded-full bg-emerald-500/10 px-2 py-1 text-emerald-200">live</span>
+						</div>
+						<pre class="h-full space-y-0 px-5 py-5 text-sm leading-relaxed text-white"><code>{sampleLog}</code></pre>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+			<div class="rounded-2xl border border-white/10 bg-[#153937]/60 px-5 py-6 text-center shadow shadow-emerald-900/40">
+				<p class="text-4xl font-semibold text-white">3</p>
+				<p class="text-sm text-[#d8ebe9]">Transports wrapped: HTTP, SSE, STDIO</p>
+			</div>
+			<div class="rounded-2xl border border-white/10 bg-[#153937]/60 px-5 py-6 text-center shadow shadow-emerald-900/40">
+				<p class="text-4xl font-semibold text-white">0</p>
+				<p class="text-sm text-[#d8ebe9]">WAN ports exposed in Unix-socket mode</p>
+			</div>
+			<div class="rounded-2xl border border-white/10 bg-[#153937]/60 px-5 py-6 text-center shadow shadow-emerald-900/40">
+				<p class="text-4xl font-semibold text-white">250 ms</p>
+				<p class="text-sm text-[#d8ebe9]">Buffered log flush cadence</p>
+			</div>
+			<div class="rounded-2xl border border-white/10 bg-[#153937]/60 px-5 py-6 text-center shadow shadow-emerald-900/40">
+				<p class="text-4xl font-semibold text-white">Keychain</p>
+				<p class="text-sm text-[#d8ebe9]">Secrets stored via OS keyring</p>
+			</div>
+		</section>
+
+		<section class="grid gap-6 lg:grid-cols-2">
+			{features.map((feature) => (
+				<div class="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-emerald-900/30 backdrop-blur">
+					<div class="flex items-center gap-3">
+						<span class="flex h-11 w-11 items-center justify-center rounded-xl bg-[#3a9a94]/15 text-xl">{feature.icon}</span>
+						<h3 class="text-xl font-semibold text-white">{feature.title}</h3>
+					</div>
+					<p class="mt-3 text-base text-[#d8ebe9]">{feature.body}</p>
+				</div>
+			))}
+		</section>
+
+		<section class="rounded-3xl border border-white/10 bg-[#0f2a29]/80 px-6 py-10 shadow-lg shadow-emerald-900/40 backdrop-blur lg:px-10">
+			<div class="flex flex-col gap-6 lg:flex-row lg:items-center lg:gap-10">
+				<div class="flex-1 space-y-3">
+					<p class="text-sm font-semibold uppercase tracking-[0.2em] text-[#8ac6c1]">Secure by design</p>
+					<h2 class="text-3xl font-semibold text-white">Secrets stay in the keychain, not your repo.</h2>
+					<p class="text-lg text-[#d8ebe9]/90">
+						MCP Bouncer uses the cross-platform `keyring` crate in production and an in-memory store in tests. After migrating tokens off disk, it scrubs plaintext so nothing lingers.
+					</p>
+					<ul class="grid gap-2 text-sm text-[#d8ebe9]/90 sm:grid-cols-2">
+						<li class="flex items-center gap-2"><span class="text-[#3a9a94]">•</span>OAuth tokens stay out of `oauth.json`</li>
+						<li class="flex items-center gap-2"><span class="text-[#3a9a94]">•</span>Named secrets via one trait</li>
+						<li class="flex items-center gap-2"><span class="text-[#3a9a94]">•</span>CI friendly memory store</li>
+						<li class="flex items-center gap-2"><span class="text-[#3a9a94]">•</span>Recursive redaction for keys</li>
+					</ul>
+				</div>
+				<div class="flex-1 rounded-2xl border border-white/10 bg-[#153937]/70 p-6 shadow-inner shadow-emerald-900/30">
+					<p class="mb-4 text-xs uppercase tracking-[0.22em] text-[#d8ebe9]/80">Transport coverage</p>
+					<div class="space-y-3 text-sm text-[#e5e7ea]">
+						<div class="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 px-4 py-3">
+							<span>Inbound interceptors</span>
+							<span class="rounded-full bg-[#3a9a94]/15 px-3 py-1 text-[#b5dad6]">Streamable HTTP</span>
+						</div>
+						<div class="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 px-4 py-3">
+							<span>Outbound interceptors</span>
+							<span class="rounded-full bg-[#3a9a94]/15 px-3 py-1 text-[#b5dad6]">SSE</span>
+						</div>
+						<div class="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 px-4 py-3">
+							<span>Child process transport</span>
+							<span class="rounded-full bg-[#3a9a94]/15 px-3 py-1 text-[#b5dad6]">STDIO</span>
+						</div>
+						<p class="text-xs text-[#d8ebe9]/70">All paths share the same logging pipeline, so your UI shows a single consistent history.</p>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<section class="rounded-3xl border border-white/10 bg-white/5 px-6 py-10 shadow-2xl backdrop-blur lg:px-10">
+			<p class="text-sm uppercase tracking-[0.2em] text-[#5a5f66]">See it in action</p>
+			<h2 class="mt-3 text-3xl font-semibold text-white sm:text-4xl">Manage servers, debug calls, and audit logs.</h2>
+			<div class="mt-8 grid gap-6 lg:grid-cols-3">
+				<figure class="overflow-hidden rounded-2xl border border-white/10 bg-[#0f2a29]/70 shadow-lg shadow-emerald-900/30">
+					<img src="/serverlist.png" alt="Server list view showing MCP servers and transports" class="w-full" loading="lazy" />
+					<figcaption class="px-4 py-3 text-sm text-[#d8ebe9]">Server list with transport badges and quick enable/disable.</figcaption>
+				</figure>
+				<figure class="overflow-hidden rounded-2xl border border-white/10 bg-[#0f2a29]/70 shadow-lg shadow-emerald-900/30">
+					<img src="/debugger.png" alt="Debugger tab for calling MCP tools" class="w-full" loading="lazy" />
+					<figcaption class="px-4 py-3 text-sm text-[#d8ebe9]">Debugger tab issues tool calls through the proxy for live testing.</figcaption>
+				</figure>
+				<figure class="overflow-hidden rounded-2xl border border-white/10 bg-[#0f2a29]/70 shadow-lg shadow-emerald-900/30">
+					<img src="/logs.png" alt="Logs page showing JSON-RPC events" class="w-full" loading="lazy" />
+					<figcaption class="px-4 py-3 text-sm text-[#d8ebe9]">Logs tab reads `logs.sqlite` to show redacted JSON-RPC history.</figcaption>
+				</figure>
+			</div>
+		</section>
+
+		<section class="grid gap-6 lg:grid-cols-3">
+			{steps.map((step, index) => (
+				<div class="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-emerald-900/30">
+					<div class="flex h-10 w-10 items-center justify-center rounded-full bg-[#3a9a94]/15 text-base font-semibold text-white">
+						{index + 1}
+					</div>
+					<h3 class="text-xl font-semibold text-white">{step.title}</h3>
+					<p class="text-base text-[#d8ebe9]">{step.body}</p>
+				</div>
+			))}
+		</section>
+
+		<section class="rounded-3xl border border-white/10 bg-[#153937]/70 px-6 py-10 text-center shadow-2xl shadow-emerald-900/40 backdrop-blur lg:px-10">
+			<p class="text-sm uppercase tracking-[0.2em] text-[#d8ebe9]/80">Try it today</p>
+			<h2 class="mt-3 text-3xl font-semibold text-white sm:text-4xl">
+				Run the proxy, connect your MCP clients, and ship safer tools.
+			</h2>
+			<p class="mt-4 text-lg text-[#d8ebe9]/90 sm:mx-auto sm:max-w-3xl">
+				Follow the getting-started guide in the README, then keep this site handy as your quick brief on what MCP Bouncer delivers for your team.
+			</p>
+			<div class="mt-6 flex flex-wrap justify-center gap-3">
+				<a
+					class="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-base font-semibold text-[#0f2a29] shadow-lg shadow-emerald-900/30 transition hover:-translate-y-0.5"
+					href="https://github.com/catkins/mcp-bouncer/releases"
+				>
+					Download the app
+				</a>
+				<a
+					class="inline-flex items-center gap-2 rounded-full border border-white/20 px-6 py-3 text-base font-semibold text-white transition hover:border-white/50 hover:-translate-y-0.5"
+					href="https://github.com/catkins/mcp-bouncer"
+				>
+					Star on GitHub
+				</a>
+			</div>
+		</section>
+
+		<footer class="grid gap-3 border-t border-white/5 py-6 text-sm text-[#d8ebe9]/80 sm:grid-cols-2 sm:items-center">
+			<p>Built with Tauri v2 (Rust backend) + React UI. MCP-first by design.</p>
+			<div class="flex gap-4 sm:justify-end">
+				<a class="hover:text-white" href="https://github.com/catkins/mcp-bouncer#readme">Docs</a>
+				<a class="hover:text-white" href="https://github.com/catkins/mcp-bouncer/issues">Issues</a>
+				<a class="hover:text-white" href="https://github.com/catkins/mcp-bouncer">GitHub</a>
+			</div>
+		</footer>
+	</main>
+</Layout>
