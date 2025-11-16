@@ -74,6 +74,7 @@ function AppContent() {
   const [debugServer, setDebugServer] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [logsCount, setLogsCount] = useState<number>(0);
+  const handleLogsCleared = useCallback(() => setLogsCount(0), []);
 
   // Load logs count on startup (keeps parity with earlier behavior)
   useEffect(() => {
@@ -183,7 +184,7 @@ function AppContent() {
           ) : tab === 'clients' ? (
             <ClientList />
           ) : tab === 'logs' ? (
-            <LogsPage />
+            <LogsPage onLogsCleared={handleLogsCleared} />
           ) : (
             <DebuggerPage
               servers={servers}

@@ -211,6 +211,23 @@ class SQLLoggingService {
     return result[0]?.count || 0;
   }
 
+  async clearEvents(server?: string): Promise<void> {
+    const db = await this.ensureDb();
+    if (server) {
+      await db.execute('DELETE FROM rpc_events WHERE server_name = ?', [server]);
+    } else {
+      await db.execute('DELETE FROM rpc_events');
+    }
+
+    // Clean up sessions that no longer have matching events
+    await db.execute(
+      `DELETE FROM sessions
+       WHERE NOT EXISTS (
+         SELECT 1 FROM rpc_events e WHERE e.session_id = sessions.session_id
+       )`,
+    );
+  }
+
   async queryEventHistogram(params: HistogramParams = {}): Promise<LogsHistogram> {
     const db = await this.ensureDb();
 
