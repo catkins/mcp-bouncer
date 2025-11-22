@@ -1,45 +1,46 @@
 ---
 import Layout from '../layouts/Layout.astro'
 
-const pageTitle = 'MCP Bouncer | Desktop gateway for Model Context Protocol servers'
+const pageTitle = 'MCP Bouncer | The Missing Control Center for MCP Servers'
 const pageDescription =
-	'Run one secure MCP proxy, keep untrusted clients off localhost, and get durable JSON-RPC logging. Built with Tauri v2 (Rust + React UI).'
+	'Stop juggling ports. Manage, debug, and secure your local Model Context Protocol servers with a unified desktop gateway.'
 
 const features = [
 	{
-		title: 'Desktop MCP gateway',
-		body: 'Point every MCP client at a single local proxy. Manage upstream HTTP, SSE, or stdio servers without exposing new ports.',
-		icon: '🛰️',
+		title: 'Visual Server Management',
+		body: 'Add, edit, and toggle upstream servers from a clean UI. No more hunting for PID files or restarting terminals.',
+		icon: '🎛️',
 	},
 	{
-		title: 'Always-on logging',
-		body: 'Requests, responses, timings, and errors are buffered then flushed to SQLite with secret redaction for deep debugging.',
-		icon: '📜',
+		title: 'Interactive Debugger',
+		body: 'Test tool calls directly in the app. Auto-generated forms from JSON schemas make it easy to verify server behavior.',
+		icon: '🐞',
 	},
 	{
-		title: 'Socket-first safety',
-		body: 'macOS/Linux can bind to /tmp/mcp-bouncer.sock and splice stdio clients through the bundled bridge CLI—no WAN surface area.',
+		title: 'Full-Traffic Observability',
+		body: 'Inspect every JSON-RPC message. Trace initialization flows, debug failed tool calls, and audit performance with a persistent, local-only, redacted log.',
+		icon: '🔍',
+	},
+	{
+		title: 'Enterprise-Grade Security',
+		body: 'Keep your keys safe. Secrets are stored in the OS keychain, and the Unix socket bridge keeps untrusted web clients off your localhost.',
 		icon: '🛡️',
-	},
-	{
-		title: 'Keychain-backed secrets',
-		body: 'OAuth and API keys live in the OS keyring via SecretStore; tests swap in an in-memory store so nothing leaks to disk.',
-		icon: '🔑',
 	},
 ]
 
 const steps = [
 	{
-		title: 'Run the proxy',
-		body: 'Start `mcp-bouncer` once. It boots the rmcp server on 127.0.0.1:8091/mcp (or Unix socket) and the React UI.',
+		title: 'Connect Your Servers',
+		body: 'Register your local or remote MCP servers once. Bouncer handles the connections and keeps them alive.',
 	},
 	{
-		title: 'Wire up clients',
-		body: 'Point your IDE, CLI, or agents to MCP Bouncer instead of each server. Tool names stay `server::tool` to avoid collisions.',
+		title: 'Point Your Agents',
+		body: 'Configure Claude Desktop, IDEs, or your own agents to talk to Bouncer’s single gateway URL or use the bridge CLI for stdio support.',
+		icon: '🔌',
 	},
 	{
-		title: 'Inspect & ship',
-		body: 'Use the Logs and Debugger tabs to trace initialize/listTools/callTool flows, durations, and redacted payloads.',
+		title: 'Debug & Monitor',
+		body: 'Watch the traffic flow. Use the built-in debugger to manually invoke tools and fix issues in real-time.',
 	},
 ]
 
@@ -88,10 +89,10 @@ const sampleLog = `{
 						Local first · Observable · Tauri v2
 					</div>
 					<h1 class="text-3xl font-semibold leading-tight text-white sm:text-4xl lg:text-5xl">
-						Run one secure MCP proxy—then watch every call.
+						The Missing Control Center for MCP Servers
 					</h1>
 					<p class="text-lg text-[#e5e7ea]/90 sm:text-xl">
-						MCP Bouncer keeps untrusted clients off your open ports, records JSON-RPC traffic to SQLite, and routes every tool call through consistent interceptors.
+						Stop juggling ports and processes. MCP Bouncer gives you a unified gateway to manage, debug, and secure your local Model Context Protocol servers.
 					</p>
 					<div class="flex flex-wrap items-center gap-3">
 						<a
@@ -141,8 +142,8 @@ const sampleLog = `{
 				<p class="text-sm text-[#d8ebe9]">WAN ports exposed in Unix-socket mode</p>
 			</div>
 			<div class="rounded-2xl border border-white/10 bg-[#153937]/60 px-5 py-6 text-center shadow shadow-emerald-900/40">
-				<p class="text-4xl font-semibold text-white">250 ms</p>
-				<p class="text-sm text-[#d8ebe9]">Buffered log flush cadence</p>
+				<p class="text-4xl font-semibold text-white">SQLite</p>
+				<p class="text-sm text-[#d8ebe9]">Full history ownership</p>
 			</div>
 			<div class="rounded-2xl border border-white/10 bg-[#153937]/60 px-5 py-6 text-center shadow shadow-emerald-900/40">
 				<p class="text-4xl font-semibold text-white">Keychain</p>
@@ -168,7 +169,7 @@ const sampleLog = `{
 					<p class="text-sm font-semibold uppercase tracking-[0.2em] text-[#8ac6c1]">Secure by design</p>
 					<h2 class="text-3xl font-semibold text-white">Secrets stay in the keychain, not your repo.</h2>
 					<p class="text-lg text-[#d8ebe9]/90">
-						MCP Bouncer uses the cross-platform `keyring` crate in production and an in-memory store in tests. After migrating tokens off disk, it scrubs plaintext so nothing lingers.
+						MCP Bouncer integrates directly with your system keyring. API keys and OAuth tokens are kept off disk, and logs are automatically redacted to prevent leaks.
 					</p>
 					<ul class="grid gap-2 text-sm text-[#d8ebe9]/90 sm:grid-cols-2">
 						<li class="flex items-center gap-2"><span class="text-[#3a9a94]">•</span>OAuth tokens stay out of `oauth.json`</li>
