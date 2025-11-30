@@ -3,3 +3,6 @@ services:
     build:
       dockerfile: .buildkite/Dockerfile
       context: ..
+    environment:
+      - GITHUB_TOKEN=$GITHUB_TOKEN
+      - BUILDKITE_TAG=$BUILDKITE_TAG
