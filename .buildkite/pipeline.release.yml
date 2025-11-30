@@ -1,0 +1,12 @@
+secrets:
+  MCP_BOUNCER_GITHUB_TOKEN: GITHUB_TOKEN
+
+steps:
+  - label: ":rocket: Build & Release"
+    if: build.tag =~ /^v\d+/
+    command: .buildkite/steps/release.sh
+    plugins:
+      - docker-compose#v5.12.1:
+          run: app
+          config: .buildkite/docker-compose.yml
+          progress: plain
